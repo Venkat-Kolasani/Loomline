@@ -19,6 +19,7 @@ untested behavior.
 
 - [x] Two clients same room see each other in presence
 - [x] Different room ids do not share presence
+- [x] Leaving client is removed from remaining clients’ presence
 - [ ] Live strokes sync (not in this slice)
 - [ ] Global undo/redo matches on both
 - [ ] Refresh restores committed canvas
@@ -48,12 +49,15 @@ exit 0
 
 ```text
 Test Files  4 passed (4)
-Tests  15 passed (15)
+Tests  17 passed (17)
 exit 0
 ```
 
-Includes `test/rooms.test.ts` proving two `idFromName` rooms keep isolated
-Durable Object storage marks (no crossover).
+Includes `test/rooms.test.ts`:
+
+- two `idFromName` rooms keep isolated Durable Object storage marks
+- two-client presence: closing client B removes B from A’s presence list
+- two-client presence: simulated `webSocketError` for B removes B from A’s list
 
 ### `npm run build`
 
@@ -71,6 +75,20 @@ GET /api/health → {"ok":true,"service":"loomline","phase":"rooms-presence"}
 
 Manual: create room A, open same `/r/<id>` in second context → presence shows
 two participants. Open room B → presence isolated from A.
+
+Manual leave regression (fix verification): with two clients in one room, close
+or navigate away client B → client A’s presence list drops B (no stale entry).
+
+### Presence leave fix (2026-07-25)
+
+**Problem:** `webSocketClose` / `webSocketError` called `broadcastPresence` while
+the departing socket was still in `ctx.getWebSockets()`, so other clients kept
+seeing the leaver.
+
+**Fix:** pass `excludeSocket` + `excludeParticipantId` into presence projection
+and skip the departing socket when broadcasting.
+
+**Verification:** `npm run typecheck && npm run test && npm run build` — 17/17.
 
 ### Deferred follow-ups (not blockers)
 

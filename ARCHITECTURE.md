@@ -50,7 +50,9 @@ zero crossover.
 2. Client opens `ws(s)://origin/ws?room=<id>` and sends `join`.
 3. Worker validates room id → `env.ROOM.idFromName(roomId)` → DO upgrade.
 4. DO assigns participant id/colour, stores small attachment metadata, broadcasts
-   `presence` on join/leave.
+   `presence` on join/leave. On leave, the departing socket is still listed by
+   `getWebSockets()` during `webSocketClose` / `webSocketError`, so presence
+   projection excludes that socket (and its participant id) before broadcast.
 
 ### Rendering layers (current)
 

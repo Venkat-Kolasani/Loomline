@@ -1,6 +1,11 @@
-import { env } from "cloudflare:workers";
+import { env, exports } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import { createRoomId, isValidRoomId } from "../shared/room";
+import {
+  PROTOCOL_VERSION,
+  createRoomId,
+  isValidRoomId,
+  type ServerMessage,
+} from "../shared/room";
 
 describe("room id helpers", () => {
   it("accepts 8-char lowercase hex ids", () => {
@@ -54,3 +59,166 @@ describe("room Durable Object isolation", () => {
     expect(valueA).not.toBe(valueB);
   });
 });
+
+describe("presence departure", () => {
+  it("excludes a client that closes from remaining presence", async () => {
+    const roomId = "cccc3333";
+    const socketA = await openRoomSocket(roomId);
+    const socketB = await openRoomSocket(roomId);
+
+    const welcomeA = await joinAndWaitWelcome(socketA, roomId, "Artist-A");
+
+    const bothVisible = waitForPresence(
+      socketA,
+      (participants) =>
+        participants.length === 2 &&
+        participants.some((p) => p.id === welcomeA.participant.id),
+    );
+    const welcomeB = await joinAndWaitWelcome(socketB, roomId, "Artist-B");
+    const withBoth = await bothVisible;
+    expect(withBoth.participants.some((p) => p.id === welcomeB.participant.id)).toBe(
+      true,
+    );
+
+    const departed = waitForPresence(
+      socketA,
+      (participants) =>
+        participants.length === 1 &&
+        participants[0]?.id === welcomeA.participant.id &&
+        !participants.some((p) => p.id === welcomeB.participant.id),
+    );
+    socketB.close(1000, "client leaving");
+    const afterLeave = await departed;
+
+    expect(afterLeave.participants).toEqual([
+      expect.objectContaining({ id: welcomeA.participant.id }),
+    ]);
+
+    socketA.close(1000, "done");
+  });
+
+  it("excludes a client after webSocketError from remaining presence", async () => {
+    const roomId = "dddd4444";
+    const socketA = await openRoomSocket(roomId);
+    const socketB = await openRoomSocket(roomId);
+
+    const welcomeA = await joinAndWaitWelcome(socketA, roomId, "Artist-A");
+
+    const bothVisible = waitForPresence(
+      socketA,
+      (participants) =>
+        participants.length === 2 &&
+        participants.some((p) => p.id === welcomeA.participant.id),
+    );
+    const welcomeB = await joinAndWaitWelcome(socketB, roomId, "Artist-B");
+    const withBoth = await bothVisible;
+    expect(withBoth.participants.some((p) => p.id === welcomeB.participant.id)).toBe(
+      true,
+    );
+
+    const departed = waitForPresence(
+      socketA,
+      (participants) =>
+        participants.length === 1 &&
+        participants[0]?.id === welcomeA.participant.id &&
+        !participants.some((p) => p.id === welcomeB.participant.id),
+    );
+
+    const stub = env.ROOM.get(env.ROOM.idFromName(roomId));
+    const simulate = await stub.fetch(
+      new Request("https://room/test/simulate-ws-error", {
+        method: "POST",
+        body: welcomeB.participant.id,
+      }),
+    );
+    expect(simulate.status).toBe(200);
+
+    const afterError = await departed;
+    expect(afterError.participants).toEqual([
+      expect.objectContaining({ id: welcomeA.participant.id }),
+    ]);
+
+    socketA.close(1000, "done");
+  });
+});
+
+async function openRoomSocket(roomId: string): Promise<WebSocket> {
+  const response = await exports.default.fetch(
+    new Request(`https://example.com/ws?room=${roomId}`, {
+      headers: { Upgrade: "websocket" },
+    }),
+    env,
+    {} as ExecutionContext,
+  );
+  expect(response.status).toBe(101);
+  const socket = response.webSocket;
+  expect(socket).toBeTruthy();
+  socket!.accept();
+  return socket!;
+}
+
+async function joinAndWaitWelcome(
+  socket: WebSocket,
+  roomId: string,
+  displayName: string,
+): Promise<Extract<ServerMessage, { type: "welcome" }>> {
+  const welcome = waitForMessage(
+    socket,
+    (message): message is Extract<ServerMessage, { type: "welcome" }> =>
+      message.type === "welcome",
+  );
+  socket.send(
+    JSON.stringify({
+      type: "join",
+      protocolVersion: PROTOCOL_VERSION,
+      roomId,
+      displayName,
+    }),
+  );
+  return welcome;
+}
+
+function waitForPresence(
+  socket: WebSocket,
+  predicate: (
+    participants: Extract<ServerMessage, { type: "presence" }>["participants"],
+  ) => boolean,
+): Promise<Extract<ServerMessage, { type: "presence" }>> {
+  return waitForMessage(
+    socket,
+    (message): message is Extract<ServerMessage, { type: "presence" }> =>
+      message.type === "presence" && predicate(message.participants),
+  );
+}
+
+function waitForMessage<T extends ServerMessage>(
+  socket: WebSocket,
+  predicate: (message: ServerMessage) => message is T,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      socket.removeEventListener("message", onMessage);
+      reject(new Error("Timed out waiting for WebSocket message"));
+    }, 5_000);
+
+    function onMessage(event: MessageEvent): void {
+      if (typeof event.data !== "string") {
+        return;
+      }
+      let message: ServerMessage;
+      try {
+        message = JSON.parse(event.data) as ServerMessage;
+      } catch {
+        return;
+      }
+      if (!predicate(message)) {
+        return;
+      }
+      clearTimeout(timer);
+      socket.removeEventListener("message", onMessage);
+      resolve(message);
+    }
+
+    socket.addEventListener("message", onMessage);
+  });
+}

@@ -34,6 +34,17 @@ export class RoomDurableObject extends DurableObject<Env> {
       return new Response("Method not allowed", { status: 405 });
     }
 
+    if (url.pathname === "/test/simulate-ws-error" && request.method === "POST") {
+      const participantId = (await request.text()).trim();
+      if (!participantId) {
+        return new Response("participant id required", { status: 400 });
+      }
+      const found = await this.simulateErrorForParticipant(participantId);
+      return new Response(found ? "ok" : "not found", {
+        status: found ? 200 : 404,
+      });
+    }
+
     if (request.headers.get("Upgrade") !== "websocket") {
       return new Response("Expected WebSocket", { status: 426 });
     }
@@ -137,9 +148,8 @@ export class RoomDurableObject extends DurableObject<Env> {
     } catch {
       // Socket may already be closing.
     }
-    if (attachment?.roomId && attachment.participantId) {
-      this.broadcastPresence(attachment.roomId);
-    }
+    // getWebSockets() still includes `ws` during close; exclude it explicitly.
+    this.refreshPresenceAfterDepart(ws, attachment);
   }
 
   async webSocketError(ws: WebSocket, _error: unknown): Promise<void> {
@@ -149,13 +159,48 @@ export class RoomDurableObject extends DurableObject<Env> {
     } catch {
       // Ignore.
     }
-    if (attachment?.roomId && attachment.participantId) {
-      this.broadcastPresence(attachment.roomId);
-    }
+    // Same exclusion as close: departing socket must not appear in presence.
+    this.refreshPresenceAfterDepart(ws, attachment);
   }
 
-  private broadcastPresence(roomId: string): void {
-    const participants = this.listParticipants();
+  /**
+   * Test-only: invoke the webSocketError path for a joined participant so
+   * integration tests can cover departure-on-error without a real transport fault.
+   */
+  private async simulateErrorForParticipant(
+    participantId: string,
+  ): Promise<boolean> {
+    for (const socket of this.ctx.getWebSockets()) {
+      const attachment = socket.deserializeAttachment() as SocketAttachment | null;
+      if (attachment?.participantId === participantId) {
+        await this.webSocketError(socket, new Error("simulated"));
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private refreshPresenceAfterDepart(
+    departing: WebSocket,
+    attachment: SocketAttachment | null,
+  ): void {
+    if (!attachment?.roomId || !attachment.participantId) {
+      return;
+    }
+    this.broadcastPresence(attachment.roomId, {
+      excludeSocket: departing,
+      excludeParticipantId: attachment.participantId,
+    });
+  }
+
+  private broadcastPresence(
+    roomId: string,
+    options?: {
+      excludeSocket?: WebSocket;
+      excludeParticipantId?: string;
+    },
+  ): void {
+    const participants = this.listParticipants(options);
     const message: ServerMessage = {
       type: "presence",
       protocolVersion: PROTOCOL_VERSION,
@@ -164,6 +209,9 @@ export class RoomDurableObject extends DurableObject<Env> {
     };
     const payload = JSON.stringify(message);
     for (const socket of this.ctx.getWebSockets()) {
+      if (options?.excludeSocket && socket === options.excludeSocket) {
+        continue;
+      }
       try {
         socket.send(payload);
       } catch {
@@ -172,11 +220,23 @@ export class RoomDurableObject extends DurableObject<Env> {
     }
   }
 
-  private listParticipants(): Participant[] {
+  private listParticipants(options?: {
+    excludeSocket?: WebSocket;
+    excludeParticipantId?: string;
+  }): Participant[] {
     const participants: Participant[] = [];
     for (const socket of this.ctx.getWebSockets()) {
+      if (options?.excludeSocket && socket === options.excludeSocket) {
+        continue;
+      }
       const attachment = socket.deserializeAttachment() as SocketAttachment | null;
       if (!attachment?.participantId) {
+        continue;
+      }
+      if (
+        options?.excludeParticipantId &&
+        attachment.participantId === options.excludeParticipantId
+      ) {
         continue;
       }
       participants.push({

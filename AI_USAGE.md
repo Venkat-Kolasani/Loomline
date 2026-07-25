@@ -35,3 +35,16 @@ Product name is **Loomline** (repository and Worker name match).
 - Explains `idFromName` isolation and presence attachment metadata
 - Verified automated isolation test and two-room browser presence
 
+## Presence leave fix (`fix(presence): exclude departing socket`)
+
+### Assisted by AI
+
+- Exclude departing WebSocket/participant id from presence projection on
+  close/error; two-client integration tests; test-only simulate-error route
+
+### Manually reviewed / owned by the author
+
+- Confirms `getWebSockets()` still lists the closing socket during
+  `webSocketClose` / `webSocketError`
+- Owns the exclusion contract and test evidence in `TESTING.md`
+

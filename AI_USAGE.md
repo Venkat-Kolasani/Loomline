@@ -3,7 +3,11 @@
 AI assistance is allowed for this assignment. No retained code should be opaque
 to the author.
 
-## This slice (`chore(scaffold): initialize edge application`)
+## Project name
+
+Product name is **Loomline** (repository and Worker name match).
+
+## Scaffold (`chore(scaffold): initialize edge application`)
 
 ### Assisted by AI
 
@@ -15,21 +19,19 @@ to the author.
 ### Manually reviewed / owned by the author
 
 - Confirmed stack matches `AGENTS.md` / `PROJECT_BLUEPRINT.md` (no React,
-  Socket.io, Canvas library, or room behavior in this slice)
+  Socket.io, Canvas library, or room behavior in the scaffold)
 - Confirmed Workers vs Node.js trade-off is stated honestly in docs
 - Ran install, typecheck, test, build, and local Worker start; recorded results
   in `TESTING.md`
-- Will be able to explain every retained file: purpose, inputs/outputs, and
-  failure modes (for example: ASSETS miss, DO not yet routed, Vite-only vs
-  Wrangler-served health check)
 
-### Not retained / avoided
+## Canvas shell (`feat(canvas): add layered canvas surface`)
 
-- Framework boilerplates
-- Premature Canvas or WebSocket protocol implementations
-- Claims of performance, browser support, or multi-user behavior without tests
+### Assisted by AI
 
-## Ongoing rule
+- Two-layer canvas surface, DPR sizing helpers, responsive shell placeholders
 
-After each later AI-assisted change, update this file briefly and keep the
-compliance checklist unchecked until evidence exists.
+### Manually reviewed / owned by the author
+
+- Verified separate committed/live buffers and dirty-only paint scheduling
+- Confirmed toolbar controls stay disabled until drawing lands
+

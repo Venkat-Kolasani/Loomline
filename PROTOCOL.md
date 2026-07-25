@@ -2,7 +2,7 @@
 
 **Protocol version (planned):** `1`  
 **Status:** schemas below are **planned**. No WebSocket messages are accepted or
-emitted in the scaffold slice.
+emitted yet.
 
 ## Transport (planned)
 
@@ -85,5 +85,5 @@ implemented.
 
 | Endpoint | Transport | Behavior |
 | --- | --- | --- |
-| `GET /api/health` | HTTP | JSON `{ ok, service, phase }` for scaffold verification |
+| `GET /api/health` | HTTP | JSON `{ ok, service: "loomline", phase }` |
 | Static assets | HTTP via `ASSETS` | Built Vite client |

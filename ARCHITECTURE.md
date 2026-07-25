@@ -4,8 +4,8 @@ Status legend: **Implemented** vs **Planned**.
 
 ## Overview
 
-RelayCanvas is a room-scoped collaborative drawing app. Clients render locally
-with the Canvas 2D API and synchronize through a Cloudflare Worker that routes
+Loomline is a room-scoped collaborative drawing app. Clients render locally with
+the Canvas 2D API and will synchronize through a Cloudflare Worker that routes
 each room to one Durable Object.
 
 ```mermaid
@@ -17,30 +17,34 @@ flowchart LR
   W -->|"implemented: ASSETS"| A["Static client build"]
 ```
 
-## Implemented in this slice
+## Implemented
 
 | Piece | Role |
 | --- | --- |
-| Vite client (`client/`) | Vanilla TypeScript shell; no Canvas yet |
+| Vite client (`client/`) | Responsive shell with toolbar/status placeholders |
+| Canvas layers | CSS-stacked `committed-canvas` + `live-canvas`; separate buffers |
+| Dirty paint API | `LayeredCanvasSurface` paints a layer only when marked dirty |
 | Worker (`worker/index.ts`) | Serves `/api/health` and static assets via `env.ASSETS` |
-| `RoomDurableObject` (`worker/room.ts`) | Exported DO class + Wrangler binding/migration skeleton |
+| `RoomDurableObject` (`worker/room.ts`) | Binding/class skeleton only |
 | Wrangler assets | `dist/client` uploaded/served with the Worker on one origin |
 
 ### Request path (current)
 
 1. Browser requests a path on the Worker origin.
-2. `/api/health` returns a JSON scaffold status.
+2. `/api/health` returns JSON service status.
 3. All other paths are delegated to `env.ASSETS.fetch(request)` (built Vite output).
 4. Durable Object stubs exist in `env.ROOM` but are not routed from HTTP/WebSocket yet.
 
+### Rendering layers (current)
+
+1. **committed-canvas** — reserved for deterministic replay of server-sequenced operations. Empty until history lands.
+2. **live-canvas** — reserved for ephemeral local/remote in-progress strokes. Empty until drawing lands.
+
+These layers must never paint into each other’s buffers. There is no permanent
+render loop; a layer paints on dirty + `requestAnimationFrame`. DPR-aware resize
+updates both backing stores together.
+
 ## Planned system design
-
-### Rendering layers (planned)
-
-1. **Committed layer** — deterministic replay of visible server-confirmed operations in sequence order.
-2. **Live overlay** — ephemeral local/remote in-progress strokes; redrawn only when live state changes.
-
-Invariant: local pixels appear before the first network round trip. There is no permanent `requestAnimationFrame` loop; layers render when dirty.
 
 ### Room lifecycle (planned)
 

@@ -1,9 +1,9 @@
-# RelayCanvas
+# Loomline
 
 Real-time collaborative drawing canvas for the Flam Frontend R&D assignment.
 
 **Live URL:** _not deployed yet_  
-**Status:** scaffold only (25 Jul tooling slice)
+**Status:** layered canvas shell (no drawing tools yet)
 
 This repository intentionally uses **Cloudflare Workers + Durable Objects** (edge
 JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
@@ -14,13 +14,15 @@ JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
 - Wrangler project config
 - Cloudflare Worker that serves built static assets via `ASSETS`
 - `RoomDurableObject` binding + class skeleton (no room/WebSocket behavior)
+- Two stacked canvas layers (`committed-canvas`, `live-canvas`) with DPR resize
+- Dirty-layer paint API (no permanent render loop)
+- Accessible toolbar and connection/empty placeholders (controls disabled)
 - Scripts: `dev`, `dev:client`, `typecheck`, `test`, `build`, `deploy`
-- Baseline Vitest + Workers pool smoke tests
+- Vitest + Cloudflare Workers pool tests
 
 ## What is planned (not implemented)
 
-- Layered Canvas drawing surface
-- Brush / eraser / colour / width tools
+- Brush / eraser / colour / width drawing
 - Room landing page and isolated room IDs
 - Native WebSocket protocol and live stroke streaming
 - Authoritative committed operations + SQLite persistence
@@ -53,7 +55,6 @@ Then open the local Wrangler URL (typically `http://127.0.0.1:8787`).
 ## Multi-user testing
 
 _Not available yet._ Room isolation and WebSocket sync land in later slices.
-Planned steps will live here once rooms exist.
 
 ## Supported browsers
 
@@ -62,18 +63,19 @@ realtime are implemented and manually verified.
 
 ## Known limitations
 
-- No Canvas, no drawing, no WebSocket, no rooms
-- Production deploy not run in this slice
-- Client health check only succeeds when served through the Worker (`npm run dev`)
+- Canvas layers exist; pointer drawing is not implemented yet
+- No WebSocket, rooms, presence, or undo/redo
+- Toolbar controls are placeholders and remain disabled
+- Production deploy not run yet
 
 ## Time spent
 
-Scaffold slice: tooling + docs only (see [TESTING.md](./TESTING.md) for command evidence).
+Tracked per commit; update at submission freeze.
 
 ## AI use
 
-AI assisted scaffolding and documentation drafting. Every retained line is
-intended to be explainable by the author. Details: [AI_USAGE.md](./AI_USAGE.md).
+AI assisted scaffolding and canvas-shell work. Every retained line is intended to
+be explainable by the author. Details: [AI_USAGE.md](./AI_USAGE.md).
 
 ## Assignment Compliance Checklist
 

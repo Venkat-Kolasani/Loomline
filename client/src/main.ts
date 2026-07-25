@@ -159,6 +159,10 @@ function parseRoomPath(pathname: string): string | null {
 function showLanding(): void {
   roomSocket?.disconnect();
   roomSocket = null;
+  selfParticipant = null;
+  renderPresence([]);
+  selfBadge.hidden = true;
+  drawing.clearLocal();
   landingView.hidden = false;
   roomView.hidden = true;
   document.title = "Loomline";
@@ -185,6 +189,12 @@ function renderPresence(participants: Participant[]): void {
 }
 
 function enterRoom(roomId: string): void {
+  // Tear down any prior room session before wiring a new socket.
+  roomSocket?.disconnect();
+  roomSocket = null;
+  selfParticipant = null;
+  drawing.clearLocal();
+
   landingView.hidden = true;
   roomView.hidden = false;
   document.title = `Loomline · ${roomId}`;
@@ -204,9 +214,11 @@ function enterRoom(roomId: string): void {
   surface.paintNow();
   emptyState.hidden = drawing.hasInk();
 
-  roomSocket?.disconnect();
-  roomSocket = new RoomSocket(roomId, {
+  const socket = new RoomSocket(roomId, {
     onConnectionState: (state) => {
+      if (roomSocket !== socket) {
+        return;
+      }
       if (state === "connecting") {
         connectionStatus.textContent = "Connecting…";
       } else if (state === "connected") {
@@ -218,6 +230,9 @@ function enterRoom(roomId: string): void {
       }
     },
     onWelcome: (participant) => {
+      if (roomSocket !== socket) {
+        return;
+      }
       selfParticipant = participant;
       selfBadge.hidden = false;
       selfBadge.textContent = participant.displayName;
@@ -226,13 +241,20 @@ function enterRoom(roomId: string): void {
       drawing.setColor(participant.color);
     },
     onPresence: (participants) => {
+      if (roomSocket !== socket) {
+        return;
+      }
       renderPresence(participants);
     },
     onError: (code, message) => {
+      if (roomSocket !== socket) {
+        return;
+      }
       connectionStatus.textContent = `Error: ${code}`;
       console.warn("Room error", code, message);
     },
   });
+  roomSocket = socket;
   roomSocket.connect();
 }
 

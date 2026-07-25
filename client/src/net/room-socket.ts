@@ -19,6 +19,7 @@ export interface RoomSocketHandlers {
 
 /**
  * Presence-only room socket. Does not send drawing points.
+ * Handlers ignore events from superseded sockets after reconnect/disconnect.
  */
 export class RoomSocket {
   private socket: WebSocket | null = null;
@@ -46,6 +47,9 @@ export class RoomSocket {
     this.socket = socket;
 
     socket.addEventListener("open", () => {
+      if (this.socket !== socket) {
+        return;
+      }
       socket.send(
         JSON.stringify({
           type: "join",
@@ -57,6 +61,9 @@ export class RoomSocket {
     });
 
     socket.addEventListener("message", (event) => {
+      if (this.socket !== socket) {
+        return;
+      }
       if (typeof event.data !== "string") {
         return;
       }
@@ -71,19 +78,29 @@ export class RoomSocket {
     });
 
     socket.addEventListener("close", () => {
+      if (this.socket !== socket) {
+        return;
+      }
+      this.socket = null;
       this.handlers.onConnectionState("disconnected");
     });
 
     socket.addEventListener("error", () => {
+      if (this.socket !== socket) {
+        return;
+      }
       this.handlers.onConnectionState("error");
     });
   }
 
   disconnect(): void {
-    if (this.socket) {
-      this.socket.close();
-      this.socket = null;
+    const socket = this.socket;
+    if (!socket) {
+      return;
     }
+    // Clear before close so the close/error handlers treat this socket as superseded.
+    this.socket = null;
+    socket.close();
   }
 
   private handleServerMessage(message: ServerMessage): void {

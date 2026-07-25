@@ -90,6 +90,19 @@ and skip the departing socket when broadcasting.
 
 **Verification:** `npm run typecheck && npm run test && npm run build` — 17/17.
 
+### Client room reuse reset (2026-07-25)
+
+**Problem:** `enterRoom()` cleared the visible presence list but kept
+`selfParticipant` and local canvas ink; an old socket’s close could overwrite
+the new connection status.
+
+**Fix:** reset self/presence/ink on enter and leave; `RoomSocket` and room
+handlers ignore events from superseded sockets.
+
+**Verification:** `npm run typecheck && npm run test && npm run build` (Prompt 4
+gate re-run after both fixes) — typecheck exit 0; Tests 17 passed (17); build
+exit 0.
+
 ### Deferred follow-ups (not blockers)
 
 - Focused `LocalDrawingController` pointer-up/clear/layer tests

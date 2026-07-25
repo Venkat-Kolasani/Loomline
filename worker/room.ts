@@ -3,8 +3,10 @@ import {
   MAX_DISPLAY_NAME_LENGTH,
   parseClientMessage,
   type ClientMessage,
+  type CommittedOperation,
   type ServerMessage,
   type StrokeLivePhase,
+  type StrokePoint,
 } from "../shared/protocol";
 import {
   PROTOCOL_VERSION,
@@ -14,13 +16,20 @@ import {
   type Participant,
   type SocketAttachment,
 } from "../shared/room";
+import {
+  ensureOperationSchema,
+  insertOperation,
+  listOperations,
+  nextSequence,
+  sequenceHead,
+  type StoredOperation,
+} from "./operations";
 
 const ISOLATION_MARK_KEY = "isolationMark";
 
 /**
  * One Durable Object instance per room id (via idFromName).
- * This slice: presence + ephemeral live stroke / cursor fan-out.
- * Completed strokes are NOT persisted and do not receive sequence numbers.
+ * Live strokes are ephemeral; stroke:end persists one ordered operation.
  */
 export class RoomDurableObject extends DurableObject<Env> {
   /**
@@ -28,6 +37,13 @@ export class RoomDurableObject extends DurableObject<Env> {
    * Not durable across hibernation — by design for provisional ink.
    */
   private readonly liveStrokes = new Map<string, LiveStrokeState>();
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    ctx.blockConcurrencyWhile(async () => {
+      ensureOperationSchema(this.ctx.storage.sql);
+    });
+  }
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
@@ -136,8 +152,8 @@ export class RoomDurableObject extends DurableObject<Env> {
     } catch {
       // Socket may already be closing.
     }
+    // Abandoned live strokes are discarded — they never become durable ops.
     this.clearLiveStrokesForParticipant(attachment?.participantId);
-    // getWebSockets() still includes `ws` during close; exclude it explicitly.
     this.refreshPresenceAfterDepart(ws, attachment);
   }
 
@@ -152,10 +168,6 @@ export class RoomDurableObject extends DurableObject<Env> {
     this.refreshPresenceAfterDepart(ws, attachment);
   }
 
-  /**
-   * Test-only: invoke the webSocketError path for a joined participant so
-   * integration tests can cover departure-on-error without a real transport fault.
-   */
   private async simulateErrorForParticipant(
     participantId: string,
   ): Promise<boolean> {
@@ -206,6 +218,16 @@ export class RoomDurableObject extends DurableObject<Env> {
       roomId,
       participant,
     });
+
+    const operations = listOperations(this.ctx.storage.sql).map(toCommitted);
+    this.send(ws, {
+      type: "sync_state",
+      protocolVersion: PROTOCOL_VERSION,
+      roomId,
+      sequenceHead: sequenceHead(this.ctx.storage.sql),
+      operations,
+    });
+
     this.broadcastPresence(roomId);
   }
 
@@ -261,6 +283,7 @@ export class RoomDurableObject extends DurableObject<Env> {
       tool: message.tool,
       color: message.color,
       width: message.width,
+      points: [message.point],
     });
 
     this.broadcastStrokeLive(ws, {
@@ -288,6 +311,8 @@ export class RoomDurableObject extends DurableObject<Env> {
       return;
     }
 
+    live.points.push(...message.points);
+
     this.broadcastStrokeLive(ws, {
       roomId,
       participantId: attachment.participantId,
@@ -310,16 +335,47 @@ export class RoomDurableObject extends DurableObject<Env> {
       return;
     }
 
+    if (message.point) {
+      live.points.push(message.point);
+    }
     this.liveStrokes.delete(key);
-    const points = message.point ? [message.point] : [];
+
+    const endPoints = message.point ? [message.point] : [];
     this.broadcastStrokeLive(ws, {
       roomId,
       participantId: attachment.participantId,
       strokeId: message.strokeId,
       phase: "end",
-      points,
+      points: endPoints,
     });
-    // Intentionally no SQLite write and no operation:committed in this slice.
+
+    if (live.points.length === 0) {
+      return;
+    }
+
+    const stored: StoredOperation = {
+      sequence: nextSequence(this.ctx.storage.sql),
+      opId: crypto.randomUUID(),
+      participantId: attachment.participantId,
+      strokeId: message.strokeId,
+      tool: live.tool,
+      color: live.color,
+      width: live.width,
+      points: live.points,
+      createdAt: Date.now(),
+    };
+    insertOperation(this.ctx.storage.sql, stored);
+
+    const operation = toCommitted(stored);
+    // Broadcast to ALL sockets including the author so clients share one log.
+    this.broadcastRaw(
+      JSON.stringify({
+        type: "operation:committed",
+        protocolVersion: PROTOCOL_VERSION,
+        roomId,
+        operation,
+      } satisfies ServerMessage),
+    );
   }
 
   private broadcastStrokeLive(
@@ -332,7 +388,7 @@ export class RoomDurableObject extends DurableObject<Env> {
       tool?: LiveStrokeState["tool"];
       color?: string;
       width?: number;
-      points: { x: number; y: number }[];
+      points: StrokePoint[];
     },
   ): void {
     this.broadcastExcept(sender, {
@@ -457,10 +513,25 @@ interface LiveStrokeState {
   tool: "brush" | "eraser";
   color: string;
   width: number;
+  points: StrokePoint[];
 }
 
 function liveKey(participantId: string, strokeId: string): string {
   return `${participantId}:${strokeId}`;
+}
+
+function toCommitted(op: StoredOperation): CommittedOperation {
+  return {
+    sequence: op.sequence,
+    opId: op.opId,
+    participantId: op.participantId,
+    strokeId: op.strokeId,
+    tool: op.tool,
+    color: op.color,
+    width: op.width,
+    points: op.points,
+    createdAt: op.createdAt,
+  };
 }
 
 function sanitizeDisplayName(

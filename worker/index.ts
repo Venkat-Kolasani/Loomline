@@ -16,7 +16,7 @@ export default {
       return Response.json({
         ok: true,
         service: "loomline",
-        phase: "live-strokes",
+        phase: "durable-ops",
       });
     }
 

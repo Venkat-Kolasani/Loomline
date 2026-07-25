@@ -22,6 +22,19 @@ export interface StrokePoint {
 
 export type StrokeLivePhase = "start" | "points" | "end";
 
+/** One durable completed stroke, ordered by server-assigned `sequence`. */
+export interface CommittedOperation {
+  sequence: number;
+  opId: string;
+  participantId: string;
+  strokeId: string;
+  tool: DrawingTool;
+  color: string;
+  width: number;
+  points: StrokePoint[];
+  createdAt: number;
+}
+
 export type ClientMessage =
   | {
       type: "join";
@@ -93,6 +106,19 @@ export type ServerMessage =
       participantId: string;
       x: number;
       y: number;
+    }
+  | {
+      type: "operation:committed";
+      protocolVersion: typeof PROTOCOL_VERSION;
+      roomId: string;
+      operation: CommittedOperation;
+    }
+  | {
+      type: "sync_state";
+      protocolVersion: typeof PROTOCOL_VERSION;
+      roomId: string;
+      sequenceHead: number;
+      operations: CommittedOperation[];
     }
   | {
       type: "error";

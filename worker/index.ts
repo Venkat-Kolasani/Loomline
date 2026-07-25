@@ -1,9 +1,9 @@
 /**
- * RelayCanvas Worker entry.
+ * Loomline Worker entry.
  *
  * Serves built static assets via the ASSETS binding and exposes a health
  * endpoint for scaffold verification. Room WebSocket routing is intentionally
- * not implemented in this slice.
+ * not implemented yet.
  */
 
 export { RoomDurableObject } from "./room";
@@ -15,8 +15,8 @@ export default {
     if (url.pathname === "/api/health") {
       return Response.json({
         ok: true,
-        service: "relaycanvas",
-        phase: "scaffold",
+        service: "loomline",
+        phase: "canvas-shell",
       });
     }
 

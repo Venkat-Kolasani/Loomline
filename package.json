@@ -1,8 +1,8 @@
 {
-  "name": "relaycanvas",
+  "name": "loomline",
   "version": "0.1.0",
   "private": true,
-  "description": "RelayCanvas — real-time collaborative drawing canvas on Cloudflare Workers + Durable Objects",
+  "description": "Loomline — real-time collaborative drawing canvas on Cloudflare Workers + Durable Objects",
   "type": "module",
   "scripts": {
     "dev": "npm run build:client && wrangler dev",

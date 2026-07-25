@@ -1,7 +1,7 @@
 import { env, exports } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
-describe("RelayCanvas scaffold", () => {
+describe("Loomline scaffold", () => {
   it("serves a health response from the Worker entry", async () => {
     const response = await exports.default.fetch(
       new Request("https://example.com/api/health"),
@@ -14,8 +14,8 @@ describe("RelayCanvas scaffold", () => {
     const body: unknown = await response.json();
     expect(body).toMatchObject({
       ok: true,
-      service: "relaycanvas",
-      phase: "scaffold",
+      service: "loomline",
+      phase: "canvas-shell",
     });
   });
 

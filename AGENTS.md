@@ -1,4 +1,4 @@
-# RelayCanvas - agent operating contract
+# Loomline - agent operating contract
 
 ## Read before acting
 
@@ -8,7 +8,7 @@ with a generic whiteboard, a React app, or an unscoped set of features.
 
 ## Product objective
 
-Build `RelayCanvas`: a deployable, interview-defensible, real-time collaborative
+Build `Loomline`: a deployable, interview-defensible, real-time collaborative
 drawing canvas for the Flam Frontend R&D assignment. It must demonstrate raw
 Canvas skill, careful real-time systems design, resilience, and product polish.
 

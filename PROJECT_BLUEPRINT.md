@@ -1,8 +1,8 @@
-# RelayCanvas - delivery blueprint
+# Loomline - delivery blueprint
 
 ## Decision
 
-Build the **Real-Time Collaborative Drawing Canvas** assignment as `RelayCanvas`:
+Build the **Real-Time Collaborative Drawing Canvas** assignment as `Loomline`:
 a room-scoped, deterministic multiplayer drawing application. The submission will
 be deployed on Cloudflare's free Workers/Durable Objects platform and submitted
 with a public GitHub repository, a live URL, a short demo video, and clear

@@ -1,2 +1,41 @@
 # Local-only Cursor execution prompts. Never publish these instructions.
 PROMPTS.md
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Wrangler / Cloudflare local state
+.wrangler/
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# Logs and OS noise
+*.log
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test / coverage
+coverage/
+.vitest/
+
+# Local SQLite / Durable Object artifacts
+*.sqlite
+*.sqlite-journal
+
+# Type generation temp (committed worker-configuration.d.ts is regenerated intentionally)
+.wrangler/types/

@@ -1,0 +1,35 @@
+# AI usage
+
+AI assistance is allowed for this assignment. No retained code should be opaque
+to the author.
+
+## This slice (`chore(scaffold): initialize edge application`)
+
+### Assisted by AI
+
+- Project layout for Vite client + Wrangler Worker + Durable Object skeleton
+- Initial `package.json` scripts and Vitest Workers pool wiring
+- First drafts of README / ARCHITECTURE / PROTOCOL / DECISIONS / TESTING docs
+- Health endpoint and minimal DO skeleton implementation
+
+### Manually reviewed / owned by the author
+
+- Confirmed stack matches `AGENTS.md` / `PROJECT_BLUEPRINT.md` (no React,
+  Socket.io, Canvas library, or room behavior in this slice)
+- Confirmed Workers vs Node.js trade-off is stated honestly in docs
+- Ran install, typecheck, test, build, and local Worker start; recorded results
+  in `TESTING.md`
+- Will be able to explain every retained file: purpose, inputs/outputs, and
+  failure modes (for example: ASSETS miss, DO not yet routed, Vite-only vs
+  Wrangler-served health check)
+
+### Not retained / avoided
+
+- Framework boilerplates
+- Premature Canvas or WebSocket protocol implementations
+- Claims of performance, browser support, or multi-user behavior without tests
+
+## Ongoing rule
+
+After each later AI-assisted change, update this file briefly and keep the
+compliance checklist unchecked until evidence exists.

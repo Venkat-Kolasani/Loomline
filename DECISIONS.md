@@ -254,3 +254,29 @@ and has no measured threshold. Prefer a future checkpoint record once Prompt 10
 Unicode UTF-8 bypass, rate limit on valid / malformed / repeated-join frames,
 rapid history, zero-user cleanup). Prior `test/history.test.ts` rapid path.
 Gate recorded in [TESTING.md](./TESTING.md).
+
+## D8 — Measured diagnostics only (`?debug=1` + synthetic load)
+
+### Problem / invariant
+
+Interviewers ask for FPS / latency / scale evidence. Claiming “60 FPS” or a
+fixed RTT budget without a stated workload violates the evidence rule.
+
+### Selected design
+
+- Optional diagnostics panel when `?debug=1` is present: FPS from rAF deltas,
+  RTT from `ping`/`pong`, msg/s counters, presence count, sequence head.
+- Reproducible `scripts/synthetic-load.mjs`: 5 clients × 100 strokes; record
+  wall clock, commit rate, `/api/room-metrics` head — never invent CPU%.
+- Document browser/machine/network and limitations next to the numbers.
+
+### Rejected alternative
+
+**Always-on HUD and marketing “60 FPS / &lt;50 ms” badges.**
+
+Rejected: permanent UI noise for reviewers; unmeasured SLA claims are dishonest.
+
+### Verification
+
+`test/observability.test.ts` (ping/pong + room-metrics). Manual panel screenshot
++ `npm run load` results in [TESTING.md](./TESTING.md).

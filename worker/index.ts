@@ -16,8 +16,12 @@ export default {
       return Response.json({
         ok: true,
         service: "loomline",
-        phase: "hardened",
+        phase: "observability",
       });
+    }
+
+    if (url.pathname === "/api/room-metrics") {
+      return routeRoomMetrics(env, url);
     }
 
     if (url.pathname === "/ws") {
@@ -27,6 +31,16 @@ export default {
     return env.ASSETS.fetch(request);
   },
 } satisfies ExportedHandler<Env>;
+
+function routeRoomMetrics(env: Env, url: URL): Response | Promise<Response> {
+  const roomId = url.searchParams.get("room") ?? "";
+  if (!isValidRoomId(roomId)) {
+    return new Response("Invalid room id", { status: 400 });
+  }
+  const durableId = env.ROOM.idFromName(roomId);
+  const stub = env.ROOM.get(durableId);
+  return stub.fetch(new Request("https://room/test/durable-head"));
+}
 
 function routeRoomWebSocket(
   request: Request,

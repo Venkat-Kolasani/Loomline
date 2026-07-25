@@ -240,6 +240,7 @@ export class RoomDurableObject extends DurableObject<Env> {
       case "cursor":
       case "history:undo":
       case "history:redo":
+      case "ping":
         this.handleJoinedMessage(ws, attachment, result.message, roomId);
         return;
     }
@@ -382,6 +383,15 @@ export class RoomDurableObject extends DurableObject<Env> {
         return;
       case "history:redo":
         this.handleHistoryRedo(roomId);
+        return;
+      case "ping":
+        this.send(ws, {
+          type: "pong",
+          protocolVersion: PROTOCOL_VERSION,
+          roomId,
+          clientTime: message.clientTime,
+          serverTime: Date.now(),
+        });
         return;
     }
   }

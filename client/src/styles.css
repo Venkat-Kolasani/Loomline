@@ -390,6 +390,57 @@ h1 {
   border: 1px solid rgba(0, 0, 0, 0.12);
 }
 
+/* Developer-only (`?debug=1`) — not part of the product chrome. */
+.debug-panel {
+  position: fixed;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  z-index: 40;
+  width: min(16rem, calc(100vw - 1.5rem));
+  padding: 0.65rem 0.75rem;
+  background: rgba(18, 22, 28, 0.92);
+  color: #e8ecef;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.debug-heading {
+  margin: 0 0 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.debug-metrics {
+  margin: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.debug-metrics > div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem;
+}
+
+.debug-metrics dt {
+  margin: 0;
+  color: rgba(232, 236, 239, 0.7);
+}
+
+.debug-metrics dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.debug-note {
+  margin: 0.45rem 0 0;
+  color: rgba(232, 236, 239, 0.55);
+  font-size: 0.65rem;
+}
+
 @media (max-width: 640px) {
   .app {
     padding: 0.75rem;

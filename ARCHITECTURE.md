@@ -89,9 +89,28 @@ acknowledges them, then move into the committed store (no double paint).
 
 ## Planned
 
-- Client-side chunking if an outgoing points batch ever exceeds 64
 - Sticky participant identity across reconnect (optional polish)
 - Checkpoint / retention after a measured room-size baseline (DECISIONS D7)
+
+## Diagnostics (`?debug=1`) and load baseline (implemented)
+
+Developer-only overlay (not product chrome):
+
+| Metric | Source |
+| --- | --- |
+| Render FPS | `requestAnimationFrame` deltas while the panel is active |
+| WS RTT | `ping` / `pong` echo of `clientTime` |
+| Inbound / outbound msg/s | Client counters reset each second |
+| Participants | Latest `presence` length |
+| Sequence head | `sync_state` / commits / `history:changed` |
+
+Synthetic load: `npm run load` → `scripts/synthetic-load.mjs` (5 Node WebSocket
+clients × 100 completed strokes). Server snapshot via
+`GET /api/room-metrics?room=` (sequenceHead, operationCount, live counts).
+**No Worker CPU%** is available from the runtime; do not invent it.
+
+Measured results live in [TESTING.md](./TESTING.md). Do not treat idle FPS or
+localhost RTT as a cross-network SLA.
 
 ## Reconnect / hibernation (implemented)
 

@@ -152,6 +152,33 @@ describe("parseClientMessage", () => {
     expect(result.ok).toBe(true);
   });
 
+  it("accepts ping with clientTime", () => {
+    const result = parseClientMessage({
+      type: "ping",
+      protocolVersion: PROTOCOL_VERSION,
+      roomId: "abcd1234",
+      clientTime: 100.5,
+    });
+    expect(result).toEqual({
+      ok: true,
+      message: {
+        type: "ping",
+        protocolVersion: 1,
+        roomId: "abcd1234",
+        clientTime: 100.5,
+      },
+    });
+  });
+
+  it("rejects ping without clientTime", () => {
+    const result = parseClientMessage({
+      type: "ping",
+      protocolVersion: PROTOCOL_VERSION,
+      roomId: "abcd1234",
+    });
+    expect(result.ok).toBe(false);
+  });
+
   it("rejects non-object payloads", () => {
     const result = parseClientMessage("join");
     expect(result.ok).toBe(false);

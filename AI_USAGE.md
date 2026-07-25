@@ -143,3 +143,15 @@ Product name is **Loomline** (repository and Worker name match).
 - Explains why history is not debounced and why empty rooms do not wipe ops
 - Owns the hibernation-eligibility claim vs what Vitest can actually prove
 
+## Observability (`feat(observability): add runtime metrics baseline`)
+
+### Assisted by AI
+
+- `ping`/`pong`, `?debug=1` diagnostics panel, `/api/room-metrics`,
+  `scripts/synthetic-load.mjs`, observability tests, docs D8
+
+### Manually reviewed / owned by the author
+
+- Owns measured vs claimed FPS/RTT language and load-script limitations
+- Ran local load + two-client demo; recorded numbers in TESTING.md
+

@@ -49,6 +49,9 @@ export interface RoomSocketHandlers {
   onError: (code: string, message: string) => void;
   /** Fired when an unexpected close schedules a reconnect (ephemeral UI reset). */
   onReconnectScheduled?: (attempt: number, delayMs: number) => void;
+  onPong?: (clientTime: number, serverTime: number) => void;
+  onOutboundMessage?: () => void;
+  onInboundMessage?: () => void;
 }
 
 export class RoomSocket {
@@ -168,6 +171,15 @@ export class RoomSocket {
     });
   }
 
+  sendPing(clientTime: number = performance.now()): void {
+    this.send({
+      type: "ping",
+      protocolVersion: PROTOCOL_VERSION,
+      roomId: this.roomId,
+      clientTime,
+    });
+  }
+
   private openSocket(isReconnect: boolean): void {
     this.joined = false;
     if (this.socket) {
@@ -206,6 +218,7 @@ export class RoomSocket {
       if (typeof event.data !== "string") {
         return;
       }
+      this.handlers.onInboundMessage?.();
       let message: ServerMessage;
       try {
         message = JSON.parse(event.data) as ServerMessage;
@@ -274,6 +287,7 @@ export class RoomSocket {
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       return;
     }
+    this.handlers.onOutboundMessage?.();
     socket.send(JSON.stringify(message));
   }
 
@@ -314,6 +328,9 @@ export class RoomSocket {
           message.canUndo,
           message.canRedo,
         );
+        break;
+      case "pong":
+        this.handlers.onPong?.(message.clientTime, message.serverTime);
         break;
       case "error":
         this.handlers.onError(message.code, message.message);

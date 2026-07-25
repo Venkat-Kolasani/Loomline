@@ -3,6 +3,75 @@
 Evidence log for Loomline. Record **exact commands and outcomes**. Do not claim
 untested behavior.
 
+## Results — diagnostics + load baseline (2026-07-25)
+
+Environment:
+
+| Field | Value |
+| --- | --- |
+| Machine | Apple silicon (arm64), macOS 26.2 (Build 25C56) |
+| Node | v24.12.0 |
+| Network | localhost (`127.0.0.1`) — not WAN / not 4G |
+| Browser (panel) | Cursor embedded browser viewing `http://127.0.0.1:8787` (Chromium-based) |
+| Workload A | Idle room + light pointer stroke with `?debug=1` |
+| Workload B | `npm run load` → 5 Node WebSocket clients × 100 completed strokes |
+
+### Automated gate
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files  16 passed (16)
+→ Tests  68 passed (68)
+→ build exit 0
+```
+
+Coverage added: `test/observability.test.ts` (ping/pong echo, room-metrics HTTP),
+protocol `ping` parse tests.
+
+### Developer panel (`?debug=1`) — measured, not an SLA
+
+Room `obs10b02` @ `http://127.0.0.1:8787/r/obs10b02?debug=1`
+
+| Metric | Observed |
+| --- | --- |
+| Render FPS (rAF deltas, idle/light) | **120.0** (ProMotion-class display; not a claimed 60 FPS budget) |
+| WS RTT (`ping`/`pong`) | **1.2 ms** idle → **3.1 ms** after light drawing (localhost) |
+| Participants | 1 idle; **3** when browser + Demo-A/B WS clients shared the room |
+| Sequence head | **2** after two committed strokes |
+| Inbound/outbound /s | fluctuated with traffic (panel shows rolling 1s windows) |
+
+Limitations: panel FPS measures the diagnostics rAF sampler, not a guarantee under
+heavy paint. Localhost RTT is not comparable to multi-region edge latency.
+
+### Synthetic load (`npm run load`)
+
+```text
+LOOMLINE_URL=http://127.0.0.1:8787 npm run load
+```
+
+| Field | Value |
+| --- | --- |
+| Room | `6789abcd` |
+| Elapsed | **3257 ms** wall clock |
+| Commits | **500 / 500** (`allComplete: true`) |
+| Commit rate | **153.5 commits/s** |
+| Observed max sequence | **500** |
+| Outbound frames (sum) | 1505 (join + 3×100 strokes × 5) |
+| Inbound frames (sum) | 8504 (includes fan-out to all peers) |
+| `/api/room-metrics` | `sequenceHead: 500`, `operationCount: 500`, live=0, no alarm |
+
+**Not measured / not claimed:** Worker or Durable Object CPU%, memory, or
+cross-region RTT. Clients are Node WebSockets — this is commit/fan-out load, not
+Canvas paint load.
+
+### Manual two-client proof (same session)
+
+1. Browser tab Connected on `obs10b02?debug=1` with diagnostics visible.
+2. Two Node clients (`Demo-A`, `Demo-B`) joined; presence showed 3 participants.
+3. Node ping RTT ≈ **20.6 ms**; `operation:committed` sequence **2** observed on
+   peer B; metrics endpoint agreed `sequenceHead: 2`.
+
 ## Latest gate (2026-07-25 — rate-limit binary frames)
 
 ```text

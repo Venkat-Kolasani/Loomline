@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p test/tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "load": "node scripts/synthetic-load.mjs",
     "deploy": "npm run build && wrangler deploy",
     "cf-typegen": "wrangler types"
   },

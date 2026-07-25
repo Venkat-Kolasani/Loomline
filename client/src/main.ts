@@ -3,6 +3,11 @@ import { LayeredCanvasSurface } from "./canvas/layers";
 import { LocalDrawingController } from "./canvas/local-drawing";
 import { RemoteStrokeStore } from "./canvas/remote-strokes";
 import type { DrawingTool } from "./canvas/stroke";
+import {
+  DiagnosticsPanel,
+  isDebugEnabled,
+  withDebugQuery,
+} from "./debug/diagnostics";
 import { LiveStrokeTransport } from "./net/live-stroke-transport";
 import { RemoteCursorLayer } from "./net/remote-cursors";
 import { RoomSocket } from "./net/room-socket";
@@ -129,6 +134,7 @@ const remoteCursors = new RemoteCursorLayer(cursorLayerRoot);
 let liveStrokeTransport: LiveStrokeTransport | null = null;
 let pendingCursor: StrokePoint | null = null;
 let cursorRaf: number | null = null;
+const diagnostics = isDebugEnabled() ? new DiagnosticsPanel() : null;
 
 const surface = new LayeredCanvasSurface({
   committedCanvas,
@@ -208,6 +214,7 @@ function showLanding(): void {
   roomSocket = null;
   selfParticipant = null;
   clearNetworkHelpers();
+  diagnostics?.stop();
   remoteStrokes.clearAll();
   committedOps.clear();
   remoteCursors.clear();
@@ -224,6 +231,7 @@ function showLanding(): void {
 function renderPresence(participants: Participant[]): void {
   presenceList.replaceChildren();
   remoteCursors.syncParticipants(participants);
+  diagnostics?.setParticipants(participants.length);
   for (const participant of participants) {
     const item = document.createElement("li");
     item.className = "presence-item";
@@ -355,13 +363,30 @@ function enterRoom(roomId: string): void {
         const attempt = detail?.attempt ?? 0;
         connectionStatus.textContent =
           attempt > 0 ? `Reconnecting… (try ${attempt})` : "Reconnecting…";
+        diagnostics?.stop();
       } else if (state === "connected") {
         connectionStatus.textContent = "Connected";
+        diagnostics?.start(() => {
+          if (roomSocket === socket && socket.isReady()) {
+            socket.sendPing(performance.now());
+          }
+        });
       } else if (state === "error") {
         connectionStatus.textContent = "Connection error";
+        diagnostics?.stop();
       } else {
         connectionStatus.textContent = "Disconnected";
+        diagnostics?.stop();
       }
+    },
+    onOutboundMessage: () => {
+      diagnostics?.noteOutbound();
+    },
+    onInboundMessage: () => {
+      diagnostics?.noteInbound();
+    },
+    onPong: (clientTime) => {
+      diagnostics?.notePong(clientTime);
     },
     onReconnectScheduled: () => {
       if (roomSocket !== socket) {
@@ -419,6 +444,7 @@ function enterRoom(roomId: string): void {
       }
       // Full snapshot/replay after join or reconnect; replaces visible set.
       committedOps.applySyncState(sequenceHead, operations);
+      diagnostics?.setSequenceHead(sequenceHead);
       setHistoryButtons(canUndo, canRedo);
       surface.markDirty("committed");
       updateEmptyState();
@@ -431,6 +457,7 @@ function enterRoom(roomId: string): void {
       if (applied) {
         surface.markDirty("committed");
       }
+      diagnostics?.setSequenceHead(committedOps.getSequenceHead());
       // New commits clear the server redo branch.
       setHistoryButtons(committedOps.getOperations().length > 0, false);
       drawing.acknowledgeCommitted(operation.strokeId);
@@ -441,6 +468,7 @@ function enterRoom(roomId: string): void {
         return;
       }
       committedOps.applySyncState(sequenceHead, operations);
+      diagnostics?.setSequenceHead(sequenceHead);
       setHistoryButtons(canUndo, canRedo);
       surface.markDirty("committed");
       updateEmptyState();
@@ -481,7 +509,7 @@ function routeFromLocation(): void {
 
 createRoomButton.addEventListener("click", () => {
   const roomId = createRoomId();
-  history.pushState(null, "", `/r/${roomId}`);
+  history.pushState(null, "", withDebugQuery(`/r/${roomId}`));
   enterRoom(roomId);
 });
 
@@ -494,7 +522,7 @@ joinForm.addEventListener("submit", (event) => {
     return;
   }
   joinError.hidden = true;
-  history.pushState(null, "", `/r/${roomId}`);
+  history.pushState(null, "", withDebugQuery(`/r/${roomId}`));
   enterRoom(roomId);
 });
 

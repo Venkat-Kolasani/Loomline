@@ -2,7 +2,8 @@
 
 **Protocol version:** `1`  
 **Status:** presence, live strokes, durable ops, global undo/redo, reconnect
-recovery, and **input-boundary hardening** are implemented.
+recovery, input-boundary hardening, and **developer diagnostics / load baseline**
+are implemented.
 
 ## Transport
 
@@ -41,6 +42,8 @@ size and per-participant rate limits are enforced in `RoomDurableObject`
 | `history:redo` | client → server | Remove newest redoable tombstone |
 | `history:changed` | server → **all** | Visible op set after undo/redo; clients rebuild |
 | `cursor` | client → server → peers | Ephemeral pointer position |
+| `ping` | client → server | RTT probe with `clientTime` (diagnostics) |
+| `pong` | server → client | Echoes `clientTime` + `serverTime` |
 | `error` | server → client | Recoverable typed failure (`stroke_expired`, …) |
 
 ### Ordering contract (implemented)
@@ -219,6 +222,7 @@ serialization.
 
 | Endpoint | Transport | Behavior |
 | --- | --- | --- |
-| `GET /api/health` | HTTP | `{ ok, service: "loomline", phase: "hardened" }` |
+| `GET /api/health` | HTTP | `{ ok, service: "loomline", phase: "observability" }` |
+| `GET /api/room-metrics?room=` | HTTP | Durable-head snapshot (`sequenceHead`, `operationCount`, live counts) for load scripts |
 | `GET /ws?room=` | WebSocket | Room join + live + committed sync + history |
 | Static assets | HTTP via `ASSETS` | Landing + `/r/:roomId` SPA |

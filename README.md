@@ -3,8 +3,8 @@
 Real-time collaborative drawing canvas for the Flam Frontend R&D assignment.
 
 **Live URL:** _not deployed yet_  
-**Status:** input boundaries hardened + reconnect recovery + global undo/redo +
-durable ops
+**Status:** measured diagnostics + load baseline + hardened boundaries +
+reconnect + undo/redo + durable ops
 
 This repository intentionally uses **Cloudflare Workers + Durable Objects** (edge
 JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
@@ -25,13 +25,15 @@ JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
   metadata is durable so hibernation cannot leave peer overlays stuck)
 - Typed rejection of malformed / oversized / rate-limited client frames
 - Empty rooms clear live state + alarms (hibernation-eligible; ops retained)
+- Developer diagnostics panel (`?debug=1`): FPS, WS RTT, msg/s, presence, seq
+- Synthetic load script: `npm run load` (5×100 strokes) + `/api/room-metrics`
 - Remote cursors (ephemeral)
 - rAF-batched outgoing points; immediate local drawing
 - Two stacked canvas layers with brush/eraser/colour/width/clear
 - Dirty-layer paint API (no permanent render loop)
-- Scripts: `dev`, `dev:client`, `typecheck`, `test`, `build`, `deploy`
+- Scripts: `dev`, `dev:client`, `typecheck`, `test`, `load`, `build`, `deploy`
 - Vitest: isolation, protocol, live strokes, history, reconnect/expiry,
-  input boundaries / rate limits / zero-user cleanup
+  input boundaries / rate limits / zero-user cleanup, observability
 
 ## What is planned (not implemented)
 
@@ -57,6 +59,7 @@ a second browser profile. Draw in one tab — the peer should see the stroke
 | `npm run dev:client` | Vite-only client HMR (no Worker / `/api/health`) |
 | `npm run typecheck` | TypeScript checks for app + tests |
 | `npm run test` | Vitest with Cloudflare Workers pool |
+| `npm run load` | Synthetic 5×100 stroke load against local `wrangler dev` |
 | `npm run build` | Production client build into `dist/client` |
 | `npm run deploy` | Build + `wrangler deploy` (requires Cloudflare auth) |
 | `npm run cf-typegen` | Regenerate `worker-configuration.d.ts` from Wrangler config |

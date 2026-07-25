@@ -82,6 +82,13 @@ export type ClientMessage =
       type: "history:redo";
       protocolVersion: typeof PROTOCOL_VERSION;
       roomId: string;
+    }
+  | {
+      type: "ping";
+      protocolVersion: typeof PROTOCOL_VERSION;
+      roomId: string;
+      /** Client `performance.now()` or `Date.now()` at send time. */
+      clientTime: number;
     };
 
 export type ServerMessage =
@@ -140,6 +147,13 @@ export type ServerMessage =
       operations: CommittedOperation[];
       canUndo: boolean;
       canRedo: boolean;
+    }
+  | {
+      type: "pong";
+      protocolVersion: typeof PROTOCOL_VERSION;
+      roomId: string;
+      clientTime: number;
+      serverTime: number;
     }
   | {
       type: "error";
@@ -213,6 +227,8 @@ export function parseClientMessage(value: unknown): ParseClientResult {
           roomId: record.roomId as string,
         },
       };
+    case "ping":
+      return parsePing(record);
     default:
       return {
         ok: false,
@@ -220,6 +236,28 @@ export function parseClientMessage(value: unknown): ParseClientResult {
         message: `Unsupported message type: ${record.type}`,
       };
   }
+}
+
+function parsePing(record: Record<string, unknown>): ParseClientResult {
+  if (
+    typeof record.clientTime !== "number" ||
+    !Number.isFinite(record.clientTime)
+  ) {
+    return {
+      ok: false,
+      code: "invalid_payload",
+      message: "ping.clientTime must be a finite number.",
+    };
+  }
+  return {
+    ok: true,
+    message: {
+      type: "ping",
+      protocolVersion: PROTOCOL_VERSION,
+      roomId: record.roomId as string,
+      clientTime: record.clientTime,
+    },
+  };
 }
 
 function parseJoin(

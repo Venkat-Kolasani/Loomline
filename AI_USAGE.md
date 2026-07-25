@@ -24,14 +24,14 @@ Product name is **Loomline** (repository and Worker name match).
 - Ran install, typecheck, test, build, and local Worker start; recorded results
   in `TESTING.md`
 
-## Canvas shell (`feat(canvas): add layered canvas surface`)
+## Local drawing (`feat(canvas): add local pointer drawing tools`)
 
 ### Assisted by AI
 
-- Two-layer canvas surface, DPR sizing helpers, responsive shell placeholders
+- Pointer drawing controller, stroke painting, point-distance filter, toolbar wiring
 
 ### Manually reviewed / owned by the author
 
-- Verified separate committed/live buffers and dirty-only paint scheduling
-- Confirmed toolbar controls stay disabled until drawing lands
+- Verified brush/eraser/clear locally; touch PointerEvent emulation in-session
+- Confirmed dirty-only rAF paint and no networking in the drawing path
 

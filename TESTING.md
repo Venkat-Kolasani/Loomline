@@ -24,15 +24,15 @@ untested behavior.
 
 ### Touch / mobile
 
-- [ ] Touch drawing works (emulator or device)
-- [ ] Controls usable on narrow viewport
+- [x] Touch drawing path exercised via PointerEvent `pointerType: "touch"` emulation
+- [ ] Controls usable on narrow viewport (spot-check later with real device)
 
 ### Deployed smoke
 
 - [ ] Fresh session on live URL loads
 - [ ] Two clients against deployed origin
 
-## Results — layered canvas shell (2026-07-25)
+## Results — local drawing tools (2026-07-25)
 
 Environment: macOS darwin 25.2.0, Node v24.12.0, npm 11.6.2.
 
@@ -45,12 +45,12 @@ exit 0
 ### `npm run test`
 
 ```text
-Test Files  2 passed (2)
-Tests  6 passed (6)
+Test Files  3 passed (3)
+Tests  12 passed (12)
 exit 0
 ```
 
-Covered: Worker health + Room DO skeleton; canvas sizing/DPR helpers.
+Includes point-filter geometry tests (`test/points.test.ts`).
 
 ### `npm run build`
 
@@ -59,18 +59,20 @@ vite build → dist/client
 exit 0
 ```
 
-### Local Worker (`npm run dev`)
+### Local Worker + browser proof
 
 ```text
 Ready on http://localhost:8787
-GET /api/health → {"ok":true,"service":"loomline","phase":"canvas-shell"}
-GET / → 200 (Loomline shell with committed + live canvases)
+GET /api/health → {"ok":true,"service":"loomline","phase":"local-drawing"}
 ```
 
-DPR check (browser): stage CSS size scaled to backing buffers on both canvases;
-`committed-canvas` z-index 1, `live-canvas` z-index 2.
+Desktop PointerEvent stroke: committed layer gained non-zero pixels; empty-state hidden.  
+Touch-emulated PointerEvent stroke (`pointerType: "touch"`): accepted on same path.  
+Clear: committed pixels → 0; empty-state shown again.  
+Eraser tool toggles `aria-pressed` and disables colour while active.
 
 ### Notes
 
-- Pointer drawing, WebSocket, and rooms are not implemented yet.
-- `npm run deploy` not required yet; production URL unset.
+- No network sync in this slice.
+- Undo/Redo still disabled (server-owned later).
+- Screenshot kept local only (not committed).

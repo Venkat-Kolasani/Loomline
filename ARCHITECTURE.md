@@ -24,6 +24,8 @@ flowchart LR
 | Vite client (`client/`) | Responsive shell with toolbar/status placeholders |
 | Canvas layers | CSS-stacked `committed-canvas` + `live-canvas`; separate buffers |
 | Dirty paint API | `LayeredCanvasSurface` paints a layer only when marked dirty |
+| Local drawing | Pointer Events + capture; brush/eraser/colour/width/clear |
+| Point filter | Near-duplicate samples dropped (`minDistance` CSS px) |
 | Worker (`worker/index.ts`) | Serves `/api/health` and static assets via `env.ASSETS` |
 | `RoomDurableObject` (`worker/room.ts`) | Binding/class skeleton only |
 | Wrangler assets | `dist/client` uploaded/served with the Worker on one origin |
@@ -37,12 +39,13 @@ flowchart LR
 
 ### Rendering layers (current)
 
-1. **committed-canvas** — reserved for deterministic replay of server-sequenced operations. Empty until history lands.
-2. **live-canvas** — reserved for ephemeral local/remote in-progress strokes. Empty until drawing lands.
+1. **committed-canvas** — finished local strokes (later: server-sequenced ops).
+2. **live-canvas** — in-progress stroke preview only; cleared between strokes.
 
-These layers must never paint into each other’s buffers. There is no permanent
-render loop; a layer paints on dirty + `requestAnimationFrame`. DPR-aware resize
-updates both backing stores together.
+Pointer drawing updates live immediately (dirty + rAF). On pointer up, the stroke
+is appended to the local completed list and replayed on committed. Eraser strokes
+use `destination-out` on committed; live shows a translucent preview while active.
+No networking in this module.
 
 ## Planned system design
 

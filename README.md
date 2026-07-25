@@ -3,7 +3,7 @@
 Real-time collaborative drawing canvas for the Flam Frontend R&D assignment.
 
 **Live URL:** _not deployed yet_  
-**Status:** layered canvas shell (no drawing tools yet)
+**Status:** local drawing tools (not synced yet)
 
 This repository intentionally uses **Cloudflare Workers + Durable Objects** (edge
 JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
@@ -16,13 +16,13 @@ JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
 - `RoomDurableObject` binding + class skeleton (no room/WebSocket behavior)
 - Two stacked canvas layers (`committed-canvas`, `live-canvas`) with DPR resize
 - Dirty-layer paint API (no permanent render loop)
-- Accessible toolbar and connection/empty placeholders (controls disabled)
+- Local pointer drawing: brush, eraser, colour, width, clear
+- Near-duplicate point filtering; finished strokes bake onto committed layer
 - Scripts: `dev`, `dev:client`, `typecheck`, `test`, `build`, `deploy`
 - Vitest + Cloudflare Workers pool tests
 
 ## What is planned (not implemented)
 
-- Brush / eraser / colour / width drawing
 - Room landing page and isolated room IDs
 - Native WebSocket protocol and live stroke streaming
 - Authoritative committed operations + SQLite persistence
@@ -63,10 +63,10 @@ realtime are implemented and manually verified.
 
 ## Known limitations
 
-- Canvas layers exist; pointer drawing is not implemented yet
-- No WebSocket, rooms, presence, or undo/redo
-- Toolbar controls are placeholders and remain disabled
-- Production deploy not run yet
+- Drawing is local only — not synced over the network yet
+- Undo/Redo remain disabled until server-owned history lands
+- No rooms, presence, or deploy yet
+- Resize redraws from the in-memory stroke list (expected for this slice)
 
 ## Time spent
 
@@ -83,7 +83,7 @@ Leave unchecked until implemented **and** verified with evidence.
 
 ### Frontend features
 
-- [ ] Drawing tools: brush, eraser, colours, stroke width
+- [x] Drawing tools: brush, eraser, colours, stroke width
 - [ ] Real-time sync: peers see in-progress strokes, not only finished strokes
 - [ ] User indicators: remote cursor / drawing position
 - [ ] Conflict resolution: overlapping strokes remain stable via server sequence
@@ -92,16 +92,16 @@ Leave unchecked until implemented **and** verified with evidence.
 
 ### Technical stack
 
-- [ ] Frontend: vanilla TypeScript + HTML5 Canvas (no framework, no Canvas library)
+- [x] Frontend: vanilla TypeScript + HTML5 Canvas (no framework, no Canvas library)
 - [ ] Backend realtime: native browser WebSocket (no Socket.io)
 - [ ] Backend hosting: Cloudflare Worker + one Durable Object per room (documented trade-off vs Node.js)
 - [ ] Persistence: Durable Object SQLite for committed operations
 
 ### Technical challenges
 
-- [ ] Efficient Canvas path rendering and dirty-layer redraws
+- [x] Efficient Canvas path rendering and dirty-layer redraws
 - [ ] Pointer batching (at most one network batch per animation frame)
-- [ ] Layered committed vs live overlay model
+- [x] Layered committed vs live overlay model
 - [ ] Versioned, validated WebSocket protocol
 - [ ] Server-authoritative operation ordering
 - [ ] Global undo/redo without mutating the durable operation log incorrectly

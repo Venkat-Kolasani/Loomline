@@ -24,14 +24,14 @@ Product name is **Loomline** (repository and Worker name match).
 - Ran install, typecheck, test, build, and local Worker start; recorded results
   in `TESTING.md`
 
-## Local drawing (`feat(canvas): add local pointer drawing tools`)
+## Rooms + presence (`feat(rooms): add isolated room routing`)
 
 ### Assisted by AI
 
-- Pointer drawing controller, stroke painting, point-distance filter, toolbar wiring
+- Room id helpers, Worker `/ws` routing, Durable Object presence, landing UI
 
 ### Manually reviewed / owned by the author
 
-- Verified brush/eraser/clear locally; touch PointerEvent emulation in-session
-- Confirmed dirty-only rAF paint and no networking in the drawing path
+- Explains `idFromName` isolation and presence attachment metadata
+- Verified automated isolation test and two-room browser presence
 

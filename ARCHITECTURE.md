@@ -5,80 +5,71 @@ Status legend: **Implemented** vs **Planned**.
 ## Overview
 
 Loomline is a room-scoped collaborative drawing app. Clients render locally with
-the Canvas 2D API and will synchronize through a Cloudflare Worker that routes
-each room to one Durable Object.
+the Canvas 2D API. Presence (and later drawing sync) goes through a Cloudflare
+Worker that routes each room id to one Durable Object.
 
 ```mermaid
 flowchart LR
-  C1["Client A"] -->|"planned: wss /ws?room=id"| W["Cloudflare Worker"]
-  C2["Client B"] -->|"planned: wss /ws?room=id"| W
-  W -->|"planned: room id routing"| R["RoomDurableObject"]
+  L["Landing /r create"] --> C1["Client A /r/id"]
+  C1 -->|"wss /ws?room=id"| W["Cloudflare Worker"]
+  C2["Client B /r/id"] -->|"wss /ws?room=id"| W
+  W -->|"idFromName(roomId)"| R["RoomDurableObject"]
+  R --> P["Presence via WS attachments"]
   R --> S["Planned: SQLite committed ops"]
-  W -->|"implemented: ASSETS"| A["Static client build"]
+  W -->|"ASSETS"| A["Static SPA"]
 ```
+
+## Why `idFromName(roomId)` is safe isolation
+
+Cloudflare maps the string passed to `idFromName` through an internal hash to a
+**unique Durable Object id**. The Worker never shares one DO across different
+room id strings: `idFromName("aaaa1111")` and `idFromName("bbbb2222")` yield
+different ids and therefore different SQLite stores and WebSocket sets.
+
+We do **not** use `newUniqueId()` for rooms, because clients must reconnect to
+the same room by sharing the human room id in the URL.
+
+Verified in `test/rooms.test.ts`: two room ids write distinct storage marks with
+zero crossover.
 
 ## Implemented
 
 | Piece | Role |
 | --- | --- |
-| Vite client (`client/`) | Responsive shell with toolbar/status placeholders |
-| Canvas layers | CSS-stacked `committed-canvas` + `live-canvas`; separate buffers |
-| Dirty paint API | `LayeredCanvasSurface` paints a layer only when marked dirty |
-| Local drawing | Pointer Events + capture; brush/eraser/colour/width/clear |
-| Point filter | Near-duplicate samples dropped (`minDistance` CSS px) |
-| Worker (`worker/index.ts`) | Serves `/api/health` and static assets via `env.ASSETS` |
-| `RoomDurableObject` (`worker/room.ts`) | Binding/class skeleton only |
-| Wrangler assets | `dist/client` uploaded/served with the Worker on one origin |
+| Landing (`/`) | Create random 8-char room id or join by id → `/r/:roomId` |
+| Room client | Presence list + connection status; local drawing only |
+| Canvas layers | `committed-canvas` + `live-canvas`; dirty rAF paint |
+| Local drawing | Brush/eraser/colour/width/clear (not networked) |
+| Worker | `/api/health`, `/ws?room=`, static assets |
+| `RoomDurableObject` | Hibernatable WebSocket join + presence broadcast |
+| Shared (`shared/room.ts`) | Room id helpers + protocol types |
 
 ### Request path (current)
 
-1. Browser requests a path on the Worker origin.
-2. `/api/health` returns JSON service status.
-3. All other paths are delegated to `env.ASSETS.fetch(request)` (built Vite output).
-4. Durable Object stubs exist in `env.ROOM` but are not routed from HTTP/WebSocket yet.
+1. `/` and `/r/:roomId` served as SPA assets.
+2. Client opens `ws(s)://origin/ws?room=<id>` and sends `join`.
+3. Worker validates room id → `env.ROOM.idFromName(roomId)` → DO upgrade.
+4. DO assigns participant id/colour, stores small attachment metadata, broadcasts
+   `presence` on join/leave.
 
 ### Rendering layers (current)
 
-1. **committed-canvas** — finished local strokes (later: server-sequenced ops).
-2. **live-canvas** — in-progress stroke preview only; cleared between strokes.
+1. **committed-canvas** — finished **local** strokes (later: server-sequenced ops).
+2. **live-canvas** — in-progress local stroke preview.
 
-Pointer drawing updates live immediately (dirty + rAF). On pointer up, the stroke
-is appended to the local completed list and replayed on committed. Eraser strokes
-use `destination-out` on committed; live shows a translucent preview while active.
-No networking in this module.
+## Planned
 
-## Planned system design
+### Drawing sync / persistence
 
-### Room lifecycle (planned)
-
-1. Landing page creates/opens a short room id URL.
-2. Worker upgrades WebSocket and routes by room id to `env.ROOM.idFromName(roomId)`.
-3. DO accepts the socket, sends a snapshot, then streams live + committed events.
-4. Idle rooms may hibernate; constructor/reload restores durable state from SQLite.
-5. Different room ids map to different DO instances — no shared history.
-
-### Persistence (planned)
-
-- Persist only completed strokes as operation records (not one row per pointer point).
-- Store room metadata and undo tombstones in Durable Object SQLite.
-- Live strokes remain ephemeral and may expire safely.
-
-### Reconnect / hibernation (planned)
-
-- Client reconnects with last-seen sequence.
-- Server returns snapshot/replay from durable state.
-- Client ignores already-applied sequences.
-- Hibernation is treated as real: in-memory-only state is never assumed to survive.
+- Live stroke fan-out and durable `operation:committed` with SQLite
+- Global tombstone undo/redo
+- Snapshot/replay on reconnect
 
 ### Scaling path (planned, not claimed)
 
-- Horizontal fan-out is per room (one DO coordinator per room).
-- Large histories may later use optional Canvas checkpoints (stretch).
-- Cross-region latency will be measured and documented, not promised up front.
+- One DO coordinator per room; measure before claiming multi-region numbers
 
 ## Explicit runtime note
 
 This is **not** a Node.js server. The Worker runs on Cloudflare's edge JavaScript
-runtime. Native WebSockets and TypeScript remain web-standard; the coordinator is
-a Durable Object instead of a long-lived Node `ws` process. Rationale:
-[DECISIONS.md](./DECISIONS.md).
+runtime. Rationale: [DECISIONS.md](./DECISIONS.md).

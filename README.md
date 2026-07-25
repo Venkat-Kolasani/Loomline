@@ -3,7 +3,7 @@
 Real-time collaborative drawing canvas for the Flam Frontend R&D assignment.
 
 **Live URL:** _not deployed yet_  
-**Status:** local drawing tools (not synced yet)
+**Status:** isolated rooms + presence (drawing still local-only)
 
 This repository intentionally uses **Cloudflare Workers + Durable Objects** (edge
 JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
@@ -11,24 +11,21 @@ JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
 ## What works now (implemented)
 
 - Vite vanilla TypeScript client shell
-- Wrangler project config
-- Cloudflare Worker that serves built static assets via `ASSETS`
-- `RoomDurableObject` binding + class skeleton (no room/WebSocket behavior)
-- Two stacked canvas layers (`committed-canvas`, `live-canvas`) with DPR resize
+- Landing page: create/join shareable `/r/<roomId>` links
+- Worker routes `/ws?room=` to one Durable Object per room via `idFromName`
+- Presence: join/leave list with deterministic participant colours
+- Two stacked canvas layers with local brush/eraser/colour/width/clear
 - Dirty-layer paint API (no permanent render loop)
-- Local pointer drawing: brush, eraser, colour, width, clear
-- Near-duplicate point filtering; finished strokes bake onto committed layer
 - Scripts: `dev`, `dev:client`, `typecheck`, `test`, `build`, `deploy`
-- Vitest + Cloudflare Workers pool tests
+- Vitest isolation proof for two room ids
 
 ## What is planned (not implemented)
 
-- Room landing page and isolated room IDs
-- Native WebSocket protocol and live stroke streaming
+- Live stroke streaming between peers
 - Authoritative committed operations + SQLite persistence
 - Global undo/redo
-- Presence, cursors, reconnect recovery
-- Deployed demo and multi-user proof
+- Cursors, reconnect snapshot recovery
+- Deployed demo and multi-user drawing proof
 
 ## Quick start
 
@@ -40,7 +37,8 @@ npm run build
 npm run dev
 ```
 
-Then open the local Wrangler URL (typically `http://127.0.0.1:8787`).
+Then open `http://127.0.0.1:8787/`, create a room, and optionally open the same
+room URL in a second browser profile to see presence update.
 
 | Script | Purpose |
 | --- | --- |
@@ -54,19 +52,25 @@ Then open the local Wrangler URL (typically `http://127.0.0.1:8787`).
 
 ## Multi-user testing
 
-_Not available yet._ Room isolation and WebSocket sync land in later slices.
+1. Run `npm run dev` and open `http://127.0.0.1:8787/`.
+2. Click **Create room** and copy the room link.
+3. Open the same link in a second browser/profile — both presence lists should
+   show two participants.
+4. Open a **different** room id — presence must not include the first room’s users.
+5. Drawing still does not sync (expected until the realtime stroke slice).
 
 ## Supported browsers
 
-_Not claimed yet._ Target: current Chrome, Firefox, and Safari once drawing and
-realtime are implemented and manually verified.
+_Not claimed yet._ Target: current Chrome, Firefox, and Safari once drawing sync
+and mobile passes are verified.
 
 ## Known limitations
 
-- Drawing is local only — not synced over the network yet
-- Undo/Redo remain disabled until server-owned history lands
-- No rooms, presence, or deploy yet
-- Resize redraws from the in-memory stroke list (expected for this slice)
+- Drawing remains local-only (not broadcast)
+- Undo/Redo disabled until server history lands
+- No cursor indicators yet
+- Production deploy not run yet
+- Resize redraws from the in-memory local stroke list
 
 ## Time spent
 
@@ -88,13 +92,13 @@ Leave unchecked until implemented **and** verified with evidence.
 - [ ] User indicators: remote cursor / drawing position
 - [ ] Conflict resolution: overlapping strokes remain stable via server sequence
 - [ ] Global undo/redo across all users
-- [ ] User management: online presence and deterministic participant colours
+- [x] User management: online presence and deterministic participant colours
 
 ### Technical stack
 
 - [x] Frontend: vanilla TypeScript + HTML5 Canvas (no framework, no Canvas library)
-- [ ] Backend realtime: native browser WebSocket (no Socket.io)
-- [ ] Backend hosting: Cloudflare Worker + one Durable Object per room (documented trade-off vs Node.js)
+- [x] Backend realtime: native browser WebSocket (no Socket.io)
+- [x] Backend hosting: Cloudflare Worker + one Durable Object per room (documented trade-off vs Node.js)
 - [ ] Persistence: Durable Object SQLite for committed operations
 
 ### Technical challenges
@@ -102,11 +106,11 @@ Leave unchecked until implemented **and** verified with evidence.
 - [x] Efficient Canvas path rendering and dirty-layer redraws
 - [ ] Pointer batching (at most one network batch per animation frame)
 - [x] Layered committed vs live overlay model
-- [ ] Versioned, validated WebSocket protocol
+- [x] Versioned, validated WebSocket protocol
 - [ ] Server-authoritative operation ordering
 - [ ] Global undo/redo without mutating the durable operation log incorrectly
 - [ ] Reconnect / snapshot recovery without duplicate sequence application
-- [ ] Recoverable typed errors for invalid client messages
+- [x] Recoverable typed errors for invalid client messages
 
 ### Submission / demo
 
@@ -120,9 +124,9 @@ Leave unchecked until implemented **and** verified with evidence.
 
 ### Documentation completeness
 
-- [ ] Architecture diagrams and room lifecycle documented as implemented
-- [ ] Protocol schemas match shipped messages
-- [ ] Honest Workers vs Node.js trade-off documented
+- [x] Architecture diagrams and room lifecycle documented as implemented
+- [x] Protocol schemas match shipped messages
+- [x] Honest Workers vs Node.js trade-off documented
 - [ ] Automated and manual test evidence recorded with dates/results
 
 ## Related docs

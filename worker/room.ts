@@ -174,15 +174,10 @@ export class RoomDurableObject extends DurableObject<Env> {
     ws: WebSocket,
     message: string | ArrayBuffer,
   ): Promise<void> {
-    if (typeof message !== "string") {
-      this.sendError(ws, "invalid_payload", "Binary frames are not supported.");
-      return;
-    }
-
     const attachment = ws.deserializeAttachment() as SocketAttachment | null;
 
-    // Joined sockets: every frame counts toward the budget before parse/dispatch
-    // so malformed, oversized, unknown-type, and repeated-join floods cannot bypass.
+    // Joined sockets: every frame counts toward the budget before type/size/parse
+    // so binary, malformed, oversized, unknown-type, and repeated-join floods cannot bypass.
     if (attachment?.participantId) {
       if (
         !allowParticipantMessage(
@@ -198,6 +193,11 @@ export class RoomDurableObject extends DurableObject<Env> {
         );
         return;
       }
+    }
+
+    if (typeof message !== "string") {
+      this.sendError(ws, "invalid_payload", "Binary frames are not supported.");
+      return;
     }
 
     const byteLength = new TextEncoder().encode(message).byteLength;

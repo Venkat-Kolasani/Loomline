@@ -146,6 +146,20 @@ describe("room input boundaries", () => {
     socket.close(1000, "done");
   });
 
+  it("rate-limits a joined socket flooding binary frames", async () => {
+    const roomId = "bbbb9023";
+    const socket = await openRoomSocket(roomId);
+    await joinAndDrain(socket, roomId, "Flood-Binary");
+
+    const err = waitForError(socket, "rate_limited");
+    const binary = new Uint8Array([1, 2, 3]).buffer;
+    for (let i = 0; i < MAX_MESSAGES_PER_WINDOW + 1; i += 1) {
+      socket.send(binary);
+    }
+    await err;
+    socket.close(1000, "done");
+  });
+
   it("serializes rapid undo/redo without corrupting sequence or redo", async () => {
     const roomId = "bbbb9014";
     const socket = await openRoomSocket(roomId);

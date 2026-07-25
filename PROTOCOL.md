@@ -195,12 +195,13 @@ restores via full visible `sync_state`.
 
 `120` frames/s is sized for normal rAF drawing: one `stroke:points` batch plus
 one `cursor` per ~60 Hz frame, with headroom for `start` / `end` / history.
-Once a socket has a participant id, **every** incoming text frame counts toward
-that budget **before** size checks, JSON parse, or type dispatch — including
-malformed, oversized, unknown-type, and repeated `join` frames. Exceeding the
-budget returns `error` `rate_limited`; the room stays alive. History is **not**
-debounced — each accepted `history:undo` / `history:redo` runs to completion
-under Durable Object serialization.
+Once a socket has a participant id, **every** incoming frame (text or binary)
+counts toward that budget **before** the binary reject, size checks, JSON parse,
+or type dispatch — including binary floods, malformed, oversized, unknown-type,
+and repeated `join` frames. Exceeding the budget returns `error` `rate_limited`;
+the room stays alive. History is **not** debounced — each accepted
+`history:undo` / `history:redo` runs to completion under Durable Object
+serialization.
 
 ### Typed boundary errors (non-exhaustive)
 

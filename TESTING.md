@@ -3,6 +3,18 @@
 Evidence log for Loomline. Record **exact commands and outcomes**. Do not claim
 untested behavior.
 
+## Latest gate (2026-07-25 — rate-limit binary frames)
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files  15 passed (15)
+→ Tests  63 passed (63)
+→ build exit 0
+```
+
+Joined binary-frame flood → `rate_limited` (limiter runs before typeof string check).
+
 ## Latest gate (2026-07-25 — UTF-8 size + pre-parse rate limit)
 
 ```text

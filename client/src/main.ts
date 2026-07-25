@@ -1,35 +1,78 @@
-const statusNode = document.querySelector("#status");
+import { LayeredCanvasSurface } from "./canvas/layers";
 
-if (!(statusNode instanceof HTMLElement)) {
-  throw new Error("Expected #status element in scaffold shell.");
+function requireElement<T extends Element>(
+  selector: string,
+  guard: (value: Element) => value is T,
+): T {
+  const node = document.querySelector(selector);
+  if (!node || !guard(node)) {
+    throw new Error(`Missing required element: ${selector}`);
+  }
+  return node;
 }
 
-const statusEl: HTMLElement = statusNode;
+const stage = requireElement(
+  "#canvas-stage",
+  (node): node is HTMLElement => node instanceof HTMLElement,
+);
+const committedCanvas = requireElement(
+  "#committed-canvas",
+  (node): node is HTMLCanvasElement => node instanceof HTMLCanvasElement,
+);
+const liveCanvas = requireElement(
+  "#live-canvas",
+  (node): node is HTMLCanvasElement => node instanceof HTMLCanvasElement,
+);
+const connectionStatus = requireElement(
+  "#connection-status",
+  (node): node is HTMLElement => node instanceof HTMLElement,
+);
+const emptyState = requireElement(
+  "#empty-state",
+  (node): node is HTMLElement => node instanceof HTMLElement,
+);
 
-async function checkHealth(): Promise<void> {
+const surface = new LayeredCanvasSurface({
+  committedCanvas,
+  liveCanvas,
+});
+
+function resizeSurface(): void {
+  const rect = stage.getBoundingClientRect();
+  surface.resizeToContainer(rect.width, rect.height);
+}
+
+resizeSurface();
+surface.paintNow();
+
+const resizeObserver = new ResizeObserver(() => {
+  resizeSurface();
+});
+resizeObserver.observe(stage);
+
+window.addEventListener(
+  "resize",
+  () => {
+    resizeSurface();
+  },
+  { passive: true },
+);
+
+connectionStatus.textContent = "Disconnected";
+emptyState.hidden = false;
+
+async function refreshConnectionPlaceholder(): Promise<void> {
   try {
     const response = await fetch("/api/health");
     if (!response.ok) {
-      statusEl.textContent = `Health check failed (${response.status}).`;
+      connectionStatus.textContent = "Disconnected";
       return;
     }
-
-    const body: unknown = await response.json();
-    if (
-      typeof body === "object" &&
-      body !== null &&
-      "ok" in body &&
-      body.ok === true
-    ) {
-      statusEl.textContent = "Worker health OK — scaffold is running.";
-      return;
-    }
-
-    statusEl.textContent = "Unexpected health response shape.";
+    // Room WebSocket is not wired yet; health only proves the Worker origin.
+    connectionStatus.textContent = "Disconnected";
   } catch {
-    statusEl.textContent =
-      "Could not reach /api/health. Use `npm run dev` (Wrangler) rather than Vite alone for the full Worker.";
+    connectionStatus.textContent = "Disconnected";
   }
 }
 
-void checkHealth();
+void refreshConnectionPlaceholder();

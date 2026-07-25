@@ -7,16 +7,74 @@
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
-    <main class="shell">
-      <p class="eyebrow">RelayCanvas</p>
-      <h1>Scaffold ready</h1>
-      <p class="lede">
-        Baseline Vite client, Cloudflare Worker static assets, and Durable
-        Object binding are in place. Drawing and realtime collaboration arrive
-        in later slices.
-      </p>
-      <p id="status" class="status" role="status">Checking local Worker health…</p>
-    </main>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand-block">
+          <p class="eyebrow">RelayCanvas</p>
+          <h1>Room canvas</h1>
+        </div>
+        <p id="connection-status" class="connection-status" role="status">
+          Disconnected
+        </p>
+      </header>
+
+      <div
+        class="toolbar"
+        role="toolbar"
+        aria-label="Drawing tools"
+        aria-controls="live-canvas"
+      >
+        <button type="button" id="tool-brush" disabled>Brush</button>
+        <button type="button" id="tool-eraser" disabled>Eraser</button>
+        <label class="field">
+          <span>Color</span>
+          <input
+            id="tool-color"
+            type="color"
+            value="#0f6a5a"
+            disabled
+            aria-disabled="true"
+          />
+        </label>
+        <label class="field">
+          <span>Width</span>
+          <input
+            id="tool-width"
+            type="range"
+            min="1"
+            max="32"
+            value="4"
+            disabled
+            aria-disabled="true"
+          />
+        </label>
+        <button type="button" id="tool-undo" disabled>Undo</button>
+        <button type="button" id="tool-redo" disabled>Redo</button>
+      </div>
+
+      <section
+        class="stage-wrap"
+        aria-label="Drawing surface"
+      >
+        <div id="canvas-stage" class="canvas-stage">
+          <canvas
+            id="committed-canvas"
+            width="1"
+            height="1"
+            aria-label="Committed drawing layer"
+          ></canvas>
+          <canvas
+            id="live-canvas"
+            width="1"
+            height="1"
+            aria-label="Live stroke overlay"
+          ></canvas>
+        </div>
+        <p id="empty-state" class="empty-state">
+          Canvas is empty. Tools and drawing are not enabled yet.
+        </p>
+      </section>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

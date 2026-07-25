@@ -58,3 +58,16 @@ Product name is **Loomline** (repository and Worker name match).
 
 - Understands why old close handlers must not overwrite a new connection status
 
+## Live strokes (`feat(realtime): broadcast live stroke batches`)
+
+### Assisted by AI
+
+- `shared/protocol.ts` validation, DO live fan-out, client rAF batcher, remote
+  live overlay + cursor layer, protocol/live integration tests, docs updates
+
+### Manually reviewed / owned by the author
+
+- Explains why local paint is immediate while network points coalesce per rAF
+- Confirms `stroke:end` does **not** persist or sequence in this slice
+- Owns two-browser mid-stroke proof and typed-error recovery evidence
+

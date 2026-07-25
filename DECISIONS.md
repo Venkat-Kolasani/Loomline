@@ -71,5 +71,35 @@ These will get full decision records when implemented:
 
 - Global tombstone undo/redo vs mutating/deleting ops
 - Overlap policy = server sequence stacking (not pixel merge / CRDT)
-- Pointer distance filter + rAF batching thresholds
 - Snapshot vs full replay for reconnect of large histories
+
+## D3 — rAF point batching for live stroke network sends
+
+### Problem / invariant
+
+Raw pointer events can fire far more often than one frame. Emitting one
+WebSocket message per sample would flood the room and fight the “local paint
+before network” invariant by coupling responsiveness to send rate.
+
+### Selected design
+
+- Local canvas updates on every accepted filtered point immediately.
+- `StrokePointBatcher` queues outbound points and flushes **at most once per
+  `requestAnimationFrame`** as `stroke:points`.
+- `stroke:start` and `stroke:end` send immediately (end flushes the batcher
+  first). The Durable Object fans out `stroke:live` to peers only — no SQLite.
+
+### Rejected alternative
+
+One network message per pointer event, or a fixed timer (e.g. 50 ms) independent
+of frames.
+
+Rejected because per-event floods the wire under fast input, and a fixed timer
+decouples from display refresh without improving local latency.
+
+### Verification
+
+- Unit: `test/stroke-batcher.test.ts` coalesces multiple enqueues into one flush.
+- Integration: `test/live-strokes.test.ts` proves peer receives `stroke:live`
+  start/points before end.
+- Manual two-browser: peer sees ink mid-stroke. See [TESTING.md](./TESTING.md).

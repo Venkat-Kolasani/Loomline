@@ -190,7 +190,41 @@ Pointer / touch-emulation drawing still completes strokes on the live layer.
 
 ---
 
-## Template for new entries
+## I6 — Landing and room views both painted because `[hidden]` lost to `.app`
+
+**When:** Prompt 5 (live strokes), first browser proof on `/`.
+
+**What the issue was**
+
+The landing page and the room shell rendered stacked on `/`. Room status showed
+“Disconnected” even though `routeFromLocation` never called `enterRoom`.
+
+**Root cause**
+
+Author rule `.app { display: grid }` overrides the user-agent stylesheet’s
+`[hidden] { display: none }` (same specificity; author wins). The room view kept
+the `hidden` attribute but was still laid out.
+
+**What we fixed**
+
+Add an explicit author rule:
+
+```css
+[hidden] {
+  display: none !important;
+}
+```
+
+**Why this way**
+
+- Restores the HTML `hidden` contract without restructuring view CSS.
+- Rejected toggling only a `.is-visible` class — would diverge from the existing
+  `hidden` attribute pattern on `#view-landing` / `#view-room`.
+
+**Verification**
+
+Reload `/` → only landing visible; create room → only room visible. Live stroke
+proof proceeds on that layout.
 
 Copy this block when logging a future issue:
 

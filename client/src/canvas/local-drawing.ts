@@ -1,3 +1,4 @@
+import type { StrokePoint } from "../../../shared/protocol";
 import type { CanvasBackingSize } from "./sizing";
 import { clientToCssPoint } from "./sizing";
 import { appendFilteredPoint, type Point } from "./points";
@@ -9,25 +10,47 @@ import {
 } from "./stroke";
 import type { LayeredCanvasSurface } from "./layers";
 
+export interface LocalStrokeStartEvent {
+  strokeId: string;
+  tool: DrawingTool;
+  color: string;
+  width: number;
+  point: StrokePoint;
+}
+
+export interface LocalDrawingNetworkHooks {
+  onStrokeStart: (event: LocalStrokeStartEvent) => void;
+  onStrokePoints: (strokeId: string, points: StrokePoint[]) => void;
+  onStrokeEnd: (strokeId: string, point?: StrokePoint) => void;
+  onCursor: (point: StrokePoint) => void;
+}
+
 export interface LocalDrawingOptions {
   surface: LayeredCanvasSurface;
   liveCanvas: HTMLCanvasElement;
   minPointDistance?: number;
   onStrokesChanged?: (hasInk: boolean) => void;
+  network?: LocalDrawingNetworkHooks;
+}
+
+interface ActiveStroke extends Stroke {
+  strokeId: string;
 }
 
 /**
- * Local-only pointer drawing. Finished strokes live on the committed layer;
- * the in-progress stroke paints on the live overlay. No networking.
+ * Local pointer drawing with optional network hooks.
+ * Local pixels paint immediately; network point batches are owned by the caller
+ * (typically one stroke:points send per animation frame).
  */
 export class LocalDrawingController {
   private readonly surface: LayeredCanvasSurface;
   private readonly liveCanvas: HTMLCanvasElement;
   private readonly minPointDistance: number;
   private readonly onStrokesChanged?: (hasInk: boolean) => void;
+  private network?: LocalDrawingNetworkHooks;
 
   private completed: Stroke[] = [];
-  private active: Stroke | null = null;
+  private active: ActiveStroke | null = null;
   private drawing = false;
   private activePointerId: number | null = null;
 
@@ -40,12 +63,17 @@ export class LocalDrawingController {
     this.liveCanvas = options.liveCanvas;
     this.minPointDistance = options.minPointDistance ?? 1.5;
     this.onStrokesChanged = options.onStrokesChanged;
+    this.network = options.network;
 
     this.liveCanvas.addEventListener("pointerdown", this.onPointerDown);
     this.liveCanvas.addEventListener("pointermove", this.onPointerMove);
     this.liveCanvas.addEventListener("pointerup", this.onPointerUp);
     this.liveCanvas.addEventListener("pointercancel", this.onPointerUp);
     this.liveCanvas.addEventListener("lostpointercapture", this.onLostCapture);
+  }
+
+  setNetworkHooks(network: LocalDrawingNetworkHooks | undefined): void {
+    this.network = network;
   }
 
   getPainters(): {
@@ -113,7 +141,9 @@ export class LocalDrawingController {
     this.activePointerId = event.pointerId;
 
     const point = this.toCanvasPoint(event);
+    const strokeId = crypto.randomUUID();
     this.active = {
+      strokeId,
       tool: this.tool,
       color: this.color,
       width: this.width,
@@ -121,15 +151,25 @@ export class LocalDrawingController {
     };
     this.surface.markDirty("live");
     this.notify();
+    this.network?.onStrokeStart({
+      strokeId,
+      tool: this.tool,
+      color: this.color,
+      width: this.width,
+      point,
+    });
+    this.network?.onCursor(point);
   };
 
   private readonly onPointerMove = (event: PointerEvent): void => {
+    const point = this.toCanvasPoint(event);
+    this.network?.onCursor(point);
+
     if (!this.drawing || event.pointerId !== this.activePointerId || !this.active) {
       return;
     }
 
     event.preventDefault();
-    const point = this.toCanvasPoint(event);
     const nextPoints = appendFilteredPoint(
       this.active.points,
       point,
@@ -141,6 +181,7 @@ export class LocalDrawingController {
 
     this.active.points = nextPoints as Point[];
     this.surface.markDirty("live");
+    this.network?.onStrokePoints(this.active.strokeId, [point]);
   };
 
   private readonly onPointerUp = (event: PointerEvent): void => {
@@ -167,8 +208,10 @@ export class LocalDrawingController {
       // Ignore release failures when capture was never held.
     }
 
-    if (this.active && this.active.points.length > 0) {
-      this.completed = [...this.completed, this.active];
+    const active = this.active;
+    if (active && active.points.length > 0) {
+      this.completed = [...this.completed, active];
+      this.network?.onStrokeEnd(active.strokeId);
     }
 
     this.active = null;

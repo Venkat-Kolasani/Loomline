@@ -1,12 +1,17 @@
 import { DurableObject } from "cloudflare:workers";
 import {
+  MAX_DISPLAY_NAME_LENGTH,
+  parseClientMessage,
+  type ClientMessage,
+  type ServerMessage,
+  type StrokeLivePhase,
+} from "../shared/protocol";
+import {
   PROTOCOL_VERSION,
   colorForParticipantId,
   defaultDisplayName,
   isValidRoomId,
-  type ClientMessage,
   type Participant,
-  type ServerMessage,
   type SocketAttachment,
 } from "../shared/room";
 
@@ -14,9 +19,16 @@ const ISOLATION_MARK_KEY = "isolationMark";
 
 /**
  * One Durable Object instance per room id (via idFromName).
- * This slice: WebSocket join + presence only. No drawing sync yet.
+ * This slice: presence + ephemeral live stroke / cursor fan-out.
+ * Completed strokes are NOT persisted and do not receive sequence numbers.
  */
 export class RoomDurableObject extends DurableObject<Env> {
+  /**
+   * Ephemeral in-memory live strokes for this isolate wake.
+   * Not durable across hibernation — by design for provisional ink.
+   */
+  private readonly liveStrokes = new Map<string, LiveStrokeState>();
+
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
@@ -28,7 +40,8 @@ export class RoomDurableObject extends DurableObject<Env> {
         return new Response("ok");
       }
       if (request.method === "GET") {
-        const value = (await this.ctx.storage.get<string>(ISOLATION_MARK_KEY)) ?? "";
+        const value =
+          (await this.ctx.storage.get<string>(ISOLATION_MARK_KEY)) ?? "";
         return new Response(value);
       }
       return new Response("Method not allowed", { status: 405 });
@@ -85,23 +98,83 @@ export class RoomDurableObject extends DurableObject<Env> {
       return;
     }
 
-    const join = parseJoinMessage(parsed);
-    if (!join) {
-      this.sendError(
-        ws,
-        "unsupported_type",
-        "Only join messages are accepted in this slice.",
-      );
+    const result = parseClientMessage(parsed);
+    if (!result.ok) {
+      this.sendError(ws, result.code, result.message);
       return;
     }
 
     const attachment = ws.deserializeAttachment() as SocketAttachment | null;
-    const roomId = attachment?.roomId ?? join.roomId;
-    if (!isValidRoomId(roomId) || join.roomId !== roomId) {
+    const roomId = attachment?.roomId ?? result.message.roomId;
+    if (!isValidRoomId(roomId) || result.message.roomId !== roomId) {
       this.sendError(ws, "room_mismatch", "roomId does not match this socket.");
       return;
     }
 
+    switch (result.message.type) {
+      case "join":
+        this.handleJoin(ws, attachment, result.message, roomId);
+        return;
+      case "stroke:start":
+      case "stroke:points":
+      case "stroke:end":
+      case "cursor":
+        this.handleJoinedMessage(ws, attachment, result.message, roomId);
+        return;
+    }
+  }
+
+  async webSocketClose(
+    ws: WebSocket,
+    code: number,
+    reason: string,
+    _wasClean: boolean,
+  ): Promise<void> {
+    const attachment = ws.deserializeAttachment() as SocketAttachment | null;
+    try {
+      ws.close(code, reason);
+    } catch {
+      // Socket may already be closing.
+    }
+    this.clearLiveStrokesForParticipant(attachment?.participantId);
+    // getWebSockets() still includes `ws` during close; exclude it explicitly.
+    this.refreshPresenceAfterDepart(ws, attachment);
+  }
+
+  async webSocketError(ws: WebSocket, _error: unknown): Promise<void> {
+    const attachment = ws.deserializeAttachment() as SocketAttachment | null;
+    try {
+      ws.close(1011, "error");
+    } catch {
+      // Ignore.
+    }
+    this.clearLiveStrokesForParticipant(attachment?.participantId);
+    this.refreshPresenceAfterDepart(ws, attachment);
+  }
+
+  /**
+   * Test-only: invoke the webSocketError path for a joined participant so
+   * integration tests can cover departure-on-error without a real transport fault.
+   */
+  private async simulateErrorForParticipant(
+    participantId: string,
+  ): Promise<boolean> {
+    for (const socket of this.ctx.getWebSockets()) {
+      const attachment = socket.deserializeAttachment() as SocketAttachment | null;
+      if (attachment?.participantId === participantId) {
+        await this.webSocketError(socket, new Error("simulated"));
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private handleJoin(
+    ws: WebSocket,
+    attachment: SocketAttachment | null,
+    join: Extract<ClientMessage, { type: "join" }>,
+    roomId: string,
+  ): void {
     if (attachment?.participantId) {
       this.sendError(ws, "already_joined", "Already joined this room.");
       return;
@@ -136,48 +209,157 @@ export class RoomDurableObject extends DurableObject<Env> {
     this.broadcastPresence(roomId);
   }
 
-  async webSocketClose(
+  private handleJoinedMessage(
     ws: WebSocket,
-    code: number,
-    reason: string,
-    _wasClean: boolean,
-  ): Promise<void> {
-    const attachment = ws.deserializeAttachment() as SocketAttachment | null;
-    try {
-      ws.close(code, reason);
-    } catch {
-      // Socket may already be closing.
+    attachment: SocketAttachment | null,
+    message: Exclude<ClientMessage, { type: "join" }>,
+    roomId: string,
+  ): void {
+    if (!attachment?.participantId) {
+      this.sendError(ws, "not_joined", "Join the room before sending strokes.");
+      return;
     }
-    // getWebSockets() still includes `ws` during close; exclude it explicitly.
-    this.refreshPresenceAfterDepart(ws, attachment);
+
+    switch (message.type) {
+      case "stroke:start":
+        this.handleStrokeStart(ws, attachment, message, roomId);
+        return;
+      case "stroke:points":
+        this.handleStrokePoints(ws, attachment, message, roomId);
+        return;
+      case "stroke:end":
+        this.handleStrokeEnd(ws, attachment, message, roomId);
+        return;
+      case "cursor":
+        this.broadcastExcept(ws, {
+          type: "cursor",
+          protocolVersion: PROTOCOL_VERSION,
+          roomId,
+          participantId: attachment.participantId,
+          x: message.x,
+          y: message.y,
+        });
+        return;
+    }
   }
 
-  async webSocketError(ws: WebSocket, _error: unknown): Promise<void> {
-    const attachment = ws.deserializeAttachment() as SocketAttachment | null;
-    try {
-      ws.close(1011, "error");
-    } catch {
-      // Ignore.
+  private handleStrokeStart(
+    ws: WebSocket,
+    attachment: SocketAttachment,
+    message: Extract<ClientMessage, { type: "stroke:start" }>,
+    roomId: string,
+  ): void {
+    const key = liveKey(attachment.participantId, message.strokeId);
+    if (this.liveStrokes.has(key)) {
+      this.sendError(ws, "stroke_active", "Stroke already started.");
+      return;
     }
-    // Same exclusion as close: departing socket must not appear in presence.
-    this.refreshPresenceAfterDepart(ws, attachment);
+
+    this.liveStrokes.set(key, {
+      participantId: attachment.participantId,
+      strokeId: message.strokeId,
+      tool: message.tool,
+      color: message.color,
+      width: message.width,
+    });
+
+    this.broadcastStrokeLive(ws, {
+      roomId,
+      participantId: attachment.participantId,
+      strokeId: message.strokeId,
+      phase: "start",
+      tool: message.tool,
+      color: message.color,
+      width: message.width,
+      points: [message.point],
+    });
   }
 
-  /**
-   * Test-only: invoke the webSocketError path for a joined participant so
-   * integration tests can cover departure-on-error without a real transport fault.
-   */
-  private async simulateErrorForParticipant(
-    participantId: string,
-  ): Promise<boolean> {
-    for (const socket of this.ctx.getWebSockets()) {
-      const attachment = socket.deserializeAttachment() as SocketAttachment | null;
-      if (attachment?.participantId === participantId) {
-        await this.webSocketError(socket, new Error("simulated"));
-        return true;
+  private handleStrokePoints(
+    ws: WebSocket,
+    attachment: SocketAttachment,
+    message: Extract<ClientMessage, { type: "stroke:points" }>,
+    roomId: string,
+  ): void {
+    const key = liveKey(attachment.participantId, message.strokeId);
+    const live = this.liveStrokes.get(key);
+    if (!live) {
+      this.sendError(ws, "unknown_stroke", "No active stroke for strokeId.");
+      return;
+    }
+
+    this.broadcastStrokeLive(ws, {
+      roomId,
+      participantId: attachment.participantId,
+      strokeId: message.strokeId,
+      phase: "points",
+      points: message.points,
+    });
+  }
+
+  private handleStrokeEnd(
+    ws: WebSocket,
+    attachment: SocketAttachment,
+    message: Extract<ClientMessage, { type: "stroke:end" }>,
+    roomId: string,
+  ): void {
+    const key = liveKey(attachment.participantId, message.strokeId);
+    const live = this.liveStrokes.get(key);
+    if (!live) {
+      this.sendError(ws, "unknown_stroke", "No active stroke for strokeId.");
+      return;
+    }
+
+    this.liveStrokes.delete(key);
+    const points = message.point ? [message.point] : [];
+    this.broadcastStrokeLive(ws, {
+      roomId,
+      participantId: attachment.participantId,
+      strokeId: message.strokeId,
+      phase: "end",
+      points,
+    });
+    // Intentionally no SQLite write and no operation:committed in this slice.
+  }
+
+  private broadcastStrokeLive(
+    sender: WebSocket,
+    payload: {
+      roomId: string;
+      participantId: string;
+      strokeId: string;
+      phase: StrokeLivePhase;
+      tool?: LiveStrokeState["tool"];
+      color?: string;
+      width?: number;
+      points: { x: number; y: number }[];
+    },
+  ): void {
+    this.broadcastExcept(sender, {
+      type: "stroke:live",
+      protocolVersion: PROTOCOL_VERSION,
+      roomId: payload.roomId,
+      participantId: payload.participantId,
+      strokeId: payload.strokeId,
+      phase: payload.phase,
+      tool: payload.tool,
+      color: payload.color,
+      width: payload.width,
+      points: payload.points,
+    });
+  }
+
+  private clearLiveStrokesForParticipant(
+    participantId: string | undefined,
+  ): void {
+    if (!participantId) {
+      return;
+    }
+    for (const key of [...this.liveStrokes.keys()]) {
+      if (key.startsWith(`${participantId}:`)) {
+        this.liveStrokes.delete(key);
       }
     }
-    return false;
   }
 
   private refreshPresenceAfterDepart(
@@ -207,9 +389,16 @@ export class RoomDurableObject extends DurableObject<Env> {
       roomId,
       participants,
     };
-    const payload = JSON.stringify(message);
+    this.broadcastRaw(JSON.stringify(message), options?.excludeSocket);
+  }
+
+  private broadcastExcept(sender: WebSocket, message: ServerMessage): void {
+    this.broadcastRaw(JSON.stringify(message), sender);
+  }
+
+  private broadcastRaw(payload: string, exclude?: WebSocket): void {
     for (const socket of this.ctx.getWebSockets()) {
-      if (options?.excludeSocket && socket === options.excludeSocket) {
+      if (exclude && socket === exclude) {
         continue;
       }
       try {
@@ -262,32 +451,16 @@ export class RoomDurableObject extends DurableObject<Env> {
   }
 }
 
-function parseJoinMessage(value: unknown): ClientMessage | null {
-  if (typeof value !== "object" || value === null) {
-    return null;
-  }
-  const record = value as Record<string, unknown>;
-  if (record.type !== "join") {
-    return null;
-  }
-  if (record.protocolVersion !== PROTOCOL_VERSION) {
-    return null;
-  }
-  if (typeof record.roomId !== "string") {
-    return null;
-  }
-  if (
-    record.displayName !== undefined &&
-    typeof record.displayName !== "string"
-  ) {
-    return null;
-  }
-  return {
-    type: "join",
-    protocolVersion: PROTOCOL_VERSION,
-    roomId: record.roomId,
-    displayName: record.displayName,
-  };
+interface LiveStrokeState {
+  participantId: string;
+  strokeId: string;
+  tool: "brush" | "eraser";
+  color: string;
+  width: number;
+}
+
+function liveKey(participantId: string, strokeId: string): string {
+  return `${participantId}:${strokeId}`;
 }
 
 function sanitizeDisplayName(
@@ -297,6 +470,6 @@ function sanitizeDisplayName(
   if (!raw) {
     return fallback;
   }
-  const trimmed = raw.trim().slice(0, 24);
+  const trimmed = raw.trim().slice(0, MAX_DISPLAY_NAME_LENGTH);
   return trimmed.length > 0 ? trimmed : fallback;
 }

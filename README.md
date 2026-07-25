@@ -3,7 +3,7 @@
 Real-time collaborative drawing canvas for the Flam Frontend R&D assignment.
 
 **Live URL:** _not deployed yet_  
-**Status:** isolated rooms + presence (drawing still local-only)
+**Status:** live stroke streaming between room participants (not yet durable)
 
 This repository intentionally uses **Cloudflare Workers + Durable Objects** (edge
 JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
@@ -14,18 +14,20 @@ JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
 - Landing page: create/join shareable `/r/<roomId>` links
 - Worker routes `/ws?room=` to one Durable Object per room via `idFromName`
 - Presence: join/leave list with deterministic participant colours
-- Two stacked canvas layers with local brush/eraser/colour/width/clear
+- Live stroke fan-out (`stroke:start` / `points` / `end` → `stroke:live`)
+- Remote cursors (ephemeral)
+- rAF-batched outgoing points; immediate local drawing
+- Two stacked canvas layers with brush/eraser/colour/width/clear
 - Dirty-layer paint API (no permanent render loop)
 - Scripts: `dev`, `dev:client`, `typecheck`, `test`, `build`, `deploy`
-- Vitest isolation proof for two room ids
+- Vitest: room isolation, protocol validation, live stroke fan-out
 
 ## What is planned (not implemented)
 
-- Live stroke streaming between peers
 - Authoritative committed operations + SQLite persistence
 - Global undo/redo
-- Cursors, reconnect snapshot recovery
-- Deployed demo and multi-user drawing proof
+- Reconnect snapshot recovery
+- Deployed demo URL
 
 ## Quick start
 
@@ -37,8 +39,9 @@ npm run build
 npm run dev
 ```
 
-Then open `http://127.0.0.1:8787/`, create a room, and optionally open the same
-room URL in a second browser profile to see presence update.
+Then open `http://127.0.0.1:8787/`, create a room, and open the same room URL in
+a second browser profile. Draw in one tab — the peer should see the stroke
+**while it is still in progress**.
 
 | Script | Purpose |
 | --- | --- |
@@ -56,8 +59,11 @@ room URL in a second browser profile to see presence update.
 2. Click **Create room** and copy the room link.
 3. Open the same link in a second browser/profile — both presence lists should
    show two participants.
-4. Open a **different** room id — presence must not include the first room’s users.
-5. Drawing still does not sync (expected until the realtime stroke slice).
+4. Draw slowly in client A — client B must show the stroke **before** A lifts
+   the pointer (live overlay).
+5. Open a **different** room id — presence and strokes must not cross rooms.
+6. Finished strokes are visible to peers via provisional client retention, but
+   are **not** durable / sequenced yet (no undo, no refresh recovery).
 
 ## Supported browsers
 
@@ -66,11 +72,12 @@ and mobile passes are verified.
 
 ## Known limitations
 
-- Drawing remains local-only (not broadcast)
+- Completed strokes are **not** persisted (no SQLite / no sequence yet)
+- Refresh loses all ink; reconnect does not restore a snapshot
 - Undo/Redo disabled until server history lands
-- No cursor indicators yet
+- Clear is local-only (does not clear peers)
 - Production deploy not run yet
-- Resize redraws from the in-memory local stroke list
+- Resize redraws from in-memory stroke lists
 
 ## Time spent
 
@@ -88,8 +95,8 @@ Leave unchecked until implemented **and** verified with evidence.
 ### Frontend features
 
 - [x] Drawing tools: brush, eraser, colours, stroke width
-- [ ] Real-time sync: peers see in-progress strokes, not only finished strokes
-- [ ] User indicators: remote cursor / drawing position
+- [x] Real-time sync: peers see in-progress strokes, not only finished strokes
+- [x] User indicators: remote cursor / drawing position
 - [ ] Conflict resolution: overlapping strokes remain stable via server sequence
 - [ ] Global undo/redo across all users
 - [x] User management: online presence and deterministic participant colours
@@ -104,7 +111,7 @@ Leave unchecked until implemented **and** verified with evidence.
 ### Technical challenges
 
 - [x] Efficient Canvas path rendering and dirty-layer redraws
-- [ ] Pointer batching (at most one network batch per animation frame)
+- [x] Pointer batching (at most one network batch per animation frame)
 - [x] Layered committed vs live overlay model
 - [x] Versioned, validated WebSocket protocol
 - [ ] Server-authoritative operation ordering

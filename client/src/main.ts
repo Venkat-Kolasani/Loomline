@@ -1,9 +1,13 @@
 import { LayeredCanvasSurface } from "./canvas/layers";
 import { LocalDrawingController } from "./canvas/local-drawing";
+import { RemoteStrokeStore } from "./canvas/remote-strokes";
 import type { DrawingTool } from "./canvas/stroke";
+import { RemoteCursorLayer } from "./net/remote-cursors";
 import { RoomSocket } from "./net/room-socket";
+import { StrokePointBatcher } from "./net/stroke-batcher";
 import type { Participant } from "../../shared/room";
 import { createRoomId, isValidRoomId } from "../../shared/room";
+import type { StrokePoint } from "../../shared/protocol";
 
 function requireElement<T extends Element>(
   selector: string,
@@ -52,6 +56,10 @@ const committedCanvas = requireElement(
 const liveCanvas = requireElement(
   "#live-canvas",
   (node): node is HTMLCanvasElement => node instanceof HTMLCanvasElement,
+);
+const cursorLayerRoot = requireElement(
+  "#cursor-layer",
+  (node): node is HTMLElement => node instanceof HTMLElement,
 );
 const connectionStatus = requireElement(
   "#connection-status",
@@ -105,14 +113,22 @@ const widthValue = requireElement(
 let drawing!: LocalDrawingController;
 let roomSocket: RoomSocket | null = null;
 let selfParticipant: Participant | null = null;
+const remoteStrokes = new RemoteStrokeStore();
+const remoteCursors = new RemoteCursorLayer(cursorLayerRoot);
+
+let strokeBatcher: StrokePointBatcher | null = null;
+let pendingCursor: StrokePoint | null = null;
+let cursorRaf: number | null = null;
 
 const surface = new LayeredCanvasSurface({
   committedCanvas,
   liveCanvas,
   paintCommitted: (ctx, size) => {
+    remoteStrokes.paintProvisionalCommitted(ctx);
     drawing.getPainters().paintCommitted(ctx, size);
   },
   paintLive: (ctx, size) => {
+    remoteStrokes.paintLive(ctx);
     drawing.getPainters().paintLive(ctx, size);
   },
 });
@@ -120,10 +136,17 @@ const surface = new LayeredCanvasSurface({
 drawing = new LocalDrawingController({
   surface,
   liveCanvas,
-  onStrokesChanged: (hasInk) => {
-    emptyState.hidden = hasInk;
+  onStrokesChanged: () => {
+    updateEmptyState();
   },
 });
+
+function updateEmptyState(): void {
+  const hasRemote =
+    remoteStrokes.getActiveStrokes().length > 0 ||
+    remoteStrokes.getProvisionalFinished().length > 0;
+  emptyState.hidden = drawing.hasInk() || hasRemote;
+}
 
 function resizeSurface(): void {
   const rect = stage.getBoundingClientRect();
@@ -156,20 +179,36 @@ function parseRoomPath(pathname: string): string | null {
   return isValidRoomId(roomId) ? roomId : null;
 }
 
+function clearNetworkHelpers(): void {
+  strokeBatcher?.clear();
+  strokeBatcher = null;
+  if (cursorRaf !== null) {
+    cancelAnimationFrame(cursorRaf);
+    cursorRaf = null;
+  }
+  pendingCursor = null;
+  drawing.setNetworkHooks(undefined);
+}
+
 function showLanding(): void {
   roomSocket?.disconnect();
   roomSocket = null;
   selfParticipant = null;
+  clearNetworkHelpers();
+  remoteStrokes.clearAll();
+  remoteCursors.clear();
   renderPresence([]);
   selfBadge.hidden = true;
   drawing.clearLocal();
   landingView.hidden = false;
   roomView.hidden = true;
   document.title = "Loomline";
+  updateEmptyState();
 }
 
 function renderPresence(participants: Participant[]): void {
   presenceList.replaceChildren();
+  remoteCursors.syncParticipants(participants);
   for (const participant of participants) {
     const item = document.createElement("li");
     item.className = "presence-item";
@@ -186,6 +225,74 @@ function renderPresence(participants: Participant[]): void {
     item.appendChild(label);
     presenceList.appendChild(item);
   }
+
+  if (selfParticipant) {
+    const presentIds = new Set(participants.map((p) => p.id));
+    for (const stroke of remoteStrokes.getActiveStrokes()) {
+      if (!presentIds.has(stroke.participantId)) {
+        const result = remoteStrokes.clearParticipant(stroke.participantId);
+        if (result.liveDirty) {
+          surface.markDirty("live");
+        }
+      }
+    }
+  }
+}
+
+function scheduleCursorSend(point: StrokePoint): void {
+  pendingCursor = point;
+  if (cursorRaf !== null) {
+    return;
+  }
+  cursorRaf = requestAnimationFrame(() => {
+    cursorRaf = null;
+    const next = pendingCursor;
+    pendingCursor = null;
+    if (!next || !roomSocket?.isReady()) {
+      return;
+    }
+    roomSocket.sendCursor(next.x, next.y);
+  });
+}
+
+function wireDrawingNetwork(socket: RoomSocket): void {
+  strokeBatcher = new StrokePointBatcher({
+    sendPoints: (strokeId, points) => {
+      if (roomSocket !== socket || !socket.isReady()) {
+        return;
+      }
+      socket.sendStrokePoints(strokeId, points);
+    },
+  });
+
+  drawing.setNetworkHooks({
+    onStrokeStart: (event) => {
+      if (roomSocket !== socket || !socket.isReady()) {
+        return;
+      }
+      strokeBatcher?.flushNow();
+      socket.sendStrokeStart(event);
+    },
+    onStrokePoints: (strokeId, points) => {
+      if (roomSocket !== socket) {
+        return;
+      }
+      strokeBatcher?.enqueue(strokeId, points);
+    },
+    onStrokeEnd: (strokeId, point) => {
+      if (roomSocket !== socket || !socket.isReady()) {
+        return;
+      }
+      strokeBatcher?.flushNow();
+      socket.sendStrokeEnd(strokeId, point);
+    },
+    onCursor: (point) => {
+      if (roomSocket !== socket) {
+        return;
+      }
+      scheduleCursorSend(point);
+    },
+  });
 }
 
 function enterRoom(roomId: string): void {
@@ -193,6 +300,9 @@ function enterRoom(roomId: string): void {
   roomSocket?.disconnect();
   roomSocket = null;
   selfParticipant = null;
+  clearNetworkHelpers();
+  remoteStrokes.clearAll();
+  remoteCursors.clear();
   drawing.clearLocal();
 
   landingView.hidden = true;
@@ -212,7 +322,7 @@ function enterRoom(roomId: string): void {
   syncWidthLabel();
   resizeSurface();
   surface.paintNow();
-  emptyState.hidden = drawing.hasInk();
+  updateEmptyState();
 
   const socket = new RoomSocket(roomId, {
     onConnectionState: (state) => {
@@ -246,6 +356,30 @@ function enterRoom(roomId: string): void {
       }
       renderPresence(participants);
     },
+    onStrokeLive: (message) => {
+      if (roomSocket !== socket) {
+        return;
+      }
+      const dirty = remoteStrokes.applyLive(message);
+      if (dirty.liveDirty) {
+        surface.markDirty("live");
+      }
+      if (dirty.committedDirty) {
+        surface.markDirty("committed");
+      }
+      updateEmptyState();
+    },
+    onCursor: (message) => {
+      if (roomSocket !== socket) {
+        return;
+      }
+      remoteCursors.setPosition(
+        message.participantId,
+        message.x,
+        message.y,
+        selfParticipant?.id ?? null,
+      );
+    },
     onError: (code, message) => {
       if (roomSocket !== socket) {
         return;
@@ -255,6 +389,7 @@ function enterRoom(roomId: string): void {
     },
   });
   roomSocket = socket;
+  wireDrawingNetwork(socket);
   roomSocket.connect();
 }
 
@@ -308,6 +443,7 @@ widthInput.addEventListener("input", () => {
 
 clearButton.addEventListener("click", () => {
   drawing.clearLocal();
+  updateEmptyState();
 });
 
 new ResizeObserver(() => {

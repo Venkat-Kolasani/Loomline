@@ -20,10 +20,10 @@ untested behavior.
 - [x] Two clients same room see each other in presence
 - [x] Different room ids do not share presence
 - [x] Leaving client is removed from remaining clients’ presence
-- [ ] Live strokes sync (not in this slice)
+- [x] Live strokes sync mid-stroke (peer sees ink before pointer up)
 - [ ] Global undo/redo matches on both
 - [ ] Refresh restores committed canvas
-- [ ] Malformed WS payload returns typed error; room survives
+- [x] Malformed stroke payload returns typed error; room survives (automated)
 
 ### Touch / mobile
 
@@ -34,6 +34,61 @@ untested behavior.
 
 - [ ] Fresh session on live URL loads
 - [ ] Two clients against deployed origin
+
+## Results — live stroke streaming (2026-07-25)
+
+Environment: macOS darwin 25.2.0, Node v24.12.0, npm 11.6.2.
+
+### `npm run typecheck`
+
+```text
+exit 0
+```
+
+### `npm run test`
+
+```text
+Test Files  7 passed (7)
+Tests  31 passed (31)
+exit 0
+```
+
+Includes:
+
+- `test/protocol.test.ts` — versioned message validation (join, stroke, cursor, rejects)
+- `test/stroke-batcher.test.ts` — at most one outbound points batch per rAF
+- `test/live-strokes.test.ts` — peer receives `stroke:live` start/points before end;
+  invalid color → typed `error`; room still accepts a later valid stroke;
+  cursor fan-out
+
+### `npm run build`
+
+```text
+vite build → dist/client
+exit 0
+```
+
+### Local Worker + two-browser mid-stroke proof
+
+```text
+Ready on http://127.0.0.1:8787
+GET /api/health → {"ok":true,"service":"loomline","phase":"live-strokes"}
+One workerd listener on :8787
+```
+
+Manual / browser automation (room `06c902e9`):
+
+1. Tab A (`Artist-dfc6`) and Tab B (`Artist-2412`) both Connected; presence = 2.
+2. Tab A synthetic pointerdown + moves **without** pointerup.
+3. Tab B live-canvas had **3894** opaque pixels **before** A ended the stroke;
+   empty-state hidden; remote cursor label `Artist-dfc6` visible at stroke tip.
+4. Screenshot evidence: peer canvas shows brown in-progress stroke + cursor.
+
+Invariant protected: local pixels before network; remote in-progress ink on
+live overlay only; no durable sequence in this slice.
+
+Also fixed I6: author `.app { display: grid }` overrode UA `[hidden]`; added
+`[hidden] { display: none !important; }` so landing/room do not stack.
 
 ## Results — rooms + presence (2026-07-25)
 

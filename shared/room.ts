@@ -1,4 +1,5 @@
-/** Protocol version for all Loomline WebSocket messages. */
+/** Room identity helpers and participant metadata shared by client and Worker. */
+
 export const PROTOCOL_VERSION = 1 as const;
 
 export const ROOM_ID_PATTERN = /^[a-z0-9]{8}$/;
@@ -26,33 +27,6 @@ export interface SocketAttachment {
   color: string;
   roomId: string;
 }
-
-export type ClientMessage = {
-  type: "join";
-  protocolVersion: typeof PROTOCOL_VERSION;
-  roomId: string;
-  displayName?: string;
-};
-
-export type ServerMessage =
-  | {
-      type: "welcome";
-      protocolVersion: typeof PROTOCOL_VERSION;
-      roomId: string;
-      participant: Participant;
-    }
-  | {
-      type: "presence";
-      protocolVersion: typeof PROTOCOL_VERSION;
-      roomId: string;
-      participants: Participant[];
-    }
-  | {
-      type: "error";
-      protocolVersion: typeof PROTOCOL_VERSION;
-      code: string;
-      message: string;
-    };
 
 export function isValidRoomId(roomId: string): boolean {
   return ROOM_ID_PATTERN.test(roomId);

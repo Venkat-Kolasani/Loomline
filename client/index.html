@@ -12,7 +12,7 @@
       <h1>Collaborative canvas rooms</h1>
       <p class="lede">
         Create a shareable room link. Each room id maps to its own Durable
-        Object — drawing sync arrives in a later slice; presence is live now.
+        Object. Peers see live strokes as you draw.
       </p>
       <div class="landing-actions">
         <button type="button" id="create-room">Create room</button>
@@ -115,11 +115,13 @@
             width="1"
             height="1"
             tabindex="0"
-            aria-label="Drawing canvas. Local only; not synced yet."
+            aria-label="Drawing canvas. Local strokes paint immediately; peers see live ink."
           ></canvas>
+          <div id="cursor-layer" class="cursor-layer" aria-hidden="true"></div>
         </div>
         <p id="empty-state" class="empty-state">
-          Draw locally. Strokes are not synced to others yet.
+          Draw to start. Peers in this room see your stroke while it is in
+          progress.
         </p>
       </section>
     </div>

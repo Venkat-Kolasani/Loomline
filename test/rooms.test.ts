@@ -1,11 +1,7 @@
 import { env, exports } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import {
-  PROTOCOL_VERSION,
-  createRoomId,
-  isValidRoomId,
-  type ServerMessage,
-} from "../shared/room";
+import { PROTOCOL_VERSION, type ServerMessage } from "../shared/protocol";
+import { createRoomId, isValidRoomId } from "../shared/room";
 
 describe("room id helpers", () => {
   it("accepts 8-char lowercase hex ids", () => {

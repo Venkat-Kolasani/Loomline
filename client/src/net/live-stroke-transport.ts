@@ -49,16 +49,22 @@ export class LiveStrokeTransport {
     this.batcher.enqueue(strokeId, points);
   }
 
-  onStrokeEnd(strokeId: string, point?: StrokePoint): void {
+  /**
+   * @returns true when stroke:end was sent (client should await operation:committed).
+   */
+  onStrokeEnd(strokeId: string, point?: StrokePoint): boolean {
     if (!this.acceptedStarts.has(strokeId)) {
-      // Start was never accepted (e.g. Connecting…); keep local ink only.
-      return;
+      // Start was never accepted (e.g. Connecting…); no durable op will arrive.
+      return false;
     }
     this.batcher.flushNow();
-    if (this.sink.isReady()) {
-      this.sink.sendStrokeEnd(strokeId, point);
+    if (!this.sink.isReady()) {
+      this.acceptedStarts.delete(strokeId);
+      return false;
     }
+    this.sink.sendStrokeEnd(strokeId, point);
     this.acceptedStarts.delete(strokeId);
+    return true;
   }
 
   clear(): void {

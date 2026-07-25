@@ -50,7 +50,7 @@ describe("LiveStrokeTransport connecting race", () => {
       { x: 3, y: 3 },
     ]);
     await new Promise((resolve) => setTimeout(resolve, 10));
-    transport.onStrokeEnd(strokeId);
+    expect(transport.onStrokeEnd(strokeId)).toBe(false);
 
     expect(sent).toEqual([]);
   });
@@ -79,7 +79,7 @@ describe("LiveStrokeTransport connecting race", () => {
     });
     transport.onStrokePoints("s1", [{ x: 2, y: 2 }]);
     await new Promise((resolve) => setTimeout(resolve, 10));
-    transport.onStrokeEnd("s1");
+    expect(transport.onStrokeEnd("s1")).toBe(true);
 
     expect(sent).toEqual(["start:s1", "points:s1:1", "end:s1"]);
   });

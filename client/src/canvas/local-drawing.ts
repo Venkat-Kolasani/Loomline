@@ -4,7 +4,6 @@ import { clientToCssPoint } from "./sizing";
 import { appendFilteredPoint, type Point } from "./points";
 import {
   paintStroke,
-  paintStrokes,
   type DrawingTool,
   type Stroke,
 } from "./stroke";
@@ -21,7 +20,8 @@ export interface LocalStrokeStartEvent {
 export interface LocalDrawingNetworkHooks {
   onStrokeStart: (event: LocalStrokeStartEvent) => void;
   onStrokePoints: (strokeId: string, points: StrokePoint[]) => void;
-  onStrokeEnd: (strokeId: string, point?: StrokePoint) => void;
+  /** Return true when the server will emit operation:committed for this stroke. */
+  onStrokeEnd: (strokeId: string, point?: StrokePoint) => boolean;
   onCursor: (point: StrokePoint) => void;
 }
 
@@ -38,9 +38,8 @@ interface ActiveStroke extends Stroke {
 }
 
 /**
- * Local pointer drawing with optional network hooks.
- * Local pixels paint immediately; network point batches are owned by the caller
- * (typically one stroke:points send per animation frame).
+ * Local pointer drawing. Finished strokes wait on the live layer until
+ * operation:committed arrives (awaitingCommit), then leave the live overlay.
  */
 export class LocalDrawingController {
   private readonly surface: LayeredCanvasSurface;
@@ -49,7 +48,8 @@ export class LocalDrawingController {
   private readonly onStrokesChanged?: (hasInk: boolean) => void;
   private network?: LocalDrawingNetworkHooks;
 
-  private completed: Stroke[] = [];
+  /** Own strokes ended locally but not yet confirmed by the server. */
+  private awaitingCommit: ActiveStroke[] = [];
   private active: ActiveStroke | null = null;
   private drawing = false;
   private activePointerId: number | null = null;
@@ -87,10 +87,12 @@ export class LocalDrawingController {
     ) => void;
   } {
     return {
-      paintCommitted: (ctx) => {
-        paintStrokes(ctx, this.completed);
-      },
+      // Committed pixels come only from CommittedOperationStore.
+      paintCommitted: () => {},
       paintLive: (ctx) => {
+        for (const stroke of this.awaitingCommit) {
+          paintStroke(ctx, stroke, "preview");
+        }
         if (this.active) {
           paintStroke(ctx, this.active, "preview");
         }
@@ -110,17 +112,31 @@ export class LocalDrawingController {
     this.width = Math.min(32, Math.max(1, Math.round(width)));
   }
 
+  /** Drop a locally ended stroke once the server has committed it. */
+  acknowledgeCommitted(strokeId: string): boolean {
+    const before = this.awaitingCommit.length;
+    this.awaitingCommit = this.awaitingCommit.filter(
+      (stroke) => stroke.strokeId !== strokeId,
+    );
+    if (this.awaitingCommit.length !== before) {
+      this.surface.markDirty("live");
+      this.notify();
+      return true;
+    }
+    return false;
+  }
+
   clearLocal(): void {
-    this.completed = [];
+    this.awaitingCommit = [];
     this.active = null;
     this.drawing = false;
     this.activePointerId = null;
-    this.surface.markAllDirty();
+    this.surface.markDirty("live");
     this.notify();
   }
 
   hasInk(): boolean {
-    return this.completed.length > 0 || this.active !== null;
+    return this.awaitingCommit.length > 0 || this.active !== null;
   }
 
   private readonly onPointerDown = (event: PointerEvent): void => {
@@ -210,14 +226,17 @@ export class LocalDrawingController {
 
     const active = this.active;
     if (active && active.points.length > 0) {
-      this.completed = [...this.completed, active];
-      this.network?.onStrokeEnd(active.strokeId);
+      const willCommit = this.network?.onStrokeEnd(active.strokeId) ?? false;
+      if (willCommit) {
+        this.awaitingCommit = [...this.awaitingCommit, active];
+      }
+      // If start never reached the server, drop live ink with the stroke end.
     }
 
     this.active = null;
     this.drawing = false;
     this.activePointerId = null;
-    this.surface.markAllDirty();
+    this.surface.markDirty("live");
     this.notify();
   }
 

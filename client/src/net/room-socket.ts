@@ -1,6 +1,7 @@
 import {
   PROTOCOL_VERSION,
   type ClientMessage,
+  type CommittedOperation,
   type ServerMessage,
   type StrokePoint,
 } from "../../../shared/protocol";
@@ -20,12 +21,17 @@ export interface RoomSocketHandlers {
     message: Extract<ServerMessage, { type: "stroke:live" }>,
   ) => void;
   onCursor: (message: Extract<ServerMessage, { type: "cursor" }>) => void;
+  onSyncState: (
+    sequenceHead: number,
+    operations: CommittedOperation[],
+    roomId: string,
+  ) => void;
+  onOperationCommitted: (operation: CommittedOperation, roomId: string) => void;
   onError: (code: string, message: string) => void;
 }
 
 /**
- * Room WebSocket: join, presence, live stroke fan-in/out, cursors.
- * Does not send durable history messages in this slice.
+ * Room WebSocket: join, presence, live strokes, cursors, committed ops.
  */
 export class RoomSocket {
   private socket: WebSocket | null = null;
@@ -105,7 +111,6 @@ export class RoomSocket {
     if (!socket) {
       return;
     }
-    // Clear before close so the close/error handlers treat this socket as superseded.
     this.socket = null;
     socket.close();
   }
@@ -185,6 +190,16 @@ export class RoomSocket {
         break;
       case "cursor":
         this.handlers.onCursor(message);
+        break;
+      case "sync_state":
+        this.handlers.onSyncState(
+          message.sequenceHead,
+          message.operations,
+          message.roomId,
+        );
+        break;
+      case "operation:committed":
+        this.handlers.onOperationCommitted(message.operation, message.roomId);
         break;
       case "error":
         this.handlers.onError(message.code, message.message);

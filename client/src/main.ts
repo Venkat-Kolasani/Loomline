@@ -1,3 +1,4 @@
+import { CommittedOperationStore } from "./canvas/committed-ops";
 import { LayeredCanvasSurface } from "./canvas/layers";
 import { LocalDrawingController } from "./canvas/local-drawing";
 import { RemoteStrokeStore } from "./canvas/remote-strokes";
@@ -114,6 +115,7 @@ let drawing!: LocalDrawingController;
 let roomSocket: RoomSocket | null = null;
 let selfParticipant: Participant | null = null;
 const remoteStrokes = new RemoteStrokeStore();
+const committedOps = new CommittedOperationStore();
 const remoteCursors = new RemoteCursorLayer(cursorLayerRoot);
 
 let liveStrokeTransport: LiveStrokeTransport | null = null;
@@ -123,9 +125,8 @@ let cursorRaf: number | null = null;
 const surface = new LayeredCanvasSurface({
   committedCanvas,
   liveCanvas,
-  paintCommitted: (ctx, size) => {
-    remoteStrokes.paintProvisionalCommitted(ctx);
-    drawing.getPainters().paintCommitted(ctx, size);
+  paintCommitted: (ctx) => {
+    committedOps.paint(ctx);
   },
   paintLive: (ctx, size) => {
     remoteStrokes.paintLive(ctx);
@@ -142,10 +143,9 @@ drawing = new LocalDrawingController({
 });
 
 function updateEmptyState(): void {
-  const hasRemote =
-    remoteStrokes.getActiveStrokes().length > 0 ||
-    remoteStrokes.getProvisionalFinished().length > 0;
-  emptyState.hidden = drawing.hasInk() || hasRemote;
+  const hasRemote = remoteStrokes.getActiveStrokes().length > 0;
+  const hasCommitted = committedOps.getOperations().length > 0;
+  emptyState.hidden = drawing.hasInk() || hasRemote || hasCommitted;
 }
 
 function resizeSurface(): void {
@@ -196,6 +196,7 @@ function showLanding(): void {
   selfParticipant = null;
   clearNetworkHelpers();
   remoteStrokes.clearAll();
+  committedOps.clear();
   remoteCursors.clear();
   renderPresence([]);
   selfBadge.hidden = true;
@@ -285,9 +286,9 @@ function wireDrawingNetwork(socket: RoomSocket): void {
     },
     onStrokeEnd: (strokeId, point) => {
       if (roomSocket !== socket) {
-        return;
+        return false;
       }
-      transport.onStrokeEnd(strokeId, point);
+      return transport.onStrokeEnd(strokeId, point);
     },
     onCursor: (point) => {
       if (roomSocket !== socket) {
@@ -305,6 +306,7 @@ function enterRoom(roomId: string): void {
   selfParticipant = null;
   clearNetworkHelpers();
   remoteStrokes.clearAll();
+  committedOps.clear();
   remoteCursors.clear();
   drawing.clearLocal();
 
@@ -367,9 +369,6 @@ function enterRoom(roomId: string): void {
       if (dirty.liveDirty) {
         surface.markDirty("live");
       }
-      if (dirty.committedDirty) {
-        surface.markDirty("committed");
-      }
       updateEmptyState();
     },
     onCursor: (message) => {
@@ -383,8 +382,32 @@ function enterRoom(roomId: string): void {
         selfParticipant?.id ?? null,
       );
     },
+    onSyncState: (sequenceHead, operations) => {
+      if (roomSocket !== socket) {
+        return;
+      }
+      committedOps.applySyncState(sequenceHead, operations);
+      surface.markDirty("committed");
+      updateEmptyState();
+    },
+    onOperationCommitted: (operation) => {
+      if (roomSocket !== socket) {
+        return;
+      }
+      const applied = committedOps.applyCommitted(operation);
+      if (applied) {
+        surface.markDirty("committed");
+      }
+      drawing.acknowledgeCommitted(operation.strokeId);
+      updateEmptyState();
+    },
     onError: (code, message) => {
       if (roomSocket !== socket) {
+        return;
+      }
+      // Keep Connected for recoverable stroke errors (e.g. unknown_stroke).
+      if (code === "unknown_stroke" || code === "stroke_active") {
+        console.warn("Room error", code, message);
         return;
       }
       connectionStatus.textContent = `Error: ${code}`;

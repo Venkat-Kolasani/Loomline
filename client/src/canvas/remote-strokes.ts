@@ -1,7 +1,6 @@
 import type { ServerMessage } from "../../../shared/protocol";
 import {
   paintStroke,
-  paintStrokes,
   type DrawingTool,
   type Stroke,
 } from "./stroke";
@@ -12,18 +11,15 @@ export interface RemoteLiveStroke extends Stroke {
 }
 
 /**
- * Ephemeral remote in-progress strokes for the live overlay.
- * Finished remote strokes are retained provisionally on the committed painter
- * until durable operation:committed exists (next slice) — they are NOT
- * server-sequenced yet.
+ * Ephemeral remote in-progress strokes for the live overlay only.
+ * Finished remotes leave the live layer; durable ink arrives via operation:committed.
  */
 export class RemoteStrokeStore {
   private readonly active = new Map<string, RemoteLiveStroke>();
-  private provisionalFinished: Stroke[] = [];
 
   applyLive(
     message: Extract<ServerMessage, { type: "stroke:live" }>,
-  ): { liveDirty: boolean; committedDirty: boolean } {
+  ): { liveDirty: boolean } {
     const key = remoteKey(message.participantId, message.strokeId);
 
     if (message.phase === "start") {
@@ -32,7 +28,7 @@ export class RemoteStrokeStore {
         message.color === undefined ||
         message.width === undefined
       ) {
-        return { liveDirty: false, committedDirty: false };
+        return { liveDirty: false };
       }
       this.active.set(key, {
         strokeId: message.strokeId,
@@ -42,37 +38,22 @@ export class RemoteStrokeStore {
         width: message.width,
         points: [...message.points],
       });
-      return { liveDirty: true, committedDirty: false };
+      return { liveDirty: true };
     }
 
     const existing = this.active.get(key);
     if (!existing) {
-      return { liveDirty: false, committedDirty: false };
+      return { liveDirty: false };
     }
 
     if (message.phase === "points") {
       existing.points = [...existing.points, ...message.points];
-      return { liveDirty: true, committedDirty: false };
+      return { liveDirty: true };
     }
 
-    // phase === "end"
-    if (message.points.length > 0) {
-      existing.points = [...existing.points, ...message.points];
-    }
+    // phase === "end" — drop from live; committed op follows from the server.
     this.active.delete(key);
-    if (existing.points.length > 0) {
-      this.provisionalFinished = [
-        ...this.provisionalFinished,
-        {
-          tool: existing.tool,
-          color: existing.color,
-          width: existing.width,
-          points: existing.points,
-        },
-      ];
-      return { liveDirty: true, committedDirty: true };
-    }
-    return { liveDirty: true, committedDirty: false };
+    return { liveDirty: true };
   }
 
   clearParticipant(participantId: string): { liveDirty: boolean } {
@@ -88,25 +69,16 @@ export class RemoteStrokeStore {
 
   clearAll(): void {
     this.active.clear();
-    this.provisionalFinished = [];
   }
 
   getActiveStrokes(): readonly RemoteLiveStroke[] {
     return [...this.active.values()];
   }
 
-  getProvisionalFinished(): readonly Stroke[] {
-    return this.provisionalFinished;
-  }
-
   paintLive(ctx: CanvasRenderingContext2D): void {
     for (const stroke of this.active.values()) {
       paintStroke(ctx, stroke, "preview");
     }
-  }
-
-  paintProvisionalCommitted(ctx: CanvasRenderingContext2D): void {
-    paintStrokes(ctx, this.provisionalFinished);
   }
 }
 

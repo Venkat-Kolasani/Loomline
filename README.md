@@ -84,7 +84,8 @@ and mobile passes are verified.
 
 ## Known limitations
 
-- Clear is local-only (does not clear peers’ committed ops or history)
+- Clear is local-only: blanks this client's committed + live view; does not
+  mutate server history or peers' canvases (rejoin/`sync_state` restores ops)
 - Live in-progress strokes are not undoable (only completed ops)
 - Reconnect assigns a new participant id (no sticky identity yet)
 - Reconnect uses a full visible `sync_state` snapshot (not a delta by last-seq)

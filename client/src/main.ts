@@ -477,13 +477,19 @@ function enterRoom(roomId: string): void {
       if (roomSocket !== socket) {
         return;
       }
-      // Keep Connected for recoverable stroke errors (e.g. unknown_stroke).
+      // Recoverable protocol / anti-abuse errors: room stays open — do not
+      // flip connection status to Error (I9). Keep Connected while WS is open.
       if (
         code === "unknown_stroke" ||
         code === "stroke_active" ||
-        code === "stroke_expired"
+        code === "stroke_expired" ||
+        code === "rate_limited" ||
+        code === "invalid_json" ||
+        code === "payload_too_large" ||
+        code === "unsupported_type" ||
+        code === "invalid_payload"
       ) {
-        console.warn("Room error", code, message);
+        console.debug("Room error", code, message);
         return;
       }
       connectionStatus.textContent = `Error: ${code}`;
@@ -544,7 +550,11 @@ widthInput.addEventListener("input", () => {
 });
 
 clearButton.addEventListener("click", () => {
+  // Local visual clear only — does not undo server history or peers' canvases.
   drawing.clearLocal();
+  remoteStrokes.clearAll();
+  committedOps.clear();
+  surface.markAllDirty();
   updateEmptyState();
 });
 

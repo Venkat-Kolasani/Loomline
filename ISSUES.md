@@ -370,6 +370,55 @@ large and still would not help peer clear without an alarm payload.
 `test/live-expiry-hibernate.test.ts` (52 tests total). Docs: ARCHITECTURE,
 PROTOCOL, DECISIONS D6, TESTING.
 
+## I8 — Clear only wiped uncommitted live ink
+
+**When:** manual testing after observability (2026-07-25)
+
+**What the issue was**
+After finished (committed) strokes, **Clear** appeared to do nothing — ink stayed
+on the canvas.
+
+**Root cause**
+The click handler only called `drawing.clearLocal()`, which drops active /
+awaiting-commit strokes on the live layer. Committed ops live in
+`CommittedOperationStore` and paint the committed canvas, so Clear never touched
+what users actually saw.
+
+**What we fixed**
+Local Clear also clears the local committed store and remote live overlays, then
+marks both layers dirty. Still no server message — peers and room history are
+unchanged; rejoin / `sync_state` restores ops.
+
+**Why this way**
+Matches documented “local-only clear” without making Clear global undo. Rejected
+a server wipe (would break collaboration invariants).
+
+**Verification**
+Manual: commit a stroke → Clear → this client’s canvases empty; peer unchanged.
+
+## I9 — `rate_limited` looked like a connection failure
+
+**When:** manual / `?debug=1` after Prompt 9 rate limits (2026-07-25)
+
+**What the issue was**
+Status showed `Error: rate_limited` even though the WebSocket stayed open and
+drawing continued.
+
+**Root cause**
+Client `onError` treated every typed server `error` as fatal UI state, including
+recoverable boundary codes (`rate_limited`, `invalid_json`, etc.).
+
+**What we fixed**
+Those codes no longer change connection status; status stays Connected while the
+socket is open. Server limiter unchanged.
+
+**Why this way**
+Anti-abuse replies are not disconnects. Rejected a user-facing toast — noisy for
+an intentional flood budget users should not hit in honest drawing.
+
+**Verification**
+`npm run typecheck && npm run test && npm run build`.
+
 Copy this block when logging a future issue:
 
 ```markdown

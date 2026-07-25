@@ -28,3 +28,14 @@ export function allowParticipantMessage(
   entry.count += 1;
   return entry.count <= maxPerWindow;
 }
+
+/** Test-only override so integration floods stay within one window under load. */
+let testMaxMessagesPerWindow: number | null = null;
+
+export function setTestMaxMessagesPerWindow(max: number | null): void {
+  testMaxMessagesPerWindow = max;
+}
+
+export function effectiveMaxMessagesPerWindow(): number {
+  return testMaxMessagesPerWindow ?? MAX_MESSAGES_PER_WINDOW;
+}

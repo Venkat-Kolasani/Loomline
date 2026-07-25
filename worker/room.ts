@@ -47,6 +47,8 @@ import {
 } from "./live-expiry";
 import {
   allowParticipantMessage,
+  effectiveMaxMessagesPerWindow,
+  setTestMaxMessagesPerWindow,
   type RateLimitState,
 } from "./rate-limit";
 
@@ -119,6 +121,29 @@ export class RoomDurableObject extends DurableObject<Env> {
       });
     }
 
+    if (url.pathname === "/test/rate-limit-max" && request.method === "POST") {
+      try {
+        const body = (await request.json()) as { max?: number | null };
+        if (body.max === null) {
+          setTestMaxMessagesPerWindow(null);
+          return Response.json({ max: null });
+        }
+        if (
+          typeof body.max === "number" &&
+          Number.isInteger(body.max) &&
+          body.max > 0
+        ) {
+          setTestMaxMessagesPerWindow(body.max);
+          return Response.json({ max: body.max });
+        }
+      } catch {
+        // Fall through to 400.
+      }
+      return new Response("Expected JSON { max: positive int | null }", {
+        status: 400,
+      });
+    }
+
     if (url.pathname === "/test/durable-head" && request.method === "GET") {
       const head = sequenceHead(this.ctx.storage.sql);
       const ops = listOperations(this.ctx.storage.sql);
@@ -184,6 +209,7 @@ export class RoomDurableObject extends DurableObject<Env> {
           this.messageRates,
           attachment.participantId,
           Date.now(),
+          effectiveMaxMessagesPerWindow(),
         )
       ) {
         this.sendError(

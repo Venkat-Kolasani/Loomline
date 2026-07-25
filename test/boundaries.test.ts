@@ -95,11 +95,12 @@ describe("room input boundaries", () => {
 
   it("returns typed rate_limited after the per-participant frame budget", async () => {
     const roomId = "bbbb9013";
+    await setRoomRateLimitMax(roomId, 5);
     const socket = await openRoomSocket(roomId);
     await joinAndDrain(socket, roomId, "Boundary");
 
     const err = waitForError(socket, "rate_limited");
-    for (let i = 0; i < MAX_MESSAGES_PER_WINDOW + 1; i += 1) {
+    for (let i = 0; i < 6; i += 1) {
       socket.send(
         JSON.stringify({
           type: "cursor",
@@ -112,23 +113,27 @@ describe("room input boundaries", () => {
     }
     await err;
     socket.close(1000, "done");
+    await setRoomRateLimitMax(roomId, null);
   });
 
   it("rate-limits a joined socket flooding malformed frames", async () => {
     const roomId = "bbbb9021";
+    await setRoomRateLimitMax(roomId, 5);
     const socket = await openRoomSocket(roomId);
     await joinAndDrain(socket, roomId, "Flood-JSON");
 
     const err = waitForError(socket, "rate_limited");
-    for (let i = 0; i < MAX_MESSAGES_PER_WINDOW + 1; i += 1) {
+    for (let i = 0; i < 6; i += 1) {
       socket.send("{not-json");
     }
     await err;
     socket.close(1000, "done");
+    await setRoomRateLimitMax(roomId, null);
   });
 
   it("rate-limits a joined socket flooding repeated join frames", async () => {
     const roomId = "bbbb9022";
+    await setRoomRateLimitMax(roomId, 5);
     const socket = await openRoomSocket(roomId);
     await joinAndDrain(socket, roomId, "Flood-Join");
 
@@ -139,25 +144,28 @@ describe("room input boundaries", () => {
       roomId,
       displayName: "Flood-Join",
     });
-    for (let i = 0; i < MAX_MESSAGES_PER_WINDOW + 1; i += 1) {
+    for (let i = 0; i < 6; i += 1) {
       socket.send(joinFrame);
     }
     await err;
     socket.close(1000, "done");
+    await setRoomRateLimitMax(roomId, null);
   });
 
   it("rate-limits a joined socket flooding binary frames", async () => {
     const roomId = "bbbb9023";
+    await setRoomRateLimitMax(roomId, 5);
     const socket = await openRoomSocket(roomId);
     await joinAndDrain(socket, roomId, "Flood-Binary");
 
     const err = waitForError(socket, "rate_limited");
     const binary = new Uint8Array([1, 2, 3]).buffer;
-    for (let i = 0; i < MAX_MESSAGES_PER_WINDOW + 1; i += 1) {
+    for (let i = 0; i < 6; i += 1) {
       socket.send(binary);
     }
     await err;
     socket.close(1000, "done");
+    await setRoomRateLimitMax(roomId, null);
   });
 
   it("serializes rapid undo/redo without corrupting sequence or redo", async () => {
@@ -283,6 +291,21 @@ async function fetchDurableHead(roomId: string): Promise<{
     alarmScheduled: boolean;
     rateLimitEntries: number;
   };
+}
+
+async function setRoomRateLimitMax(
+  roomId: string,
+  max: number | null,
+): Promise<void> {
+  const stub = env.ROOM.get(env.ROOM.idFromName(roomId));
+  const response = await stub.fetch(
+    new Request("https://room/test/rate-limit-max", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ max }),
+    }),
+  );
+  expect(response.status).toBe(200);
 }
 
 async function openRoomSocket(roomId: string): Promise<WebSocket> {

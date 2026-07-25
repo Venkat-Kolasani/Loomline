@@ -8,6 +8,7 @@ import {
   type StrokeLivePhase,
   type StrokePoint,
 } from "../shared/protocol";
+import { MAX_CLIENT_MESSAGE_BYTES } from "../shared/limits";
 import {
   PROTOCOL_VERSION,
   colorForParticipantId,
@@ -35,6 +36,7 @@ import {
   listHiddenSequences,
 } from "./history";
 import {
+  clearAllLiveStrokeExpiry,
   countLiveStrokeExpiry,
   deleteLiveStrokeExpiry,
   deleteLiveStrokeExpiryForParticipant,
@@ -43,6 +45,10 @@ import {
   soonestLiveStrokeExpiry,
   upsertLiveStrokeExpiry,
 } from "./live-expiry";
+import {
+  allowParticipantMessage,
+  type RateLimitState,
+} from "./rate-limit";
 
 const ISOLATION_MARK_KEY = "isolationMark";
 
@@ -62,6 +68,8 @@ export class RoomDurableObject extends DurableObject<Env> {
    * alarm after wake can still clear peer overlays.
    */
   private readonly liveStrokes = new Map<string, LiveStrokeState>();
+  /** Ephemeral per-participant frame counters; fine to reset on eviction. */
+  private readonly messageRates = new Map<string, RateLimitState>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -114,11 +122,14 @@ export class RoomDurableObject extends DurableObject<Env> {
     if (url.pathname === "/test/durable-head" && request.method === "GET") {
       const head = sequenceHead(this.ctx.storage.sql);
       const ops = listOperations(this.ctx.storage.sql);
+      const alarmAt = await this.ctx.storage.getAlarm();
       return Response.json({
         sequenceHead: head,
         operationCount: ops.length,
         liveStrokeCount: this.liveStrokes.size,
         pendingExpiryCount: countLiveStrokeExpiry(this.ctx.storage.sql),
+        alarmScheduled: alarmAt !== null,
+        rateLimitEntries: this.messageRates.size,
       });
     }
 
@@ -168,6 +179,15 @@ export class RoomDurableObject extends DurableObject<Env> {
       return;
     }
 
+    if (message.length > MAX_CLIENT_MESSAGE_BYTES) {
+      this.sendError(
+        ws,
+        "payload_too_large",
+        `Message exceeds ${MAX_CLIENT_MESSAGE_BYTES} bytes.`,
+      );
+      return;
+    }
+
     let parsed: unknown;
     try {
       parsed = JSON.parse(message) as unknown;
@@ -187,6 +207,27 @@ export class RoomDurableObject extends DurableObject<Env> {
     if (!isValidRoomId(roomId) || result.message.roomId !== roomId) {
       this.sendError(ws, "room_mismatch", "roomId does not match this socket.");
       return;
+    }
+
+    if (result.message.type !== "join") {
+      if (!attachment?.participantId) {
+        this.sendError(ws, "not_joined", "Join the room before sending strokes.");
+        return;
+      }
+      if (
+        !allowParticipantMessage(
+          this.messageRates,
+          attachment.participantId,
+          Date.now(),
+        )
+      ) {
+        this.sendError(
+          ws,
+          "rate_limited",
+          "Too many messages; slow down while keeping the room alive.",
+        );
+        return;
+      }
     }
 
     switch (result.message.type) {
@@ -216,9 +257,12 @@ export class RoomDurableObject extends DurableObject<Env> {
     } catch {
       // Socket may already be closing.
     }
-    // Abandoned live strokes: clear peers' overlays; never commit.
     this.abandonLiveStrokesForParticipant(attachment?.participantId);
+    if (attachment?.participantId) {
+      this.messageRates.delete(attachment.participantId);
+    }
     this.refreshPresenceAfterDepart(ws, attachment);
+    await this.cleanupIfRoomEmpty(ws);
   }
 
   async webSocketError(ws: WebSocket, _error: unknown): Promise<void> {
@@ -229,7 +273,11 @@ export class RoomDurableObject extends DurableObject<Env> {
       // Ignore.
     }
     this.abandonLiveStrokesForParticipant(attachment?.participantId);
+    if (attachment?.participantId) {
+      this.messageRates.delete(attachment.participantId);
+    }
     this.refreshPresenceAfterDepart(ws, attachment);
+    await this.cleanupIfRoomEmpty(ws);
   }
 
   private async simulateErrorForParticipant(
@@ -712,6 +760,20 @@ export class RoomDurableObject extends DurableObject<Env> {
       });
     }
     return participants;
+  }
+
+  /**
+   * Empty rooms must not retain ephemeral live state or alarms so the DO can
+   * hibernate normally. Committed SQLite ops stay — no premature log reset.
+   */
+  private async cleanupIfRoomEmpty(departing: WebSocket): Promise<void> {
+    if (this.listParticipants({ excludeSocket: departing }).length > 0) {
+      return;
+    }
+    this.liveStrokes.clear();
+    this.messageRates.clear();
+    clearAllLiveStrokeExpiry(this.ctx.storage.sql);
+    await this.ctx.storage.deleteAlarm();
   }
 
   private send(ws: WebSocket, message: ServerMessage): void {

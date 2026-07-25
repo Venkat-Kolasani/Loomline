@@ -55,8 +55,9 @@ Verified in `test/rooms.test.ts`.
 | Canvas layers | `committed-canvas` = server ops; `live-canvas` = in-progress |
 | Point batching | ≤ one `stroke:points` per animation frame |
 | `RoomDurableObject` | Live fan-out + SQLite ops + tombstones + stall alarm + `sync_state` |
-| Shared protocol | Validated versioned messages |
+| Shared protocol | Validated versioned messages + frame/rate limits |
 | Client reconnect | Exponential backoff; full snapshot on re-join |
+| Empty-room cleanup | No live timers/expiry; hibernation-eligible |
 
 ### Rendering layers (current)
 
@@ -80,11 +81,17 @@ acknowledges them, then move into the committed store (no double paint).
 - Live pointer **points** are never written as SQLite rows.
 - Table `live_stroke_expiry`: participant/stroke/room + `expires_at` only, so a
   post-hibernation alarm can still clear peer overlays (`LIVE_STROKE_STALL_MS`).
+  Upserted on start/points (correctness-first; may be ~1 small write per rAF
+  batch per active drawer — see DECISIONS D6; measure before optimizing).
+- Empty rooms (`0` joined participants): clear in-memory live strokes + rate
+  counters, delete all `live_stroke_expiry` rows, and `deleteAlarm` so the DO
+  is eligible for normal hibernation. Committed ops are **not** wiped.
 
 ## Planned
 
-- Payload rate limits / client-side 64-point chunking enforcement
+- Client-side chunking if an outgoing points batch ever exceeds 64
 - Sticky participant identity across reconnect (optional polish)
+- Checkpoint / retention after a measured room-size baseline (DECISIONS D7)
 
 ## Reconnect / hibernation (implemented)
 
@@ -103,6 +110,10 @@ sequenceDiagram
   reconnect UI for real drops and refreshes.
 - Full snapshot on join (not last-seq delta) because undo tombstones change
   visibility independently of sequence head.
+- Zero participants ⇒ no pending stall alarm and no retained live-stroke state
+  (verified in `test/boundaries.test.ts`). The Workers test runtime cannot prove
+  platform hibernation itself; it proves Loomline clears the state that would
+  block hibernation.
 
 ## Global tombstone undo/redo (implemented)
 

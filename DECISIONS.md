@@ -194,9 +194,60 @@ Rejected after review: hibernatable WebSockets stay connected while the DO is
 evicted, wiping `liveStrokes`; an alarm wake with an empty map would leave peer
 overlays stuck forever. Minimal expiry rows fix that without persisting points.
 
+### Trade-off (not optimized yet)
+
+Upserting `live_stroke_expiry.expires_at` on every accepted `stroke:points`
+batch (≤ one rAF flush per active drawer) can mean roughly **one small SQLite
+write per frame per drawer** while a stroke is in progress. That is intentional
+correctness-first behavior so hibernation cannot leave peer overlays stuck.
+
+Do **not** coalesce/throttle these writes in this submission unless load testing
+shows real pressure. If it does, measure write rate under a stated drawer count /
+stroke length, then consider a cheaper refresh (e.g. update expiry only every
+N ms or only when the alarm would move) — never by dropping the durable row.
+
 ### Verification
 
 `test/reconnect.test.ts`, `test/reconnect-backoff.test.ts`,
 `test/live-expiry-hibernate.test.ts` (`evictDurableObject` + `runDurableObjectAlarm`),
 duplicate suppression in the committed store. Manual refresh reconnect in
 [TESTING.md](./TESTING.md).
+
+## D7 — Input boundaries without silent drops or premature log reset
+
+### Problem / invariant
+
+Malformed / abusive client frames must not crash a room (invariant 10). Normal
+rAF-batched drawing must keep working. Rapid undo/redo must not corrupt sequence
+or redo state. Empty rooms must be hibernation-eligible. Do not invent an
+unmeasured operation-log wipe.
+
+### Selected design
+
+- Reject oversized text frames (`MAX_CLIENT_MESSAGE_BYTES = 16_384`) before parse.
+- Keep shape validation in `parseClientMessage` (unknown type, version, points).
+- Per-participant fixed window: `120` messages / `1s` → typed `rate_limited`.
+- Process every accepted history request under DO serialization — **no debounce**.
+- On last participant leave: clear live map, expiry rows, rate counters, and
+  `deleteAlarm`. Retain committed SQLite ops.
+- Document room growth honestly: **no measured hard cap yet**; future checkpoint /
+  retention after load baseline (not an arbitrary reset in this slice).
+
+### Rejected alternative
+
+**Debounce / coalesce undo-redo** so “spam” history collapses to one action.
+
+Rejected because intentional rapid undo must apply; silently dropping actions
+would diverge clients and violate explainable global history.
+
+**Wipe the operation log when the room empties or after N ops.**
+
+Rejected as premature: empties happen often in demos; wiping surprises rejoins
+and has no measured threshold. Prefer a future checkpoint record once Prompt 10
+(or a load pass) measures rebuild cost.
+
+### Verification
+
+`test/boundaries.test.ts` (malformed JSON, unknown type, oversized, rate limit,
+rapid history, zero-user cleanup). Prior `test/history.test.ts` rapid path.
+Gate recorded in [TESTING.md](./TESTING.md).

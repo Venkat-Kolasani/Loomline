@@ -3,7 +3,8 @@
 Real-time collaborative drawing canvas for the Flam Frontend R&D assignment.
 
 **Live URL:** _not deployed yet_  
-**Status:** reconnect recovery + global undo/redo + durable ops
+**Status:** input boundaries hardened + reconnect recovery + global undo/redo +
+durable ops
 
 This repository intentionally uses **Cloudflare Workers + Durable Objects** (edge
 JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
@@ -22,12 +23,15 @@ JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
 - Global server-owned undo/redo via tombstones; append-only op log
 - Stalled provisional strokes expire after 30s (points not persisted; expiry
   metadata is durable so hibernation cannot leave peer overlays stuck)
+- Typed rejection of malformed / oversized / rate-limited client frames
+- Empty rooms clear live state + alarms (hibernation-eligible; ops retained)
 - Remote cursors (ephemeral)
 - rAF-batched outgoing points; immediate local drawing
 - Two stacked canvas layers with brush/eraser/colour/width/clear
 - Dirty-layer paint API (no permanent render loop)
 - Scripts: `dev`, `dev:client`, `typecheck`, `test`, `build`, `deploy`
-- Vitest: isolation, protocol, live strokes, history, reconnect/expiry
+- Vitest: isolation, protocol, live strokes, history, reconnect/expiry,
+  input boundaries / rate limits / zero-user cleanup
 
 ## What is planned (not implemented)
 
@@ -82,7 +86,14 @@ and mobile passes are verified.
 - Reconnect assigns a new participant id (no sticky identity yet)
 - Reconnect uses a full visible `sync_state` snapshot (not a delta by last-seq)
 - Production deploy not run yet
-- Very long strokes are stored as one JSON blob (no checkpoint yet)
+- Very long strokes are stored as one JSON blob per completed op (no checkpoint
+  compaction yet — see DECISIONS D7)
+- Per-participant rate limit is in-memory (resets if the DO is evicted mid-abuse;
+  anti-spam, not auth)
+- Client does not yet chunk outgoing `stroke:points` if a batch somehow exceeds
+  64 points (server still rejects with `invalid_payload`)
+- Room operation-log size under heavy load is **not** load-tested; there is no
+  arbitrary reset. Future: checkpoint + retention after a measured threshold.
 
 ## Time spent
 

@@ -123,6 +123,10 @@ export function countLiveStrokeExpiry(sql: SqlStorage): number {
   return row.n;
 }
 
+export function clearAllLiveStrokeExpiry(sql: SqlStorage): void {
+  sql.exec(`DELETE FROM live_stroke_expiry`);
+}
+
 /** Soonest expires_at, or null when the table is empty. */
 export function soonestLiveStrokeExpiry(sql: SqlStorage): number | null {
   const row = sql

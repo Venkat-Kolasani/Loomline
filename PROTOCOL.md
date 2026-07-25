@@ -1,8 +1,8 @@
 # Protocol
 
 **Protocol version:** `1`  
-**Status:** presence, live strokes, durable ops, global undo/redo, and
-**client reconnect recovery** are implemented.
+**Status:** presence, live strokes, durable ops, global undo/redo, reconnect
+recovery, and **input-boundary hardening** are implemented.
 
 ## Transport
 
@@ -20,7 +20,9 @@ All JSON messages include:
 | `roomId` | string | Must match the socket room |
 
 Invalid client messages return a typed `error` and do not crash the room.
-Validation lives in `shared/protocol.ts` (`parseClientMessage`).
+Shape validation lives in `shared/protocol.ts` (`parseClientMessage`). Frame
+size and per-participant rate limits are enforced in `RoomDurableObject`
+(`shared/limits.ts`) before handlers mutate room state.
 
 ## Implemented messages
 
@@ -183,16 +185,36 @@ restores via full visible `sync_state`.
 
 | Field | Limit |
 | --- | --- |
+| Raw text frame | ≤ `16_384` bytes (`MAX_CLIENT_MESSAGE_BYTES`) before `JSON.parse` |
 | `strokeId` | 1–64 characters |
-| `points` per `stroke:points` | 1–64 |
+| `points` per `stroke:points` | 1–64 (`MAX_POINTS_PER_MESSAGE`) |
 | `width` | integer 1–32 |
 | `color` | `#RRGGBB` |
 | `displayName` | trimmed, max 24 chars |
+| Client messages / participant / 1s | ≤ `120` (`MAX_MESSAGES_PER_WINDOW`) |
+
+`120` frames/s is sized for normal rAF drawing: one `stroke:points` batch plus
+one `cursor` per ~60 Hz frame, with headroom for `start` / `end` / history.
+Exceeding the budget returns `error` `rate_limited`; the room stays alive.
+History is **not** debounced — each accepted `history:undo` / `history:redo`
+runs to completion under Durable Object serialization.
+
+### Typed boundary errors (non-exhaustive)
+
+| `code` | When |
+| --- | --- |
+| `invalid_json` | Non-JSON text frame |
+| `payload_too_large` | Frame longer than `MAX_CLIENT_MESSAGE_BYTES` |
+| `unsupported_type` | Unknown `type` |
+| `protocol_mismatch` | Wrong `protocolVersion` |
+| `invalid_payload` | Bad shape / binary frames / field constraints |
+| `rate_limited` | Per-participant frame budget exceeded |
+| `not_joined` / `room_mismatch` | Join / room binding failures |
 
 ## HTTP endpoints
 
 | Endpoint | Transport | Behavior |
 | --- | --- | --- |
-| `GET /api/health` | HTTP | `{ ok, service: "loomline", phase: "reconnect" }` |
+| `GET /api/health` | HTTP | `{ ok, service: "loomline", phase: "hardened" }` |
 | `GET /ws?room=` | WebSocket | Room join + live + committed sync + history |
 | Static assets | HTTP via `ASSETS` | Landing + `/r/:roomId` SPA |

@@ -3,6 +3,51 @@
 Evidence log for Loomline. Record **exact commands and outcomes**. Do not claim
 untested behavior.
 
+## Results — input boundaries / robustness (2026-07-25)
+
+Environment: macOS darwin 25.2.0, Node v24.12.0.
+
+### Automated
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files  15 passed (15)
+→ Tests  59 passed (59)
+→ build exit 0
+```
+
+Coverage in `test/boundaries.test.ts`:
+
+- Malformed JSON → `invalid_json`; room still accepts later messages
+- Unknown type → `unsupported_type`
+- Oversized frame → `payload_too_large` (`MAX_CLIENT_MESSAGE_BYTES`)
+- Per-participant rate limit → `rate_limited` after `MAX_MESSAGES_PER_WINDOW`
+- Rapid undo/redo serialization without sequence/redo corruption
+- Zero-user cleanup: live map, expiry rows, rate entries, and alarm cleared
+- Unit: `allowParticipantMessage` window reset
+
+### Latest gate (2026-07-25 — robustness)
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files  15 passed (15)
+→ Tests  59 passed (59)
+→ build exit 0
+```
+
+### Lifecycle test constraint
+
+The Cloudflare Vitest pool can assert `getAlarm() === null` and empty
+`live_stroke_expiry` after the last socket closes. It does **not** prove the
+platform actually hibernated the Durable Object. Hibernation eligibility here
+means: Loomline retains no pending timers or ephemeral live state that would
+keep the DO busy.
+
+Room op-log size under load is **not** measured in this slice; no arbitrary
+reset was added (see DECISIONS D7).
+
 ## Results — reconnect / hibernation recovery (2026-07-25)
 
 Environment: macOS darwin 25.2.0, Node v24.12.0.

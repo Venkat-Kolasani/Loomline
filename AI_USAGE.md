@@ -131,3 +131,15 @@ Product name is **Loomline** (repository and Worker name match).
 - Explains why in-memory-only expiry fails under hibernatable WebSockets
 - Owns the “metadata only, never points” persistence boundary
 
+## Input boundaries (`fix(robustness): harden room input boundaries`)
+
+### Assisted by AI
+
+- `shared/limits.ts` + `worker/rate-limit.ts`, oversized/rate checks in
+  `RoomDurableObject`, zero-user cleanup, `test/boundaries.test.ts`, docs D7
+
+### Manually reviewed / owned by the author
+
+- Explains why history is not debounced and why empty rooms do not wipe ops
+- Owns the hibernation-eligibility claim vs what Vitest can actually prove
+

@@ -20,7 +20,8 @@ JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
 - Exponential reconnect backoff with Connecting / Reconnecting / Connected UI
 - Duplicate committed-sequence suppression on the client
 - Global server-owned undo/redo via tombstones; append-only op log
-- Stalled provisional strokes expire after 30s (not persisted)
+- Stalled provisional strokes expire after 30s (points not persisted; expiry
+  metadata is durable so hibernation cannot leave peer overlays stuck)
 - Remote cursors (ephemeral)
 - rAF-batched outgoing points; immediate local drawing
 - Two stacked canvas layers with brush/eraser/colour/width/clear

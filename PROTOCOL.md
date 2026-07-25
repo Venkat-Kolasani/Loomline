@@ -68,14 +68,17 @@ Validation lives in `shared/protocol.ts` (`parseClientMessage`).
 
 ### Live stroke stall contract (implemented)
 
-1. Provisional strokes are in-memory only (`lastActiveAt` updated on start/points).
-2. After **30 s** without activity, the DO expires the stroke: peers get
-   `stroke:live` `phase=end`; the author gets `error` `stroke_expired`.
-3. Expired strokes are never written to SQLite.
+1. Provisional **points** are in-memory only (`liveStrokes` map).
+2. Minimal **expiry metadata** is written to SQLite `live_stroke_expiry`
+   (participant id, stroke id, room id, `expires_at`) on start/points; removed
+   on end/close/expire. Points are never stored there.
+3. After **30 s** without activity, the DO alarm reads expired rows, broadcasts
+   `stroke:live` `phase=end` to peers, and sends `error` `stroke_expired` to the
+   author if still connected — even if hibernation wiped the in-memory map.
 4. Socket close/error abandons that participant’s live strokes the same way
    (peer overlay cleared; no commit).
-5. After Durable Object hibernation, the live map is empty by design; only SQLite
-   ops/history reload in the constructor via `blockConcurrencyWhile`.
+5. After Durable Object hibernation, the live map is empty; constructor
+   re-ensures schemas and re-arms the alarm from remaining expiry rows.
 
 ### History contract (implemented)
 

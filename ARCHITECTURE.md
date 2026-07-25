@@ -75,9 +75,11 @@ acknowledges them, then move into the committed store (no double paint).
   `points_json`). Never updated or deleted by undo/redo.
 - Tables `history_hidden` / `history_redo_stack`: durable visibility + redo.
 - Schema created in the DO constructor via `blockConcurrencyWhile` (safe after
-  hibernation wake). Live map starts empty on wake.
-- Live pointer points are never written as individual rows.
-- Stalled live strokes expire after 30s (`LIVE_STROKE_STALL_MS`) via DO alarm.
+  hibernation wake). Live map starts empty on wake; constructor re-arms the
+  stall alarm from `live_stroke_expiry` if any rows remain.
+- Live pointer **points** are never written as SQLite rows.
+- Table `live_stroke_expiry`: participant/stroke/room + `expires_at` only, so a
+  post-hibernation alarm can still clear peer overlays (`LIVE_STROKE_STALL_MS`).
 
 ## Planned
 

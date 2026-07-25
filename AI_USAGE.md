@@ -119,3 +119,15 @@ Product name is **Loomline** (repository and Worker name match).
 - Explains full snapshot vs last-seq delta with tombstones
 - Owns two-browser refresh reconnect proof and 30s stall rule
 
+## Live-expiry hibernation fix (`fix(realtime): preserve live-stroke expiry across hibernation`)
+
+### Assisted by AI
+
+- `live_stroke_expiry` SQLite helpers, alarm/eviction test with
+  `evictDurableObject` / `runDurableObjectAlarm`, docs/ISSUES update
+
+### Manually reviewed / owned by the author
+
+- Explains why in-memory-only expiry fails under hibernatable WebSockets
+- Owns the “metadata only, never points” persistence boundary
+

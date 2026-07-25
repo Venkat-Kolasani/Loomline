@@ -335,6 +335,41 @@ Recurred 25 July during Prompt 8 reconnect proof after `npm run build` triggered
 while an active `wrangler dev` two-browser session is open; restart `npm run
 dev` cleanly for the next manual check.
 
+## I8 — Live-stroke expiry failed after WebSocket hibernation
+
+**When:** Prompt 8 review (P1), before Prompt 9.
+
+**What the issue was**
+
+`liveStrokes` lived only in memory. Hibernatable WebSockets stay connected while
+Cloudflare evicts the DO and resets in-memory state. A 30s alarm wake then saw
+an empty map, so peers could keep a stuck live stroke forever. The original
+expiry test never evicted the instance, so it could not catch this.
+
+**Root cause**
+
+Expiry depended on ephemeral map entries. Durable Object hibernation does not
+preserve those entries; only SQLite / attachments / alarms survive.
+
+**What we fixed**
+
+SQLite table `live_stroke_expiry` stores participant id, stroke id, room id, and
+`expires_at` (no points). Upserted on start/points; deleted on end/close/expire.
+Alarm reads expired rows, broadcasts `stroke:live` end, notifies the author, and
+deletes rows. Constructor re-arms the alarm from remaining rows. Integration
+test: `evictDurableObject` + `runDurableObjectAlarm`.
+
+**Why this way**
+
+Keeps the “do not persist live pointer points” rule while making expiry survive
+hibernation. Rejected attaching full point lists to WebSocket attachments — too
+large and still would not help peer clear without an alarm payload.
+
+**Verification**
+
+`test/live-expiry-hibernate.test.ts` (52 tests total). Docs: ARCHITECTURE,
+PROTOCOL, DECISIONS D6, TESTING.
+
 Copy this block when logging a future issue:
 
 ```markdown

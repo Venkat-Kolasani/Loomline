@@ -175,9 +175,9 @@ assume in-memory live strokes survive.
   Connected; on schedule, clear ephemeral ink; on join, replace committed store
   from full visible `sync_state`.
 - Client: `appliedSequences` set suppresses duplicate `operation:committed`.
-- Server: DO constructor re-ensures SQLite schemas; live map starts empty after
-  hibernation. Idle live strokes expire after 30s via alarm (or test hook);
-  peers get `stroke:live` end; author gets `stroke_expired`.
+- Server: DO constructor re-ensures SQLite schemas; live **points** map starts
+  empty after hibernation. Idle strokes expire after 30s via alarm using durable
+  `live_stroke_expiry` metadata (ids + `expires_at` only — never points).
 
 ### Rejected alternative
 
@@ -188,7 +188,15 @@ changing sequence head — a pure delta can revive hidden ops or miss visibility
 flips. Full visible snapshot is simpler and correct; delta remains a future
 optimization once a versioned visibility token exists.
 
+**In-memory-only stall expiry** (no SQLite metadata).
+
+Rejected after review: hibernatable WebSockets stay connected while the DO is
+evicted, wiping `liveStrokes`; an alarm wake with an empty map would leave peer
+overlays stuck forever. Minimal expiry rows fix that without persisting points.
+
 ### Verification
 
-`test/reconnect.test.ts`, `test/reconnect-backoff.test.ts`, duplicate suppression
-in the committed store. Manual refresh reconnect in [TESTING.md](./TESTING.md).
+`test/reconnect.test.ts`, `test/reconnect-backoff.test.ts`,
+`test/live-expiry-hibernate.test.ts` (`evictDurableObject` + `runDurableObjectAlarm`),
+duplicate suppression in the committed store. Manual refresh reconnect in
+[TESTING.md](./TESTING.md).

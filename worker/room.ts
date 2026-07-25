@@ -34,10 +34,19 @@ import {
   filterVisibleOperations,
   listHiddenSequences,
 } from "./history";
+import {
+  countLiveStrokeExpiry,
+  deleteLiveStrokeExpiry,
+  deleteLiveStrokeExpiryForParticipant,
+  ensureLiveExpirySchema,
+  listExpiredLiveStrokes,
+  soonestLiveStrokeExpiry,
+  upsertLiveStrokeExpiry,
+} from "./live-expiry";
 
 const ISOLATION_MARK_KEY = "isolationMark";
 
-/** Idle provisional strokes expire after this many ms (not persisted). */
+/** Idle provisional strokes expire after this many ms. Points are not persisted. */
 export const LIVE_STROKE_STALL_MS = 30_000;
 
 /**
@@ -49,16 +58,23 @@ export const LIVE_STROKE_STALL_MS = 30_000;
 export class RoomDurableObject extends DurableObject<Env> {
   /**
    * Ephemeral in-memory live strokes for this isolate wake.
-   * Not durable across hibernation — by design for provisional ink.
+   * Points do not survive hibernation. Expiry metadata is in SQLite so an
+   * alarm after wake can still clear peer overlays.
    */
   private readonly liveStrokes = new Map<string, LiveStrokeState>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    // Hibernation wake: durable ops/history live in SQLite; live map starts empty.
+    // Hibernation wake: durable ops/history/expiry live in SQLite; live map empty.
     ctx.blockConcurrencyWhile(async () => {
       ensureOperationSchema(this.ctx.storage.sql);
       ensureHistorySchema(this.ctx.storage.sql);
+      ensureLiveExpirySchema(this.ctx.storage.sql);
+      // Re-arm stall alarm from durable expiry rows after hibernation wake.
+      const soonest = soonestLiveStrokeExpiry(this.ctx.storage.sql);
+      if (soonest !== null) {
+        await this.ctx.storage.setAlarm(soonest);
+      }
     });
   }
 
@@ -102,6 +118,7 @@ export class RoomDurableObject extends DurableObject<Env> {
         sequenceHead: head,
         operationCount: ops.length,
         liveStrokeCount: this.liveStrokes.size,
+        pendingExpiryCount: countLiveStrokeExpiry(this.ctx.storage.sql),
       });
     }
 
@@ -343,6 +360,12 @@ export class RoomDurableObject extends DurableObject<Env> {
       lastActiveAt: Date.now(),
       roomId,
     });
+    this.touchLiveStrokeExpiry(
+      attachment.participantId,
+      message.strokeId,
+      roomId,
+      Date.now(),
+    );
     void this.scheduleLiveStrokeAlarm();
 
     this.broadcastStrokeLive(ws, {
@@ -372,6 +395,12 @@ export class RoomDurableObject extends DurableObject<Env> {
 
     live.points.push(...message.points);
     live.lastActiveAt = Date.now();
+    this.touchLiveStrokeExpiry(
+      attachment.participantId,
+      message.strokeId,
+      roomId,
+      live.lastActiveAt,
+    );
     void this.scheduleLiveStrokeAlarm();
 
     this.broadcastStrokeLive(ws, {
@@ -400,6 +429,12 @@ export class RoomDurableObject extends DurableObject<Env> {
       live.points.push(message.point);
     }
     this.liveStrokes.delete(key);
+    deleteLiveStrokeExpiry(
+      this.ctx.storage.sql,
+      attachment.participantId,
+      message.strokeId,
+    );
+    void this.scheduleLiveStrokeAlarm();
 
     const endPoints = message.point ? [message.point] : [];
     this.broadcastStrokeLive(ws, {
@@ -516,48 +551,73 @@ export class RoomDurableObject extends DurableObject<Env> {
     if (!participantId) {
       return;
     }
+    const fromSql = deleteLiveStrokeExpiryForParticipant(
+      this.ctx.storage.sql,
+      participantId,
+    );
+    const seen = new Set<string>();
+    for (const row of fromSql) {
+      seen.add(liveKey(row.participantId, row.strokeId));
+      this.liveStrokes.delete(liveKey(row.participantId, row.strokeId));
+      this.broadcastLiveStrokeEnd(row.roomId, row.participantId, row.strokeId);
+    }
     for (const [key, live] of [...this.liveStrokes.entries()]) {
-      if (!key.startsWith(`${participantId}:`)) {
+      if (!key.startsWith(`${participantId}:`) || seen.has(key)) {
         continue;
       }
       this.liveStrokes.delete(key);
-      this.broadcastRaw(
-        JSON.stringify({
-          type: "stroke:live",
-          protocolVersion: PROTOCOL_VERSION,
-          roomId: live.roomId,
-          participantId: live.participantId,
-          strokeId: live.strokeId,
-          phase: "end",
-          points: [],
-        } satisfies ServerMessage),
-      );
+      this.broadcastLiveStrokeEnd(live.roomId, live.participantId, live.strokeId);
     }
+    void this.scheduleLiveStrokeAlarm();
+  }
+
+  private touchLiveStrokeExpiry(
+    participantId: string,
+    strokeId: string,
+    roomId: string,
+    lastActiveAt: number,
+  ): void {
+    upsertLiveStrokeExpiry(this.ctx.storage.sql, {
+      participantId,
+      strokeId,
+      roomId,
+      expiresAt: lastActiveAt + LIVE_STROKE_STALL_MS,
+    });
+  }
+
+  private broadcastLiveStrokeEnd(
+    roomId: string,
+    participantId: string,
+    strokeId: string,
+  ): void {
+    this.broadcastRaw(
+      JSON.stringify({
+        type: "stroke:live",
+        protocolVersion: PROTOCOL_VERSION,
+        roomId,
+        participantId,
+        strokeId,
+        phase: "end",
+        points: [],
+      } satisfies ServerMessage),
+    );
   }
 
   private async expireStaleLiveStrokes(now: number): Promise<number> {
+    const expiredRows = listExpiredLiveStrokes(this.ctx.storage.sql, now);
     let expired = 0;
-    for (const [key, live] of [...this.liveStrokes.entries()]) {
-      if (now - live.lastActiveAt < LIVE_STROKE_STALL_MS) {
-        continue;
-      }
-      this.liveStrokes.delete(key);
-      expired += 1;
-      this.broadcastRaw(
-        JSON.stringify({
-          type: "stroke:live",
-          protocolVersion: PROTOCOL_VERSION,
-          roomId: live.roomId,
-          participantId: live.participantId,
-          strokeId: live.strokeId,
-          phase: "end",
-          points: [],
-        } satisfies ServerMessage),
+    for (const row of expiredRows) {
+      deleteLiveStrokeExpiry(
+        this.ctx.storage.sql,
+        row.participantId,
+        row.strokeId,
       );
-      // Notify the author socket if still connected.
+      this.liveStrokes.delete(liveKey(row.participantId, row.strokeId));
+      expired += 1;
+      this.broadcastLiveStrokeEnd(row.roomId, row.participantId, row.strokeId);
       for (const socket of this.ctx.getWebSockets()) {
         const attachment = socket.deserializeAttachment() as SocketAttachment | null;
-        if (attachment?.participantId === live.participantId) {
+        if (attachment?.participantId === row.participantId) {
           this.sendError(
             socket,
             "stroke_expired",
@@ -571,15 +631,9 @@ export class RoomDurableObject extends DurableObject<Env> {
   }
 
   private async scheduleLiveStrokeAlarm(): Promise<void> {
-    if (this.liveStrokes.size === 0) {
+    const soonest = soonestLiveStrokeExpiry(this.ctx.storage.sql);
+    if (soonest === null) {
       await this.ctx.storage.deleteAlarm();
-      return;
-    }
-    let soonest = Number.POSITIVE_INFINITY;
-    for (const live of this.liveStrokes.values()) {
-      soonest = Math.min(soonest, live.lastActiveAt + LIVE_STROKE_STALL_MS);
-    }
-    if (!Number.isFinite(soonest)) {
       return;
     }
     await this.ctx.storage.setAlarm(soonest);

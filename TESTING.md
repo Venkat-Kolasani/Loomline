@@ -11,8 +11,8 @@ Environment: macOS darwin 25.2.0, Node v24.12.0.
 
 ```text
 typecheck exit 0
-Test Files  13 passed (13)
-Tests  51 passed (51)
+Test Files  14 passed (14)
+Tests  52 passed (52)
 build exit 0
 ```
 
@@ -21,6 +21,9 @@ Coverage:
 - `test/reconnect-backoff.test.ts` — exponential delay bounds + jitter
 - `test/reconnect.test.ts` — drop + rejoin sync_state convergence; durable-head
   SQLite rehydration probe; stalled live stroke expiry without commit
+- `test/live-expiry-hibernate.test.ts` — `evictDurableObject` wipes in-memory
+  live map; durable `live_stroke_expiry` + `runDurableObjectAlarm` still clears
+  the peer overlay with no durable operation
 - Duplicate sequence suppression in `CommittedOperationStore`
 
 ### Local two-browser proof
@@ -38,6 +41,16 @@ Room rec8a001 @ http://localhost:8787
    again (see ISSUES I7). Clients showed **Reconnecting… (try N)** until the
    runtime died — UI path observed; durable recovery already proven by step 3
    and `test/reconnect.test.ts`.
+
+## Latest gate (2026-07-25 — live-expiry hibernation fix)
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files  14 passed (14)
+→ Tests  52 passed (52)
+→ build exit 0
+```
 
 ## Latest gate (2026-07-25 — reconnect)
 

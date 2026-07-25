@@ -130,10 +130,12 @@ describe("reconnect and durable recovery", () => {
       sequenceHead: number;
       operationCount: number;
       liveStrokeCount: number;
+      pendingExpiryCount: number;
     };
     expect(durable.sequenceHead).toBe(0);
     expect(durable.operationCount).toBe(0);
     expect(durable.liveStrokeCount).toBe(0);
+    expect(durable.pendingExpiryCount).toBe(0);
 
     socketA.close(1000, "done");
     socketB.close(1000, "done");

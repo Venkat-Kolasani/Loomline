@@ -210,7 +210,89 @@ describe("durable ordered operations", () => {
     socketA.close(1000, "done");
     socketB.close(1000, "done");
   });
+
+  it("assigns distinct sequences for back-to-back ends without awaiting the first commit", async () => {
+    const roomId = "llll5555";
+    const socketA = await openRoomSocket(roomId);
+    await joinAndDrain(socketA, roomId, "Rapid");
+
+    const committed: Extract<
+      ServerMessage,
+      { type: "operation:committed" }
+    >[] = [];
+    const collect = (event: MessageEvent): void => {
+      const message = parseServer(event);
+      if (message?.type === "operation:committed") {
+        committed.push(message);
+      }
+    };
+    socketA.addEventListener("message", collect);
+
+    // Fire two full stroke lifecycles with no await between the first end and
+    // the second start — proves sequence allocation under back-to-back ends.
+    sendStrokeLifecycle(socketA, roomId, "rapid-1", "#0f6a5a", [
+      { x: 1, y: 1 },
+      { x: 2, y: 2 },
+    ]);
+    sendStrokeLifecycle(socketA, roomId, "rapid-2", "#be123c", [
+      { x: 3, y: 3 },
+      { x: 4, y: 4 },
+    ]);
+
+    await waitUntil(() => committed.length >= 2);
+    socketA.removeEventListener("message", collect);
+
+    expect(committed.map((m) => m.operation.sequence)).toEqual([1, 2]);
+    expect(committed.map((m) => m.operation.strokeId).sort()).toEqual([
+      "rapid-1",
+      "rapid-2",
+    ]);
+
+    socketA.close(1000, "done");
+  });
 });
+
+function sendStrokeLifecycle(
+  socket: WebSocket,
+  roomId: string,
+  strokeId: string,
+  color: string,
+  points: { x: number; y: number }[],
+): void {
+  const first = points[0]!;
+  const rest = points.slice(1);
+  socket.send(
+    JSON.stringify({
+      type: "stroke:start",
+      protocolVersion: PROTOCOL_VERSION,
+      roomId,
+      strokeId,
+      tool: "brush",
+      color,
+      width: 4,
+      point: first,
+    }),
+  );
+  if (rest.length > 0) {
+    socket.send(
+      JSON.stringify({
+        type: "stroke:points",
+        protocolVersion: PROTOCOL_VERSION,
+        roomId,
+        strokeId,
+        points: rest,
+      }),
+    );
+  }
+  socket.send(
+    JSON.stringify({
+      type: "stroke:end",
+      protocolVersion: PROTOCOL_VERSION,
+      roomId,
+      strokeId,
+    }),
+  );
+}
 
 async function completeStroke(
   socket: WebSocket,

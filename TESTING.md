@@ -24,7 +24,8 @@ untested behavior.
 - [x] Finished strokes persist via operation:committed (same sequence on both)
 - [x] Joining client receives sync_state matching committed log
 - [ ] Global undo/redo matches on both
-- [x] Refresh/rejoin restores committed canvas via sync_state
+- [x] Refresh/rejoin restores committed canvas via sync_state (full snapshot on
+  join; reconnect backoff / last-sequence resume deferred to Prompt 8)
 - [x] Malformed stroke payload returns typed error; room survives (automated)
 - [x] Mid-stroke close does not create a durable op (automated)
 - [x] Brush then eraser overlap keeps sequence order (automated)
@@ -127,6 +128,8 @@ Includes `test/history.test.ts`:
 - joining client `sync_state` matches the committed log
 - mid-stroke close abandons live ink (sequenceHead stays 0)
 - brush then eraser overlap commits as sequences 1 then 2
+- back-to-back `stroke:end` without awaiting the first commit still yields
+  distinct sequences 1 and 2
 
 Adversarial coverage in the same suite / prior transport tests:
 
@@ -134,7 +137,8 @@ Adversarial coverage in the same suite / prior transport tests:
   points/end when start was not accepted (no orphan unknown_stroke / no false
   awaiting-commit).
 - Socket close mid-stroke: no durable op.
-- Rapid sequential commits: sequences 1,2 without collision.
+- Back-to-back ends (no await between first end and second start): sequences
+  1,2 without collision.
 - Two users brush/eraser on overlapping content: stable server order.
 
 ### Local two-browser proof

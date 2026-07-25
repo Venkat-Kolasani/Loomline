@@ -117,7 +117,7 @@ Leave unchecked until implemented **and** verified with evidence.
 - [x] Versioned, validated WebSocket protocol
 - [x] Server-authoritative operation ordering
 - [ ] Global undo/redo without mutating the durable operation log incorrectly
-- [x] Reconnect / snapshot recovery without duplicate sequence application
+- [ ] Reconnect / snapshot recovery without duplicate sequence application
 - [x] Recoverable typed errors for invalid client messages
 
 ### Submission / demo

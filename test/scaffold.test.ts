@@ -15,7 +15,7 @@ describe("Loomline scaffold", () => {
     expect(body).toMatchObject({
       ok: true,
       service: "loomline",
-      phase: "canvas-shell",
+      phase: "local-drawing",
     });
   });
 

@@ -24,54 +24,53 @@
         aria-label="Drawing tools"
         aria-controls="live-canvas"
       >
-        <button type="button" id="tool-brush" disabled>Brush</button>
-        <button type="button" id="tool-eraser" disabled>Eraser</button>
+        <button
+          type="button"
+          id="tool-brush"
+          class="is-active"
+          aria-pressed="true"
+        >
+          Brush
+        </button>
+        <button type="button" id="tool-eraser" aria-pressed="false">
+          Eraser
+        </button>
         <label class="field">
           <span>Color</span>
-          <input
-            id="tool-color"
-            type="color"
-            value="#0f6a5a"
-            disabled
-            aria-disabled="true"
-          />
+          <input id="tool-color" type="color" value="#0f6a5a" />
         </label>
         <label class="field">
           <span>Width</span>
-          <input
-            id="tool-width"
-            type="range"
-            min="1"
-            max="32"
-            value="4"
-            disabled
-            aria-disabled="true"
-          />
+          <input id="tool-width" type="range" min="1" max="32" value="4" />
+          <span id="tool-width-value" class="width-value">4px</span>
         </label>
-        <button type="button" id="tool-undo" disabled>Undo</button>
-        <button type="button" id="tool-redo" disabled>Redo</button>
+        <button type="button" id="tool-clear">Clear</button>
+        <button type="button" id="tool-undo" disabled title="Server undo comes later">
+          Undo
+        </button>
+        <button type="button" id="tool-redo" disabled title="Server redo comes later">
+          Redo
+        </button>
       </div>
 
-      <section
-        class="stage-wrap"
-        aria-label="Drawing surface"
-      >
+      <section class="stage-wrap" aria-label="Drawing surface">
         <div id="canvas-stage" class="canvas-stage">
           <canvas
             id="committed-canvas"
             width="1"
             height="1"
-            aria-label="Committed drawing layer"
+            aria-hidden="true"
           ></canvas>
           <canvas
             id="live-canvas"
             width="1"
             height="1"
-            aria-label="Live stroke overlay"
+            tabindex="0"
+            aria-label="Drawing canvas. Use brush or eraser to draw."
           ></canvas>
         </div>
         <p id="empty-state" class="empty-state">
-          Canvas is empty. Tools and drawing are not enabled yet.
+          Draw with brush or eraser. Local only — not synced yet.
         </p>
       </section>
     </div>

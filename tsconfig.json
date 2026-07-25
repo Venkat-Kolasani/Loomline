@@ -17,6 +17,6 @@
     "resolveJsonModule": true,
     "types": ["./worker-configuration.d.ts"]
   },
-  "include": ["client/**/*.ts", "worker/**/*.ts", "vite.config.ts"],
+  "include": ["client/**/*.ts", "worker/**/*.ts", "shared/**/*.ts", "vite.config.ts"],
   "exclude": ["node_modules", "dist", ".wrangler", "test"]
 }

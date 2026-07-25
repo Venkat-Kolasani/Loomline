@@ -6,6 +6,7 @@
   "include": [
     "./**/*.ts",
     "../client/src/**/*.ts",
+    "../shared/**/*.ts",
     "../worker-configuration.d.ts",
     "../worker/**/*.ts"
   ]

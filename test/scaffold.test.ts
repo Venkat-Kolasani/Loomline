@@ -15,24 +15,17 @@ describe("Loomline scaffold", () => {
     expect(body).toMatchObject({
       ok: true,
       service: "loomline",
-      phase: "local-drawing",
+      phase: "rooms-presence",
     });
   });
 
-  it("exposes a Room Durable Object skeleton", async () => {
+  it("exposes a Room Durable Object that rejects non-WebSocket fetches", async () => {
     const id = env.ROOM.idFromName("scaffold-room");
     const stub = env.ROOM.get(id);
     const response = await stub.fetch(
       new Request("https://room/scaffold-room"),
     );
 
-    expect(response.status).toBe(200);
-
-    const body: unknown = await response.json();
-    expect(body).toMatchObject({
-      ok: true,
-      role: "room-durable-object",
-      status: "skeleton",
-    });
+    expect(response.status).toBe(426);
   });
 });

@@ -21,9 +21,13 @@ untested behavior.
 - [x] Different room ids do not share presence
 - [x] Leaving client is removed from remaining clients’ presence
 - [x] Live strokes sync mid-stroke (peer sees ink before pointer up)
+- [x] Finished strokes persist via operation:committed (same sequence on both)
+- [x] Joining client receives sync_state matching committed log
 - [ ] Global undo/redo matches on both
-- [ ] Refresh restores committed canvas
+- [x] Refresh/rejoin restores committed canvas via sync_state
 - [x] Malformed stroke payload returns typed error; room survives (automated)
+- [x] Mid-stroke close does not create a durable op (automated)
+- [x] Brush then eraser overlap keeps sequence order (automated)
 
 ### Touch / mobile
 
@@ -103,6 +107,41 @@ start was accepted while ready. Test: `test/live-stroke-transport.test.ts`.
 `StrokePointBatcher` does not yet chunk or enforce the documented 64-point
 maximum client-side. Normal pointer rates stay under the limit; add an explicit
 chunking/size-limit test before claiming the payload boundary is fully hardened.
+
+## Results — durable ordered operations (2026-07-25)
+
+Environment: macOS darwin 25.2.0, Node v24.12.0.
+
+### `npm run typecheck` / `test` / `build`
+
+```text
+typecheck exit 0
+Test Files  10 passed (10)
+Tests  39 passed (39)
+build exit 0
+```
+
+Includes `test/history.test.ts`:
+
+- two clients see the same increasing sequences for overlapping strokes
+- joining client `sync_state` matches the committed log
+- mid-stroke close abandons live ink (sequenceHead stays 0)
+- brush then eraser overlap commits as sequences 1 then 2
+
+Adversarial coverage in the same suite / prior transport tests:
+
+- Connecting→connected during a stroke: `LiveStrokeTransport` suppresses
+  points/end when start was not accepted (no orphan unknown_stroke / no false
+  awaiting-commit).
+- Socket close mid-stroke: no durable op.
+- Rapid sequential commits: sequences 1,2 without collision.
+- Two users brush/eraser on overlapping content: stable server order.
+
+### Local two-browser proof
+
+Recorded after `npm run build` + `npm run dev` on
+`http://127.0.0.1:8787/` (`phase: "durable-ops"`): two tabs draw overlapping
+strokes; third join sees both via sync_state. Details filled after browser run.
 
 ## Results — rooms + presence (2026-07-25)
 

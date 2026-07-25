@@ -1,8 +1,8 @@
 # Protocol
 
 **Protocol version:** `1`  
-**Status:** presence + ephemeral live strokes / cursors **implemented**.
-Durable `operation:committed`, snapshots, and undo/redo remain planned.
+**Status:** presence, live strokes/cursors, and **durable ordered operations**
+are implemented. Undo/redo remain planned.
 
 ## Transport
 
@@ -28,23 +28,27 @@ Validation lives in `shared/protocol.ts` (`parseClientMessage`).
 | --- | --- | --- |
 | `join` | client → server | Enter the room (optional `displayName`) |
 | `welcome` | server → client | Assigned participant id, colour, display name |
+| `sync_state` | server → client | Snapshot/replay of committed ops + `sequenceHead` after join |
 | `presence` | server → all | Full participant list for the room |
-| `stroke:start` | client → server | Begin a provisional stroke (`strokeId`, tool, colour, width, first point) |
+| `stroke:start` | client → server | Begin a provisional stroke |
 | `stroke:points` | client → server | Batched additional points (≤ 64 per message) |
-| `stroke:end` | client → server | Finish the provisional stroke (optional final point) |
-| `stroke:live` | server → peers | Fan-out of start / points / end for live overlay only |
+| `stroke:end` | client → server | Finish provisional stroke; server may commit one op |
+| `stroke:live` | server → peers | Fan-out of start / points / end for live overlay |
+| `operation:committed` | server → **all** | Durable op with authoritative increasing `sequence` |
 | `cursor` | client → server → peers | Ephemeral pointer position |
 | `error` | server → client | Recoverable typed failure |
 
-### Ordering note (this slice)
+### Ordering contract (implemented)
 
-Live strokes are **ephemeral**. `stroke:end` clears server-side live tracking and
-broadcasts `phase: "end"`. It does **not** assign a sequence number or write
-SQLite. Durable ordering arrives in the next history slice.
-
-Clients may retain finished remote strokes locally as provisional ink so peers
-still see completed shapes until `operation:committed` exists. That retention is
-not authoritative.
+1. Only `stroke:end` may produce a durable operation (and only if the stroke was
+   live on the server with at least one point).
+2. The room Durable Object assigns the next strictly increasing `sequence`,
+   stores **one SQLite row** for the whole stroke, and broadcasts
+   `operation:committed` to every socket in the room (including the author).
+3. Clients apply ops by sequence and ignore duplicate sequences.
+4. Overlapping strokes are valid; later sequence paints later (stable layering).
+5. Mid-stroke disconnect discards the live stroke — it never becomes durable.
+6. Undo/redo are not implemented in this slice.
 
 ### Stroke batching contract
 
@@ -52,73 +56,50 @@ Clients must batch `stroke:points` at most once per `requestAnimationFrame`.
 Local pixels still update immediately on each accepted pointer sample.
 
 Clients must not send `stroke:points` / `stroke:end` for a `strokeId` unless
-`stroke:start` was successfully sent while joined. Strokes begun during
-Connecting… stay local-only (see `LiveStrokeTransport`).
+`stroke:start` was successfully sent while joined (`LiveStrokeTransport`).
 
-### Join example
-
-```json
-{
-  "type": "join",
-  "protocolVersion": 1,
-  "roomId": "abcd1234",
-  "displayName": "Venkat"
-}
-```
-
-### stroke:start example
+### sync_state example
 
 ```json
 {
-  "type": "stroke:start",
+  "type": "sync_state",
   "protocolVersion": 1,
   "roomId": "abcd1234",
-  "strokeId": "…uuid…",
-  "tool": "brush",
-  "color": "#0f6a5a",
-  "width": 4,
-  "point": { "x": 120.5, "y": 80 }
-}
-```
-
-### stroke:live (points) example
-
-```json
-{
-  "type": "stroke:live",
-  "protocolVersion": 1,
-  "roomId": "abcd1234",
-  "participantId": "…uuid…",
-  "strokeId": "…uuid…",
-  "phase": "points",
-  "points": [
-    { "x": 122, "y": 84 },
-    { "x": 130, "y": 90 }
+  "sequenceHead": 2,
+  "operations": [
+    {
+      "sequence": 1,
+      "opId": "…",
+      "participantId": "…",
+      "strokeId": "…",
+      "tool": "brush",
+      "color": "#0f6a5a",
+      "width": 4,
+      "points": [{ "x": 10, "y": 10 }, { "x": 20, "y": 25 }],
+      "createdAt": 1720000000000
+    }
   ]
 }
 ```
 
-### cursor example (server → peer)
+### operation:committed example
 
 ```json
 {
-  "type": "cursor",
+  "type": "operation:committed",
   "protocolVersion": 1,
   "roomId": "abcd1234",
-  "participantId": "…uuid…",
-  "x": 210,
-  "y": 140
-}
-```
-
-### error example
-
-```json
-{
-  "type": "error",
-  "protocolVersion": 1,
-  "code": "invalid_payload",
-  "message": "color must be a #RRGGBB hex string."
+  "operation": {
+    "sequence": 3,
+    "opId": "…",
+    "participantId": "…",
+    "strokeId": "…",
+    "tool": "eraser",
+    "color": "#334155",
+    "width": 12,
+    "points": [{ "x": 40, "y": 40 }, { "x": 60, "y": 60 }],
+    "createdAt": 1720000000500
+  }
 }
 ```
 
@@ -126,18 +107,8 @@ Connecting… stay local-only (see `LiveStrokeTransport`).
 
 | Message | Direction | Meaning |
 | --- | --- | --- |
-| `snapshot` / `sync_state` | server → client | Latest committed visible state + sequence cursor |
-| `operation:committed` | server → all | Durable op with authoritative `sequence` |
 | `history:undo` / `history:redo` | client → server | Global history transition |
-| `history:changed` | server → all | Rebuild committed layer |
-
-## Ordering and idempotency (planned for durable ops)
-
-1. Only `stroke:end` may produce a durable operation (next slice).
-2. The room Durable Object assigns the next strictly increasing `sequence`.
-3. Clients never apply an already-seen sequence twice.
-4. Overlapping strokes stack by server sequence.
-5. Undo/redo are server-owned tombstones over completed ops only.
+| `history:changed` | server → all | Rebuild committed layer after undo/redo |
 
 ## Payload limits (current)
 
@@ -153,6 +124,6 @@ Connecting… stay local-only (see `LiveStrokeTransport`).
 
 | Endpoint | Transport | Behavior |
 | --- | --- | --- |
-| `GET /api/health` | HTTP | `{ ok, service: "loomline", phase: "live-strokes" }` |
-| `GET /ws?room=` | WebSocket | Room join + live stroke / cursor fan-out |
+| `GET /api/health` | HTTP | `{ ok, service: "loomline", phase: "durable-ops" }` |
+| `GET /ws?room=` | WebSocket | Room join + live + committed sync |
 | Static assets | HTTP via `ASSETS` | Landing + `/r/:roomId` SPA |

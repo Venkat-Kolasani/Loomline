@@ -82,3 +82,16 @@ Product name is **Loomline** (repository and Worker name match).
 - Explains why points must not flush after welcome for a stroke that never started
   on the wire
 
+## Durable ops (`feat(history): add durable ordered room operations`)
+
+### Assisted by AI
+
+- SQLite `operations` helpers, DO commit on `stroke:end`, `sync_state`, client
+  `CommittedOperationStore`, history integration tests, docs updates
+
+### Manually reviewed / owned by the author
+
+- Explains sequence assignment, one-row-per-stroke persistence, and why
+  mid-stroke close must not commit
+- Owns overlap/join/abandon test evidence
+

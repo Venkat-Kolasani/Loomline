@@ -3,7 +3,7 @@
 Real-time collaborative drawing canvas for the Flam Frontend R&D assignment.
 
 **Live URL:** _not deployed yet_  
-**Status:** live stroke streaming between room participants (not yet durable)
+**Status:** durable ordered room operations + live stroke streaming
 
 This repository intentionally uses **Cloudflare Workers + Durable Objects** (edge
 JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
@@ -15,18 +15,19 @@ JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
 - Worker routes `/ws?room=` to one Durable Object per room via `idFromName`
 - Presence: join/leave list with deterministic participant colours
 - Live stroke fan-out (`stroke:start` / `points` / `end` → `stroke:live`)
+- Durable `operation:committed` with SQLite + strictly increasing sequence
+- Join `sync_state` snapshot/replay of the committed log
 - Remote cursors (ephemeral)
 - rAF-batched outgoing points; immediate local drawing
 - Two stacked canvas layers with brush/eraser/colour/width/clear
 - Dirty-layer paint API (no permanent render loop)
 - Scripts: `dev`, `dev:client`, `typecheck`, `test`, `build`, `deploy`
-- Vitest: room isolation, protocol validation, live stroke fan-out
+- Vitest: isolation, protocol, live strokes, sequence/join/overlap history
 
 ## What is planned (not implemented)
 
-- Authoritative committed operations + SQLite persistence
 - Global undo/redo
-- Reconnect snapshot recovery
+- Reconnect backoff / last-sequence resume UX (join already sends sync_state)
 - Deployed demo URL
 
 ## Quick start
@@ -61,9 +62,10 @@ a second browser profile. Draw in one tab — the peer should see the stroke
    show two participants.
 4. Draw slowly in client A — client B must show the stroke **before** A lifts
    the pointer (live overlay).
-5. Open a **different** room id — presence and strokes must not cross rooms.
-6. Finished strokes are visible to peers via provisional client retention, but
-   are **not** durable / sequenced yet (no undo, no refresh recovery).
+5. After A ends the stroke, both clients keep it via `operation:committed`.
+6. Open a third client on the same room — it receives `sync_state` with the same
+   committed strokes.
+7. Open a **different** room id — presence and strokes must not cross rooms.
 
 ## Supported browsers
 
@@ -72,12 +74,11 @@ and mobile passes are verified.
 
 ## Known limitations
 
-- Completed strokes are **not** persisted (no SQLite / no sequence yet)
-- Refresh loses all ink; reconnect does not restore a snapshot
 - Undo/Redo disabled until server history lands
-- Clear is local-only (does not clear peers)
+- Clear is local-only (does not clear peers’ committed ops)
+- No exponential reconnect UI yet (fresh join still gets `sync_state`)
 - Production deploy not run yet
-- Resize redraws from in-memory stroke lists
+- Very long strokes are stored as one JSON blob (no checkpoint yet)
 
 ## Time spent
 
@@ -97,7 +98,7 @@ Leave unchecked until implemented **and** verified with evidence.
 - [x] Drawing tools: brush, eraser, colours, stroke width
 - [x] Real-time sync: peers see in-progress strokes, not only finished strokes
 - [x] User indicators: remote cursor / drawing position
-- [ ] Conflict resolution: overlapping strokes remain stable via server sequence
+- [x] Conflict resolution: overlapping strokes remain stable via server sequence
 - [ ] Global undo/redo across all users
 - [x] User management: online presence and deterministic participant colours
 
@@ -106,7 +107,7 @@ Leave unchecked until implemented **and** verified with evidence.
 - [x] Frontend: vanilla TypeScript + HTML5 Canvas (no framework, no Canvas library)
 - [x] Backend realtime: native browser WebSocket (no Socket.io)
 - [x] Backend hosting: Cloudflare Worker + one Durable Object per room (documented trade-off vs Node.js)
-- [ ] Persistence: Durable Object SQLite for committed operations
+- [x] Persistence: Durable Object SQLite for committed operations
 
 ### Technical challenges
 
@@ -114,9 +115,9 @@ Leave unchecked until implemented **and** verified with evidence.
 - [x] Pointer batching (at most one network batch per animation frame)
 - [x] Layered committed vs live overlay model
 - [x] Versioned, validated WebSocket protocol
-- [ ] Server-authoritative operation ordering
+- [x] Server-authoritative operation ordering
 - [ ] Global undo/redo without mutating the durable operation log incorrectly
-- [ ] Reconnect / snapshot recovery without duplicate sequence application
+- [x] Reconnect / snapshot recovery without duplicate sequence application
 - [x] Recoverable typed errors for invalid client messages
 
 ### Submission / demo

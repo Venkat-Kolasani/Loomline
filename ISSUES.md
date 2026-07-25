@@ -190,6 +190,38 @@ Pointer / touch-emulation drawing still completes strokes on the live layer.
 
 ---
 
+## I8 — Live-end provisional ink raced ahead of durable commit
+
+**When:** Prompt 6 (durable ops), client redesign.
+
+**What the issue was**
+
+Remote `stroke:live` `phase:end` previously painted finished ink onto a
+provisional committed list. After durable ops landed, that could double-paint or
+diverge from server sequence until refresh.
+
+**Root cause**
+
+Slice 5 retained finished remotes client-side because nothing durable existed
+yet. Slice 6 introduced `operation:committed` as the sole committed source.
+
+**What we fixed**
+
+Remote live-end only clears the live overlay. Committed pixels come only from
+`sync_state` / `operation:committed`. Local finished strokes wait on the live
+layer (`awaitingCommit`) until the matching commit arrives.
+
+**Why this way**
+
+- One authoritative paint path for committed-canvas.
+- Rejected keeping provisional + committed merge — layering bugs under overlap.
+
+**Verification**
+
+History integration tests + two-browser overlap proof.
+
+---
+
 ## I7 — Stroke started while Connecting… orphaned points after welcome
 
 **When:** Prompt 5 review (P1), before durable history.

@@ -103,3 +103,30 @@ decouples from display refresh without improving local latency.
 - Integration: `test/live-strokes.test.ts` proves peer receives `stroke:live`
   start/points before end.
 - Manual two-browser: peer sees ink mid-stroke. See [TESTING.md](./TESTING.md).
+
+## D4 — Durable ops are append-only sequenced strokes, not per-point rows
+
+### Problem / invariant
+
+Completed strokes must converge for every client. Live points are high-volume
+and ephemeral; persisting each point would explode storage and break hibernation
+assumptions.
+
+### Selected design
+
+On `stroke:end`, the room DO assigns `sequence = MAX+1`, inserts **one** SQLite
+row with the full point list, and broadcasts `operation:committed` to all
+sockets. Join sends `sync_state` with the ordered log. Clients rebuild
+committed-canvas only from that log.
+
+### Rejected alternative
+
+CRDT / client-assigned order, or one DB row per pointer sample.
+
+Rejected because a single DO coordinator already gives a total order, and
+per-point rows violate the blueprint storage rule.
+
+### Verification
+
+`test/history.test.ts` (sequence equality, join snapshot, abandon, brush/eraser
+overlap). See [TESTING.md](./TESTING.md).

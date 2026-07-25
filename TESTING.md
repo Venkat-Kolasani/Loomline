@@ -103,6 +103,28 @@ handlers ignore events from superseded sockets.
 gate re-run after both fixes) — typecheck exit 0; Tests 17 passed (17); build
 exit 0.
 
+### Fresh single-Wrangler re-verify (2026-07-25, pre–Prompt 5)
+
+Earlier browser checks against a long-lived `127.0.0.1:8787` instance were
+**not** trusted: `/api/health` served the SPA landing HTML (asset fallback) and
+WebSocket leave behavior matched the pre-fix bug — consistent with a stale or
+conflicted local Worker, not with checked-in `main`.
+
+Ops: stopped all `wrangler`/`workerd` processes, cleared `.wrangler/state`,
+started **exactly one** `npm run dev`.
+
+```text
+GET http://127.0.0.1:8787/api/health
+→ {"ok":true,"service":"loomline","phase":"rooms-presence"}
+One workerd listener on :8787 (no second app server on that port).
+```
+
+Manual leave on that instance: room `fd850e7e`, two tabs → presence = 2;
+close tab B → tab A immediately and after 1.6s shows only `Artist-6829 (you)`.
+
+Note: local `SQLITE_BUSY` remains classified as concurrent Wrangler contention
+on DO SQLite state (see `ISSUES.md` I3), not an app-code defect.
+
 ### Deferred follow-ups (not blockers)
 
 - Focused `LocalDrawingController` pointer-up/clear/layer tests

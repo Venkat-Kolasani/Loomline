@@ -105,7 +105,9 @@ Dev server crashed with `database is locked: SQLITE_BUSY` (sometimes
 **Root cause**
 
 Local Durable Object SQLite under `.wrangler/state` does not tolerate concurrent
-`wrangler`/`workerd` processes (or a dirty lock after a hard kill) well.
+`wrangler`/`workerd` processes (or a dirty lock after a hard kill) well. This is
+**two local Wrangler processes contending for the same DO SQLite files**, not an
+application-code defect in presence or rooms.
 
 **What we fixed (ops, not product code)**
 

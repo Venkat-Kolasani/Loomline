@@ -35,7 +35,7 @@ Room `obs10b02` @ `http://127.0.0.1:8787/r/obs10b02?debug=1`
 
 | Metric | Observed |
 | --- | --- |
-| Render FPS (rAF deltas, idle/light) | **120.0** (ProMotion-class display; not a claimed 60 FPS budget) |
+| rAF FPS (display cadence, idle/light) | **120.0** (ProMotion-class display; not Canvas paint cost or a claimed 60 FPS budget) |
 | WS RTT (`ping`/`pong`) | **1.2 ms** idle → **3.1 ms** after light drawing (localhost) |
 | Participants | 1 idle; **3** when browser + Demo-A/B WS clients shared the room |
 | Sequence head | **2** after two committed strokes |

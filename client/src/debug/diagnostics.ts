@@ -60,7 +60,7 @@ export class DiagnosticsPanel {
     this.root.innerHTML = `
       <h2 class="debug-heading">Diagnostics</h2>
       <dl class="debug-metrics">
-        <div><dt>Render FPS</dt><dd data-metric="fps">—</dd></div>
+        <div><dt>rAF FPS</dt><dd data-metric="fps">—</dd></div>
         <div><dt>WS RTT</dt><dd data-metric="rtt">—</dd></div>
         <div><dt>Inbound /s</dt><dd data-metric="in">0</dd></div>
         <div><dt>Outbound /s</dt><dd data-metric="out">0</dd></div>

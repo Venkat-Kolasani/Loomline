@@ -98,7 +98,7 @@ Developer-only overlay (not product chrome):
 
 | Metric | Source |
 | --- | --- |
-| Render FPS | `requestAnimationFrame` deltas while the panel is active |
+| rAF FPS | `requestAnimationFrame` deltas while the panel is active (display cadence, not Canvas paint cost) |
 | WS RTT | `ping` / `pong` echo of `clientTime` |
 | Inbound / outbound msg/s | Client counters reset each second |
 | Participants | Latest `presence` length |

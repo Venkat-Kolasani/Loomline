@@ -17,7 +17,8 @@ JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
 - Worker routes `/ws?room=` to one Durable Object per room via `idFromName`
 - Presence: join/leave list with deterministic participant colours
 - Live stroke fan-out (`stroke:start` / `points` / `end` → `stroke:live`)
-- Durable `operation:committed` with SQLite + strictly increasing sequence
+- Durable stroke/clear `operation:committed` records with SQLite + strictly
+  increasing sequence
 - Join/reconnect `sync_state` snapshot of the **visible** committed log
 - Exponential reconnect backoff with Connecting / Reconnecting / Connected UI
 - Duplicate committed-sequence suppression on the client
@@ -30,9 +31,10 @@ JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
 - Synthetic load script: `npm run load` (5×100 strokes) + `/api/room-metrics`
 - Remote cursors (ephemeral)
 - rAF-batched outgoing points; immediate local drawing
-- Two stacked canvas layers with brush/eraser/colour/width/clear (eraser uses
+- Two stacked canvas layers with brush/eraser/colour/width/global Clear (eraser uses
   `destination-out` punch-through on the committed view while dragging; width
-  shares the slider and shows as an eraser-sized cursor)
+  shares the slider and shows as an eraser-sized cursor; Clear is durable,
+  room-wide, and undoable)
 - Dirty-layer paint API (no permanent render loop)
 - Scripts: `dev`, `dev:client`, `typecheck`, `test`, `load`, `build`, `deploy`
 - Vitest: isolation, protocol, live strokes, history, reconnect/expiry,
@@ -83,6 +85,8 @@ Use the live URL above, or run `npm run dev` and use
 5. In client B click **Undo** — both clients must remove the latest completed
    stroke and enable Redo.
 6. In client A click **Redo** — both clients must restore the same stroke.
+7. Click **Clear** in either client — both committed canvases blank. Click
+   **Undo** to restore the prior strokes in both, then **Redo** to clear again.
 7. Refresh either client — it gets a new participant id and restores the same
    committed canvas from `sync_state`.
 8. Open a **different** room id in a third client — presence and strokes must
@@ -111,8 +115,6 @@ Full commands and constraints are in [TESTING.md](./TESTING.md).
 
 ## Known limitations
 
-- Clear is local-only: blanks this client's committed + live view; does not
-  mutate server history or peers' canvases (rejoin/`sync_state` restores ops)
 - Live in-progress strokes are not undoable (only completed ops)
 - Reconnect assigns a new participant id (no sticky identity yet)
 - Reconnect uses a full visible `sync_state` snapshot (not a delta by last-seq)

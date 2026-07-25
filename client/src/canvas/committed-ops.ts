@@ -2,7 +2,7 @@ import type { CommittedOperation } from "../../../shared/protocol";
 import { paintStroke, type Stroke } from "./stroke";
 
 /**
- * Server-authoritative committed strokes, keyed by sequence.
+ * Server-authoritative committed operations, keyed by sequence.
  * Tracks every applied sequence so reconnect/duplicate events never double-paint.
  */
 export class CommittedOperationStore {
@@ -71,7 +71,7 @@ export class CommittedOperationStore {
 
   hasStrokeId(strokeId: string): boolean {
     for (const op of this.bySequence.values()) {
-      if (op.strokeId === strokeId) {
+      if (op.kind === "stroke" && op.strokeId === strokeId) {
         return true;
       }
     }
@@ -80,6 +80,13 @@ export class CommittedOperationStore {
 
   paint(ctx: CanvasRenderingContext2D): void {
     for (const op of this.getOperations()) {
+      if (op.kind === "clear") {
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        ctx.restore();
+        continue;
+      }
       const stroke: Stroke = {
         tool: op.tool,
         color: op.color,

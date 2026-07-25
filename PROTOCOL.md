@@ -1,7 +1,7 @@
 # Protocol
 
-**Protocol version:** `1`  
-**Status:** presence, live strokes, durable ops, global undo/redo, reconnect
+**Protocol version:** `2`
+**Status:** presence, live strokes, durable stroke/clear ops, global undo/redo, reconnect
 recovery, input-boundary hardening, and **developer diagnostics / load baseline**
 are implemented.
 
@@ -19,7 +19,7 @@ All JSON messages include:
 | Field | Type | Notes |
 | --- | --- | --- |
 | `type` | string | Message discriminant |
-| `protocolVersion` | number | Must be `1` |
+| `protocolVersion` | number | Must be `2` |
 | `roomId` | string | Must match the socket room |
 
 Invalid client messages return a typed `error` and do not crash the room.
@@ -39,6 +39,7 @@ size and per-participant rate limits are enforced in `RoomDurableObject`
 | `stroke:points` | client → server | Batched additional points (≤ 64 per message) |
 | `stroke:end` | client → server | Finish provisional stroke; server may commit one op |
 | `stroke:live` | server → peers | Fan-out of start / points / end for live overlay |
+| `canvas:clear` | client → server | Append one room-global durable clear operation |
 | `operation:committed` | server → **all** | Durable op with authoritative increasing `sequence` |
 | `history:undo` | client → server | Tombstone latest **visible** completed op |
 | `history:redo` | client → server | Remove newest redoable tombstone |
@@ -50,17 +51,20 @@ size and per-participant rate limits are enforced in `RoomDurableObject`
 
 ### Ordering contract (implemented)
 
-1. Only `stroke:end` may produce a durable operation (and only if the stroke was
-   live on the server with at least one point).
+1. `stroke:end` may produce a durable `kind: "stroke"` operation (only if the
+   stroke was live on the server with at least one point). `canvas:clear`
+   produces a durable `kind: "clear"` operation.
    An optional final point is filtered/appended before commit so pointer-up
    geometry is not lost.
 2. The room Durable Object assigns the next strictly increasing `sequence`,
-   stores **one SQLite row** for the whole stroke, and broadcasts
+   stores **one SQLite row** for the operation, and broadcasts
    `operation:committed` to every socket in the room (including the author).
 3. Clients apply ops by sequence and ignore duplicate sequences.
 4. Overlapping strokes are valid; later sequence paints later (stable layering).
 5. Mid-stroke disconnect discards the live stroke — it never becomes durable.
 6. Undo/redo never DELETE or UPDATE rows in `operations`.
+7. Replay is deterministic: a visible clear resets prior pixels at its sequence;
+   later visible strokes paint normally.
 
 ### Reconnect contract (implemented)
 
@@ -101,6 +105,10 @@ size and per-participant rate limits are enforced in `RoomDurableObject`
 5. `sync_state` and `history:changed` send only **visible** operations.
    `sequenceHead` is still `MAX(sequence)` over the full append-only log.
 6. Any joined participant may undo/redo globally; author identity does not matter.
+7. A clear is history like any completed operation: undo makes earlier strokes
+   reappear; redo reapplies the clear.
+8. Clear does not abandon active strokes. A stroke ending after clear receives a
+   later sequence and remains visible.
 
 ### Stroke batching contract
 
@@ -118,7 +126,7 @@ Clients must not send `stroke:points` / `stroke:end` for a `strokeId` unless
 ```json
 {
   "type": "sync_state",
-  "protocolVersion": 1,
+  "protocolVersion": 2,
   "roomId": "abcd1234",
   "sequenceHead": 2,
   "operations": [
@@ -126,6 +134,7 @@ Clients must not send `stroke:points` / `stroke:end` for a `strokeId` unless
       "sequence": 1,
       "opId": "…",
       "participantId": "…",
+      "kind": "stroke",
       "strokeId": "…",
       "tool": "brush",
       "color": "#0f6a5a",
@@ -144,7 +153,7 @@ Clients must not send `stroke:points` / `stroke:end` for a `strokeId` unless
 ```json
 {
   "type": "history:changed",
-  "protocolVersion": 1,
+  "protocolVersion": 2,
   "roomId": "abcd1234",
   "sequenceHead": 2,
   "operations": [
@@ -152,6 +161,7 @@ Clients must not send `stroke:points` / `stroke:end` for a `strokeId` unless
       "sequence": 1,
       "opId": "…",
       "participantId": "…",
+      "kind": "stroke",
       "strokeId": "stroke-a",
       "tool": "brush",
       "color": "#0f6a5a",
@@ -170,18 +180,44 @@ Clients must not send `stroke:points` / `stroke:end` for a `strokeId` unless
 ```json
 {
   "type": "operation:committed",
-  "protocolVersion": 1,
+  "protocolVersion": 2,
   "roomId": "abcd1234",
   "operation": {
     "sequence": 3,
     "opId": "…",
     "participantId": "…",
+    "kind": "stroke",
     "strokeId": "…",
     "tool": "eraser",
     "color": "#334155",
     "width": 12,
     "points": [{ "x": 40, "y": 40 }, { "x": 60, "y": 60 }],
     "createdAt": 1720000000500
+  }
+}
+```
+
+### canvas:clear and committed clear example
+
+```json
+{
+  "type": "canvas:clear",
+  "protocolVersion": 2,
+  "roomId": "abcd1234"
+}
+```
+
+```json
+{
+  "type": "operation:committed",
+  "protocolVersion": 2,
+  "roomId": "abcd1234",
+  "operation": {
+    "kind": "clear",
+    "sequence": 4,
+    "opId": "…",
+    "participantId": "…",
+    "createdAt": 1720000000600
   }
 }
 ```
@@ -204,7 +240,7 @@ restores via full visible `sync_state`.
 | Client messages / participant / 1s | ≤ `120` (`MAX_MESSAGES_PER_WINDOW`) |
 
 `120` frames/s is sized for normal rAF drawing: at most one
-`stroke:points` batch per display frame, plus `start` / `end` / history
+`stroke:points` batch per display frame, plus `start` / `end` / clear / history
 headroom. Cursor updates are sent only while not drawing; they do not compete
 with active stroke batches.
 Once a socket has a participant id, **every** incoming frame (text or binary)

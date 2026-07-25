@@ -1,6 +1,6 @@
 /** Room identity helpers and participant metadata shared by client and Worker. */
 
-export const PROTOCOL_VERSION = 1 as const;
+export const PROTOCOL_VERSION = 2 as const;
 
 export const ROOM_ID_PATTERN = /^[a-z0-9]{8}$/;
 

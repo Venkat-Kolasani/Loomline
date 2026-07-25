@@ -17,7 +17,7 @@ describe("parseClientMessage", () => {
       ok: true,
       message: {
         type: "join",
-        protocolVersion: 1,
+        protocolVersion: PROTOCOL_VERSION,
         roomId: "abcd1234",
         displayName: "Venkat",
       },
@@ -48,8 +48,12 @@ describe("parseClientMessage", () => {
     }
   });
 
-  it("accepts history:undo and history:redo", () => {
-    for (const type of ["history:undo", "history:redo"] as const) {
+  it("accepts canvas:clear, history:undo, and history:redo", () => {
+    for (const type of [
+      "canvas:clear",
+      "history:undo",
+      "history:redo",
+    ] as const) {
       const result = parseClientMessage({
         type,
         protocolVersion: PROTOCOL_VERSION,
@@ -59,10 +63,21 @@ describe("parseClientMessage", () => {
         ok: true,
         message: {
           type,
-          protocolVersion: 1,
+          protocolVersion: PROTOCOL_VERSION,
           roomId: "abcd1234",
         },
       });
+    }
+  });
+
+  it("rejects malformed canvas:clear without a room id", () => {
+    const result = parseClientMessage({
+      type: "canvas:clear",
+      protocolVersion: PROTOCOL_VERSION,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("invalid_payload");
     }
   });
 
@@ -163,7 +178,7 @@ describe("parseClientMessage", () => {
       ok: true,
       message: {
         type: "ping",
-        protocolVersion: 1,
+        protocolVersion: PROTOCOL_VERSION,
         roomId: "abcd1234",
         clientTime: 100.5,
       },

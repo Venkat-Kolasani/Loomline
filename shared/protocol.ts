@@ -22,18 +22,31 @@ export interface StrokePoint {
 
 export type StrokeLivePhase = "start" | "points" | "end";
 
-/** One durable completed stroke, ordered by server-assigned `sequence`. */
-export interface CommittedOperation {
+interface CommittedOperationBase {
   sequence: number;
   opId: string;
   participantId: string;
+  createdAt: number;
+}
+
+/** One durable completed stroke, ordered by server-assigned `sequence`. */
+export interface CommittedStrokeOperation extends CommittedOperationBase {
+  kind: "stroke";
   strokeId: string;
   tool: DrawingTool;
   color: string;
   width: number;
   points: StrokePoint[];
-  createdAt: number;
 }
+
+/** Durable replay barrier: erase all pixels produced by earlier visible ops. */
+export interface CommittedClearOperation extends CommittedOperationBase {
+  kind: "clear";
+}
+
+export type CommittedOperation =
+  | CommittedStrokeOperation
+  | CommittedClearOperation;
 
 export type ClientMessage =
   | {
@@ -72,6 +85,11 @@ export type ClientMessage =
       roomId: string;
       x: number;
       y: number;
+    }
+  | {
+      type: "canvas:clear";
+      protocolVersion: typeof PROTOCOL_VERSION;
+      roomId: string;
     }
   | {
       type: "history:undo";
@@ -217,6 +235,7 @@ export function parseClientMessage(value: unknown): ParseClientResult {
       return parseStrokeEnd(record);
     case "cursor":
       return parseCursor(record);
+    case "canvas:clear":
     case "history:undo":
     case "history:redo":
       return {

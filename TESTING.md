@@ -3,6 +3,74 @@
 Evidence log for Loomline. Record **exact commands and outcomes**. Do not claim
 untested behavior.
 
+## Global durable Clear gate (2026-07-26)
+
+### Automated
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files 20 passed (20)
+→ Tests 84 passed (84)
+→ Vite production build exit 0
+```
+
+Focused coverage:
+
+- `test/clear-history.test.ts`: two-client clear fan-out, join/reconnect
+  persistence, undo restores pre-clear strokes to both clients, redo reapplies
+  clear, an active stroke completes after clear at a later sequence, malformed
+  clear returns a typed error without closing the socket.
+- `test/committed-ops.test.ts`: replay order `stroke → clear → stroke`.
+- `test/remote-strokes.test.ts`: committed history rebuild does not discard an
+  active remote eraser.
+- `test/protocol.test.ts`: protocol v2 accepts `canvas:clear` and rejects its
+  malformed shape.
+
+The sandbox again printed the known non-fatal Wrangler log-file `EPERM`; Vitest
+completed 84/84 and exited 0.
+
+### Local real-server protocol proof
+
+Environment: local Wrangler at `http://127.0.0.1:8787`, two independent Node
+WebSocket clients, room `proofc01`, protocol v2.
+
+```json
+{
+  "clearSequences": [2, 2],
+  "undoVisibleKinds": ["stroke"],
+  "redoKindsA": ["stroke", "clear"],
+  "redoKindsB": ["stroke", "clear"],
+  "reconnectHead": 2,
+  "reconnectKinds": ["stroke", "clear"]
+}
+```
+
+### Deployment and deployed convergence
+
+```text
+npm run deploy
+→ https://loomline.kolasanivenkat2.workers.dev
+→ Version 17786acf-30b4-494f-a858-442846983c42
+
+GET /api/health
+→ HTTP 200
+→ {"ok":true,"service":"loomline","phase":"observability"}
+```
+
+Production room `clr2601x` returned the same two-client result: both clients
+received clear sequence `2`; undo exposed `["stroke"]`; redo converged to
+`["stroke","clear"]`; a reconnect received head `2` and the same operation kinds.
+
+### Visual evidence boundary
+
+The embedded browser tool failed to retain a newly created tab (two
+create/navigate attempts returned “No browser tab available”), so no new visual
+clear screenshot is claimed. Exact manual check on the deployed URL: open the
+same room in two windows, draw, click Clear in either, verify both blank; Undo
+must restore both and Redo must blank both again. Automated Canvas replay and
+real deployed WebSocket convergence are proven above.
+
 ## Submission gate and deployed smoke (2026-07-26)
 
 ### Clean clone

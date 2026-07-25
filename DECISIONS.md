@@ -323,3 +323,40 @@ preview deployment was also rejected because the submission needs a stable URL.
 - Fresh production clients proved mid-stroke fan-out, isolated rooms, matching
   global undo/redo state, and reconnect `sync_state`. Exact evidence is in
   [TESTING.md](./TESTING.md).
+
+## D10 — Clear is a sequenced replay barrier
+
+### Problem / invariant
+
+The original Clear button only erased one browser's pixels; peers and reconnect
+still showed the durable strokes. Global Clear must converge, survive reconnect,
+participate in undo/redo, and preserve an active stroke that completes afterward.
+
+### Selected design
+
+`canvas:clear` asks the room Durable Object to append a discriminated
+`kind: "clear"` operation with the next sequence. During deterministic replay a
+visible clear resets prior pixels; later strokes paint normally. Tombstoning the
+clear restores prior strokes, and redo makes the barrier visible again. Active
+strokes remain ephemeral during clear and receive a later sequence if completed.
+Protocol v2 adds `kind: "stroke" | "clear"` to the committed operation model.
+
+SQLite remains append-only. An `operation_type` column is added in place;
+existing rows default to `stroke`, while clear rows use the same authoritative
+sequence and history tables.
+
+### Rejected alternatives
+
+- **Delete operation rows:** destroys undo/reconnect history and breaks the
+  append-only invariant.
+- **Broadcast a temporary clear event:** disappears after reconnect and cannot
+  participate correctly in global undo/redo.
+- **Cancel active strokes:** silently loses valid user work and makes ordering
+  depend on client timing rather than the server sequence.
+
+### Verification
+
+`test/clear-history.test.ts` covers two-client fan-out, join/reconnect
+persistence, undo/redo convergence, a stroke completing after clear, and
+recoverable malformed clear input. `test/committed-ops.test.ts` verifies replay
+order `stroke → clear → stroke`.

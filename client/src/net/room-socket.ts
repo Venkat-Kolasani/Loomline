@@ -155,6 +155,14 @@ export class RoomSocket {
     });
   }
 
+  sendCanvasClear(): void {
+    this.send({
+      type: "canvas:clear",
+      protocolVersion: PROTOCOL_VERSION,
+      roomId: this.roomId,
+    });
+  }
+
   sendHistoryUndo(): void {
     this.send({
       type: "history:undo",

@@ -489,9 +489,14 @@ function enterRoom(roomId: string): void {
       diagnostics?.setSequenceHead(committedOps.getSequenceHead());
       // New commits clear the server redo branch.
       setHistoryButtons(committedOps.getOperations().length > 0, false);
-      // Drop provisional only after the store owns the stroke; keep a longer
-      // local/remote eraser hole if the committed op arrived with fewer points.
-      if (applied || committedOps.hasStrokeId(operation.strokeId)) {
+      // Clear is only a committed replay barrier. Active/provisional strokes
+      // stay intact and, when ended, receive a later server sequence.
+      if (
+        operation.kind === "stroke" &&
+        (applied || committedOps.hasStrokeId(operation.strokeId))
+      ) {
+        // Drop provisional only after the store owns the stroke; keep a longer
+        // eraser hole if the committed op arrived with fewer points.
         drawing.acknowledgeCommitted(
           operation.strokeId,
           operation.points.length,
@@ -602,12 +607,10 @@ widthInput.addEventListener("input", () => {
 });
 
 clearButton.addEventListener("click", () => {
-  // Local visual clear only — does not undo server history or peers' canvases.
-  drawing.clearLocal();
-  remoteStrokes.clearAll();
-  committedOps.clear();
-  surface.markAllDirty();
-  updateEmptyState();
+  if (!roomSocket?.isReady()) {
+    return;
+  }
+  roomSocket.sendCanvasClear();
 });
 
 undoButton.addEventListener("click", () => {

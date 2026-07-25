@@ -264,6 +264,7 @@ export class RoomDurableObject extends DurableObject<Env> {
       case "stroke:points":
       case "stroke:end":
       case "cursor":
+      case "canvas:clear":
       case "history:undo":
       case "history:redo":
       case "ping":
@@ -404,6 +405,9 @@ export class RoomDurableObject extends DurableObject<Env> {
           y: message.y,
         });
         return;
+      case "canvas:clear":
+        this.handleCanvasClear(attachment, roomId);
+        return;
       case "history:undo":
         this.handleHistoryUndo(roomId);
         return;
@@ -537,6 +541,7 @@ export class RoomDurableObject extends DurableObject<Env> {
     clearRedoBranch(this.ctx.storage.sql);
 
     const stored: StoredOperation = {
+      kind: "stroke",
       sequence: nextSequence(this.ctx.storage.sql),
       opId: crypto.randomUUID(),
       participantId: attachment.participantId,
@@ -557,6 +562,34 @@ export class RoomDurableObject extends DurableObject<Env> {
         protocolVersion: PROTOCOL_VERSION,
         roomId,
         operation,
+      } satisfies ServerMessage),
+    );
+  }
+
+  /**
+   * Append a replay barrier at the current authoritative sequence.
+   * Provisional strokes intentionally remain active: if they end afterward,
+   * their stroke operation receives a later sequence and paints over the clear.
+   */
+  private handleCanvasClear(
+    attachment: SocketAttachment,
+    roomId: string,
+  ): void {
+    clearRedoBranch(this.ctx.storage.sql);
+    const stored: StoredOperation = {
+      kind: "clear",
+      sequence: nextSequence(this.ctx.storage.sql),
+      opId: crypto.randomUUID(),
+      participantId: attachment.participantId,
+      createdAt: Date.now(),
+    };
+    insertOperation(this.ctx.storage.sql, stored);
+    this.broadcastRaw(
+      JSON.stringify({
+        type: "operation:committed",
+        protocolVersion: PROTOCOL_VERSION,
+        roomId,
+        operation: toCommitted(stored),
       } satisfies ServerMessage),
     );
   }
@@ -842,16 +875,26 @@ function liveKey(participantId: string, strokeId: string): string {
 }
 
 function toCommitted(op: StoredOperation): CommittedOperation {
-  return {
+  const base = {
     sequence: op.sequence,
     opId: op.opId,
     participantId: op.participantId,
+    createdAt: op.createdAt,
+  };
+  if (op.kind === "clear") {
+    return {
+      ...base,
+      kind: "clear",
+    };
+  }
+  return {
+    ...base,
+    kind: "stroke",
     strokeId: op.strokeId,
     tool: op.tool,
     color: op.color,
     width: op.width,
     points: op.points,
-    createdAt: op.createdAt,
   };
 }
 

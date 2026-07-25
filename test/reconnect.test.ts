@@ -158,6 +158,7 @@ describe("duplicate committed-event suppression", () => {
 
 function makeOp(sequence: number, strokeId: string): CommittedOperation {
   return {
+    kind: "stroke",
     sequence,
     opId: `op-${sequence}`,
     participantId: "p1",

@@ -9,6 +9,7 @@ import { retainProvisionalEraser } from "./eraser-retain";
 export interface RemoteLiveStroke extends Stroke {
   strokeId: string;
   participantId: string;
+  ended: boolean;
 }
 
 /**
@@ -39,6 +40,7 @@ export class RemoteStrokeStore {
         color: message.color,
         width: message.width,
         points: [...message.points],
+        ended: false,
       });
       return dirtyForTool(tool);
     }
@@ -60,6 +62,7 @@ export class RemoteStrokeStore {
       existing.points = [...existing.points, ...message.points];
     }
     if (existing.tool === "eraser") {
+      existing.ended = true;
       return message.points.length > 0
         ? dirtyForTool("eraser")
         : { liveDirty: false, committedDirty: false };
@@ -117,11 +120,11 @@ export class RemoteStrokeStore {
     this.active.clear();
   }
 
-  /** Drop provisional erasers after history/sync (store is source of truth). */
+  /** Drop completed eraser leftovers after history/sync; preserve active input. */
   clearProvisionalErasers(): boolean {
     let removed = false;
     for (const [key, stroke] of [...this.active.entries()]) {
-      if (stroke.tool === "eraser") {
+      if (stroke.tool === "eraser" && stroke.ended) {
         this.active.delete(key);
         removed = true;
       }

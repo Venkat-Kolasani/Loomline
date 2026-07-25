@@ -173,6 +173,24 @@ Product name is **Loomline** (repository and Worker name match).
 - Reviewed destination-out layering, server sequence ownership, and regression
   evidence before retaining the changes
 
+## Global durable Clear (`feat(history): synchronize global canvas clear`)
+
+### Assisted by AI
+
+- Discriminated stroke/clear operation model and protocol v2 update
+- Durable Object SQLite migration, sequenced clear handler, client replay, and
+  focused collaboration/history tests
+- Architecture, protocol, decision, and verification documentation drafts
+
+### Manually reviewed / owned by the author
+
+- Explains why clear is an append-only replay barrier rather than row deletion
+  or an ephemeral peer broadcast
+- Owns the active-stroke policy: clear affects committed history at its sequence;
+  strokes completed afterward remain visible at later sequences
+- Reviewed undo/redo, reconnect migration, malformed-input, deployed protocol
+  evidence, and the documented browser-proof limitation
+
 ## Deployment and submission documentation
 
 ### Assisted by AI

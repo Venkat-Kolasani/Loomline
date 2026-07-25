@@ -1,11 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { RemoteStrokeStore } from "../client/src/canvas/remote-strokes";
-import type { ServerMessage } from "../shared/protocol";
+import { PROTOCOL_VERSION, type ServerMessage } from "../shared/protocol";
 
 function live(
-  partial: Omit<Extract<ServerMessage, { type: "stroke:live" }>, "v" | "type">,
+  partial: Omit<
+    Extract<ServerMessage, { type: "stroke:live" }>,
+    "protocolVersion" | "type"
+  >,
 ): Extract<ServerMessage, { type: "stroke:live" }> {
-  return { v: 1, type: "stroke:live", ...partial };
+  return {
+    protocolVersion: PROTOCOL_VERSION,
+    type: "stroke:live",
+    ...partial,
+  };
 }
 
 describe("RemoteStrokeStore eraser provisional", () => {
@@ -69,5 +76,24 @@ describe("RemoteStrokeStore eraser provisional", () => {
     expect(ended.liveDirty).toBe(true);
     expect(ended.committedDirty).toBe(false);
     expect(store.getActiveStrokes()).toHaveLength(0);
+  });
+
+  it("preserves an active eraser across a committed history rebuild", () => {
+    const store = new RemoteStrokeStore();
+    store.applyLive(
+      live({
+        roomId: "abcd1234",
+        participantId: "p1",
+        strokeId: "still-active",
+        phase: "start",
+        tool: "eraser",
+        color: "#000000",
+        width: 10,
+        points: [{ x: 1, y: 1 }],
+      }),
+    );
+
+    expect(store.clearProvisionalErasers()).toBe(false);
+    expect(store.getActiveStrokes()).toHaveLength(1);
   });
 });

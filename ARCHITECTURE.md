@@ -66,7 +66,9 @@ Verified in `test/rooms.test.ts`.
 ### Rendering layers (current)
 
 1. **committed-canvas** — deterministic replay of **visible**
-   `CommittedOperation`s ordered by server `sequence`, plus **provisional
+   `CommittedOperation`s ordered by server `sequence`. A visible `kind: "clear"`
+   resets the pixel buffer at its replay position; later strokes paint normally.
+   The same pass then adds **provisional
    eraser** strokes (local active/awaiting + remote in-progress) painted with
    `destination-out` so erase punches through while dragging. Dirty on
    sync_state / operation:committed / history:changed / eraser live updates.
@@ -85,8 +87,11 @@ drawing so stroke point batches stay under the room rate limit.
 
 ### Storage
 
-- Table `operations`: one row per completed stroke (`sequence` PK, full
-  `points_json`). Never updated or deleted by undo/redo.
+- Table `operations`: one row per committed discriminated operation
+  (`operation_type = stroke | clear`, `sequence` PK). Stroke rows hold full
+  `points_json`; clear rows are replay barriers. Existing pre-clear rows migrate
+  in place with `operation_type = stroke`. Rows are never updated or deleted by
+  undo/redo.
 - Tables `history_hidden` / `history_redo_stack`: durable visibility + redo.
 - Schema created in the DO constructor via `blockConcurrencyWhile` (safe after
   hibernation wake). Live map starts empty on wake; constructor re-arms the
@@ -155,8 +160,8 @@ sequenceDiagram
    `sync_state`, then room `presence`.
 3. Live points fan out from in-memory state; only minimal expiry metadata is
    durable until a stroke ends.
-4. `stroke:end` inserts one sequenced SQLite operation and broadcasts the same
-   commit to every joined socket.
+4. `stroke:end` or `canvas:clear` inserts one sequenced SQLite operation and
+   broadcasts the same commit to every joined socket.
 5. Close/error removes presence and abandons that participant's live strokes.
 6. When the final socket leaves, live maps, expiry rows, limiter entries, and
    alarms are cleared; committed operations and history remain for later joins.
@@ -167,7 +172,7 @@ History is **server-owned and global**. The `operations` table is append-only.
 
 | Store | Role |
 | --- | --- |
-| `operations` | Every completed stroke forever (`sequence` PK) |
+| `operations` | Every completed stroke and clear forever (`sequence` PK) |
 | `history_hidden` | Sequences currently not painted |
 | `history_redo_stack` | LIFO of redoable undos (`position` + `sequence`) |
 
@@ -183,7 +188,12 @@ Start: ops `{1:A, 2:B, 3:C}` all visible. Redo stack empty.
 5. Clients rebuild committed-canvas from the visible list in `history:changed`
    or `sync_state` (joiners never see tombstoned strokes).
 
-Live strokes never enter `operations`, so they are not undoable.
+Clear is a normal undoable operation. Undoing a clear hides its sequence, so
+earlier visible strokes replay again; redo restores the barrier. Clear never
+drops active strokes: an active stroke stays on the live overlay and, if it ends
+after clear, receives a later sequence and remains visible above the cleared
+history. Live strokes themselves never enter `operations`, so they are not
+undoable.
 
 ```mermaid
 sequenceDiagram

@@ -1,21 +1,31 @@
 /**
  * Durable room operation records and SQLite helpers for RoomDurableObject.
- * One row per completed stroke; sequence is the authoritative order key.
+ * One row per committed stroke/clear; sequence is the authoritative order key.
  */
 
 import type { DrawingTool, StrokePoint } from "../shared/protocol";
 
-export interface StoredOperation {
+interface StoredOperationBase {
   sequence: number;
   opId: string;
   participantId: string;
+  createdAt: number;
+}
+
+export interface StoredStrokeOperation extends StoredOperationBase {
+  kind: "stroke";
   strokeId: string;
   tool: DrawingTool;
   color: string;
   width: number;
   points: StrokePoint[];
-  createdAt: number;
 }
+
+export interface StoredClearOperation extends StoredOperationBase {
+  kind: "clear";
+}
+
+export type StoredOperation = StoredStrokeOperation | StoredClearOperation;
 
 export function ensureOperationSchema(sql: SqlStorage): void {
   sql.exec(`
@@ -23,6 +33,7 @@ export function ensureOperationSchema(sql: SqlStorage): void {
       sequence INTEGER PRIMARY KEY,
       op_id TEXT NOT NULL UNIQUE,
       participant_id TEXT NOT NULL,
+      operation_type TEXT NOT NULL DEFAULT 'stroke',
       stroke_id TEXT NOT NULL,
       tool TEXT NOT NULL,
       color TEXT NOT NULL,
@@ -31,6 +42,16 @@ export function ensureOperationSchema(sql: SqlStorage): void {
       created_at INTEGER NOT NULL
     );
   `);
+  const columns = sql
+    .exec<{ name: string }>("PRAGMA table_info(operations)")
+    .toArray();
+  if (!columns.some((column) => column.name === "operation_type")) {
+    // Existing rooms predate clear operations. The default classifies every
+    // legacy row as a stroke without rewriting or deleting the append-only log.
+    sql.exec(
+      "ALTER TABLE operations ADD COLUMN operation_type TEXT NOT NULL DEFAULT 'stroke'",
+    );
+  }
 }
 
 export function nextSequence(sql: SqlStorage): number {
@@ -43,18 +64,21 @@ export function nextSequence(sql: SqlStorage): number {
 }
 
 export function insertOperation(sql: SqlStorage, op: StoredOperation): void {
+  const stroke = op.kind === "stroke" ? op : null;
   sql.exec(
     `INSERT INTO operations (
-      sequence, op_id, participant_id, stroke_id, tool, color, width, points_json, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      sequence, op_id, participant_id, operation_type, stroke_id, tool, color,
+      width, points_json, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     op.sequence,
     op.opId,
     op.participantId,
-    op.strokeId,
-    op.tool,
-    op.color,
-    op.width,
-    JSON.stringify(op.points),
+    op.kind,
+    stroke?.strokeId ?? "",
+    stroke?.tool ?? "",
+    stroke?.color ?? "",
+    stroke?.width ?? 0,
+    JSON.stringify(stroke?.points ?? []),
     op.createdAt,
   );
 }
@@ -65,6 +89,7 @@ export function listOperations(sql: SqlStorage): StoredOperation[] {
       sequence: number;
       op_id: string;
       participant_id: string;
+      operation_type: string;
       stroke_id: string;
       tool: string;
       color: string;
@@ -74,17 +99,26 @@ export function listOperations(sql: SqlStorage): StoredOperation[] {
     }>("SELECT * FROM operations ORDER BY sequence ASC")
     .toArray();
 
-  return rows.map((row) => ({
-    sequence: row.sequence,
-    opId: row.op_id,
-    participantId: row.participant_id,
-    strokeId: row.stroke_id,
-    tool: row.tool as DrawingTool,
-    color: row.color,
-    width: row.width,
-    points: JSON.parse(row.points_json) as StrokePoint[],
-    createdAt: row.created_at,
-  }));
+  return rows.map((row) => {
+    const base: StoredOperationBase = {
+      sequence: row.sequence,
+      opId: row.op_id,
+      participantId: row.participant_id,
+      createdAt: row.created_at,
+    };
+    if (row.operation_type === "clear") {
+      return { ...base, kind: "clear" };
+    }
+    return {
+      ...base,
+      kind: "stroke",
+      strokeId: row.stroke_id,
+      tool: row.tool as DrawingTool,
+      color: row.color,
+      width: row.width,
+      points: JSON.parse(row.points_json) as StrokePoint[],
+    };
+  });
 }
 
 export function sequenceHead(sql: SqlStorage): number {

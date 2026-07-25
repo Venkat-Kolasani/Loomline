@@ -4,6 +4,7 @@ import type { CommittedOperation } from "../shared/protocol";
 
 function op(sequence: number, strokeId: string): CommittedOperation {
   return {
+    kind: "stroke",
     sequence,
     opId: `op-${sequence}`,
     participantId: "p1",
@@ -19,12 +20,26 @@ function op(sequence: number, strokeId: string): CommittedOperation {
   };
 }
 
+function clearOp(sequence: number): CommittedOperation {
+  return {
+    kind: "clear",
+    sequence,
+    opId: `op-${sequence}`,
+    participantId: "p2",
+    createdAt: sequence * 1000,
+  };
+}
+
+function label(operation: CommittedOperation): string {
+  return operation.kind === "clear" ? "clear" : operation.strokeId;
+}
+
 describe("CommittedOperationStore", () => {
   it("applies sync_state and ignores duplicate sequences", () => {
     const store = new CommittedOperationStore();
     store.applySyncState(2, [op(1, "a"), op(2, "b")]);
     expect(store.getSequenceHead()).toBe(2);
-    expect(store.getOperations().map((o) => o.strokeId)).toEqual(["a", "b"]);
+    expect(store.getOperations().map(label)).toEqual(["a", "b"]);
 
     expect(store.applyCommitted(op(2, "b"))).toBe(false);
     expect(store.applyCommitted(op(3, "c"))).toBe(true);
@@ -37,9 +52,44 @@ describe("CommittedOperationStore", () => {
     // Intentionally apply out of arrival order relative to local time.
     store.applyCommitted(op(2, "top"));
     store.applyCommitted(op(1, "bottom"));
-    expect(store.getOperations().map((o) => o.strokeId)).toEqual([
+    expect(store.getOperations().map(label)).toEqual([
       "bottom",
       "top",
+    ]);
+  });
+
+  it("replays a clear between earlier and later strokes", () => {
+    const store = new CommittedOperationStore();
+    store.applySyncState(3, [
+      op(1, "before-clear"),
+      clearOp(2),
+      op(3, "after-clear"),
+    ]);
+    const events: string[] = [];
+    const ctx = {
+      canvas: { width: 800, height: 600 },
+      save: () => undefined,
+      restore: () => undefined,
+      setTransform: () => undefined,
+      clearRect: () => events.push("clear"),
+      beginPath: () => undefined,
+      moveTo: () => undefined,
+      lineTo: () => undefined,
+      stroke: () => events.push("stroke"),
+      lineCap: "butt",
+      lineJoin: "miter",
+      lineWidth: 1,
+      globalCompositeOperation: "source-over",
+      strokeStyle: "#000000",
+    } as unknown as CanvasRenderingContext2D;
+
+    store.paint(ctx);
+
+    expect(events).toEqual(["stroke", "clear", "stroke"]);
+    expect(store.getOperations().map(label)).toEqual([
+      "before-clear",
+      "clear",
+      "after-clear",
     ]);
   });
 });

@@ -3,10 +3,12 @@ import { paintStroke, type Stroke } from "./stroke";
 
 /**
  * Server-authoritative committed strokes, keyed by sequence.
- * Rebuilds the committed canvas only when the visible op set changes.
+ * Tracks every applied sequence so reconnect/duplicate events never double-paint.
  */
 export class CommittedOperationStore {
   private readonly bySequence = new Map<number, CommittedOperation>();
+  /** Sequences already observed (survives undo visibility changes). */
+  private readonly appliedSequences = new Set<number>();
   private head = 0;
 
   applySyncState(
@@ -16,16 +18,26 @@ export class CommittedOperationStore {
     this.bySequence.clear();
     for (const op of operations) {
       this.bySequence.set(op.sequence, op);
+      this.appliedSequences.add(op.sequence);
     }
-    this.head = sequenceHead;
+    this.head = Math.max(this.head, sequenceHead);
+    for (const op of operations) {
+      if (op.sequence > this.head) {
+        this.head = op.sequence;
+      }
+    }
     return true;
   }
 
-  /** Returns true when a new sequence was applied (committed layer dirty). */
+  /**
+   * Returns true when a new sequence was applied (committed layer dirty).
+   * Duplicate sequences are ignored (reconnect / late fan-out).
+   */
   applyCommitted(operation: CommittedOperation): boolean {
-    if (this.bySequence.has(operation.sequence)) {
+    if (this.appliedSequences.has(operation.sequence)) {
       return false;
     }
+    this.appliedSequences.add(operation.sequence);
     this.bySequence.set(operation.sequence, operation);
     if (operation.sequence > this.head) {
       this.head = operation.sequence;
@@ -35,11 +47,20 @@ export class CommittedOperationStore {
 
   clear(): void {
     this.bySequence.clear();
+    this.appliedSequences.clear();
     this.head = 0;
   }
 
   getSequenceHead(): number {
     return this.head;
+  }
+
+  getLastAppliedSequence(): number {
+    return this.head;
+  }
+
+  hasAppliedSequence(sequence: number): boolean {
+    return this.appliedSequences.has(sequence);
   }
 
   getOperations(): CommittedOperation[] {

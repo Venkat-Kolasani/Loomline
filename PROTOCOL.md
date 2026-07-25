@@ -1,8 +1,8 @@
 # Protocol
 
 **Protocol version:** `1`  
-**Status:** presence, live strokes, durable ordered operations, and **global
-tombstone undo/redo** are implemented. Reconnect backoff remains planned.
+**Status:** presence, live strokes, durable ops, global undo/redo, and
+**client reconnect recovery** are implemented.
 
 ## Transport
 
@@ -28,7 +28,7 @@ Validation lives in `shared/protocol.ts` (`parseClientMessage`).
 | --- | --- | --- |
 | `join` | client → server | Enter the room (optional `displayName`) |
 | `welcome` | server → client | Assigned participant id, colour, display name |
-| `sync_state` | server → client | Visible committed ops + `sequenceHead` + undo/redo flags after join |
+| `sync_state` | server → client | Visible committed ops + `sequenceHead` + undo/redo flags after join/reconnect |
 | `presence` | server → all | Full participant list for the room |
 | `stroke:start` | client → server | Begin a provisional stroke |
 | `stroke:points` | client → server | Batched additional points (≤ 64 per message) |
@@ -39,7 +39,7 @@ Validation lives in `shared/protocol.ts` (`parseClientMessage`).
 | `history:redo` | client → server | Remove newest redoable tombstone |
 | `history:changed` | server → **all** | Visible op set after undo/redo; clients rebuild |
 | `cursor` | client → server → peers | Ephemeral pointer position |
-| `error` | server → client | Recoverable typed failure |
+| `error` | server → client | Recoverable typed failure (`stroke_expired`, …) |
 
 ### Ordering contract (implemented)
 
@@ -52,6 +52,30 @@ Validation lives in `shared/protocol.ts` (`parseClientMessage`).
 4. Overlapping strokes are valid; later sequence paints later (stable layering).
 5. Mid-stroke disconnect discards the live stroke — it never becomes durable.
 6. Undo/redo never DELETE or UPDATE rows in `operations`.
+
+### Reconnect contract (implemented)
+
+1. Unexpected WebSocket close schedules exponential reconnect with jitter
+   (base 500 ms, cap 15 s). Intentional leave does not reconnect.
+2. UI states: Connecting… → Connected; on drop → Reconnecting… (try N).
+3. Each successful reconnect sends `join` again and receives a full visible
+   `sync_state` snapshot (not a delta). Client replaces the committed store.
+4. `CommittedOperationStore` remembers applied sequences and ignores duplicate
+   `operation:committed` events (late fan-out / overlapping reconnect).
+5. Ephemeral live ink and awaiting-commit local strokes are cleared on reconnect
+   schedule; only durable ops are restored from `sync_state`.
+6. Participant id is reassigned on each join (no sticky identity in this slice).
+
+### Live stroke stall contract (implemented)
+
+1. Provisional strokes are in-memory only (`lastActiveAt` updated on start/points).
+2. After **30 s** without activity, the DO expires the stroke: peers get
+   `stroke:live` `phase=end`; the author gets `error` `stroke_expired`.
+3. Expired strokes are never written to SQLite.
+4. Socket close/error abandons that participant’s live strokes the same way
+   (peer overlay cleared; no commit).
+5. After Durable Object hibernation, the live map is empty by design; only SQLite
+   ops/history reload in the constructor via `blockConcurrencyWhile`.
 
 ### History contract (implemented)
 
@@ -149,8 +173,8 @@ Clients must not send `stroke:points` / `stroke:end` for a `strokeId` unless
 
 ## Planned message catalogue
 
-Reconnect-oriented resume fields (last-sequence delta) remain planned; join
-already delivers a full visible `sync_state`.
+Delta-by-`lastSequence` join remains a future optimization; reconnect already
+restores via full visible `sync_state`.
 
 ## Payload limits (current)
 
@@ -166,6 +190,6 @@ already delivers a full visible `sync_state`.
 
 | Endpoint | Transport | Behavior |
 | --- | --- | --- |
-| `GET /api/health` | HTTP | `{ ok, service: "loomline", phase: "undo-redo" }` |
+| `GET /api/health` | HTTP | `{ ok, service: "loomline", phase: "reconnect" }` |
 | `GET /ws?room=` | WebSocket | Room join + live + committed sync + history |
 | Static assets | HTTP via `ASSETS` | Landing + `/r/:roomId` SPA |

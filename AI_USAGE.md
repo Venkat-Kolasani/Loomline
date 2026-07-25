@@ -107,3 +107,15 @@ Product name is **Loomline** (repository and Worker name match).
 - Explains why redo clears on new commit while hidden ops stay hidden
 - Owns global-versus-per-user decision and two-browser undo proof
 
+## Reconnect (`feat(resilience): recover rooms after reconnect`)
+
+### Assisted by AI
+
+- Client reconnect backoff + RoomSocket auto-rejoin, applied-sequence
+  suppression, DO stall alarm / abandon broadcast, reconnect tests, docs
+
+### Manually reviewed / owned by the author
+
+- Explains full snapshot vs last-seq delta with tombstones
+- Owns two-browser refresh reconnect proof and 30s stall rule
+

@@ -135,6 +135,14 @@ export class LocalDrawingController {
     this.notify();
   }
 
+  /**
+   * Drop active + awaiting-commit local ink after disconnect/reconnect.
+   * Those strokes will not receive operation:committed on the new socket.
+   */
+  abandonUncommitted(): void {
+    this.clearLocal();
+  }
+
   hasInk(): boolean {
     return this.awaitingCommit.length > 0 || this.active !== null;
   }

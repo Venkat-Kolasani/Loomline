@@ -54,8 +54,9 @@ Verified in `test/rooms.test.ts`.
 | Landing / room client | Presence, cursors, live + committed sync |
 | Canvas layers | `committed-canvas` = server ops; `live-canvas` = in-progress |
 | Point batching | ≤ one `stroke:points` per animation frame |
-| `RoomDurableObject` | Live fan-out + SQLite ordered ops + tombstone history + `sync_state` |
+| `RoomDurableObject` | Live fan-out + SQLite ops + tombstones + stall alarm + `sync_state` |
 | Shared protocol | Validated versioned messages |
+| Client reconnect | Exponential backoff; full snapshot on re-join |
 
 ### Rendering layers (current)
 
@@ -73,13 +74,33 @@ acknowledges them, then move into the committed store (no double paint).
 - Table `operations`: one row per completed stroke (`sequence` PK, full
   `points_json`). Never updated or deleted by undo/redo.
 - Tables `history_hidden` / `history_redo_stack`: durable visibility + redo.
-- Schema created in the DO constructor via `blockConcurrencyWhile`.
+- Schema created in the DO constructor via `blockConcurrencyWhile` (safe after
+  hibernation wake). Live map starts empty on wake.
 - Live pointer points are never written as individual rows.
+- Stalled live strokes expire after 30s (`LIVE_STROKE_STALL_MS`) via DO alarm.
 
 ## Planned
 
-- Reconnect backoff + last-sequence resume (join already sends full sync_state)
 - Payload rate limits / client-side 64-point chunking enforcement
+- Sticky participant identity across reconnect (optional polish)
+
+## Reconnect / hibernation (implemented)
+
+```mermaid
+sequenceDiagram
+  participant B as Client B
+  participant DO as Room DO
+  Note over B: Unexpected WS close
+  B->>B: Reconnecting… exponential backoff
+  B->>DO: new WS + join
+  DO->>B: welcome + sync_state (visible ops)
+  Note over B: Replace committed store; skip duplicate sequences
+```
+
+- Hibernation retains healthy sockets at the platform layer; Loomline still shows
+  reconnect UI for real drops and refreshes.
+- Full snapshot on join (not last-seq delta) because undo tombstones change
+  visibility independently of sequence head.
 
 ## Global tombstone undo/redo (implemented)
 

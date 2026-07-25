@@ -3,13 +3,49 @@
 Evidence log for Loomline. Record **exact commands and outcomes**. Do not claim
 untested behavior.
 
-## Latest gate (2026-07-25 — undo/redo)
+## Results — reconnect / hibernation recovery (2026-07-25)
+
+Environment: macOS darwin 25.2.0, Node v24.12.0.
+
+### Automated
+
+```text
+typecheck exit 0
+Test Files  13 passed (13)
+Tests  51 passed (51)
+build exit 0
+```
+
+Coverage:
+
+- `test/reconnect-backoff.test.ts` — exponential delay bounds + jitter
+- `test/reconnect.test.ts` — drop + rejoin sync_state convergence; durable-head
+  SQLite rehydration probe; stalled live stroke expiry without commit
+- Duplicate sequence suppression in `CommittedOperationStore`
+
+### Local two-browser proof
+
+```text
+GET /api/health → {"ok":true,"service":"loomline","phase":"reconnect"}
+Room rec8a001 @ http://localhost:8787
+```
+
+1. Tab A (`Artist-607b`) completed a stroke → **5014** opaque committed pixels.
+2. Tab B joined → same **5014** via `sync_state`; presence = 2; both Connected.
+3. Tab B **refresh** (full reload) → new participant `Artist-7910`, Connected,
+   committed canvas restored to **5014** (same as A); Undo enabled.
+4. After a local `npm run build` hot-reload, wrangler hit `SQLITE_BUSY_RECOVERY`
+   again (see ISSUES I7). Clients showed **Reconnecting… (try N)** until the
+   runtime died — UI path observed; durable recovery already proven by step 3
+   and `test/reconnect.test.ts`.
+
+## Latest gate (2026-07-25 — reconnect)
 
 ```text
 npm run typecheck && npm run test && npm run build
 → typecheck exit 0
-→ Test Files  11 passed (11)
-→ Tests  46 passed (46)
+→ Test Files  13 passed (13)
+→ Tests  51 passed (51)
 → build exit 0
 ```
 
@@ -34,8 +70,8 @@ npm run typecheck && npm run test && npm run build
 - [x] Finished strokes persist via operation:committed (same sequence on both)
 - [x] Joining client receives sync_state matching committed log
 - [x] Global undo/redo matches on both
-- [x] Refresh/rejoin restores committed canvas via sync_state (full snapshot on
-  join; reconnect backoff / last-sequence resume deferred to Prompt 8)
+- [x] Refresh/rejoin restores committed canvas via sync_state (full snapshot;
+  exponential reconnect UI + duplicate suppression shipped in Prompt 8)
 - [x] Malformed stroke payload returns typed error; room survives (automated)
 - [x] Mid-stroke close does not create a durable op (automated)
 - [x] Brush then eraser overlap keeps sequence order (automated)

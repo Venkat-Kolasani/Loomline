@@ -3,7 +3,7 @@
 Real-time collaborative drawing canvas for the Flam Frontend R&D assignment.
 
 **Live URL:** _not deployed yet_  
-**Status:** global tombstone undo/redo + durable ordered operations
+**Status:** reconnect recovery + global undo/redo + durable ops
 
 This repository intentionally uses **Cloudflare Workers + Durable Objects** (edge
 JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
@@ -16,19 +16,20 @@ JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
 - Presence: join/leave list with deterministic participant colours
 - Live stroke fan-out (`stroke:start` / `points` / `end` → `stroke:live`)
 - Durable `operation:committed` with SQLite + strictly increasing sequence
-- Join `sync_state` snapshot/replay of the **visible** committed log
-- Global server-owned undo/redo via tombstones (`history:undo` / `redo` /
-  `history:changed`); append-only op log is never mutated
+- Join/reconnect `sync_state` snapshot of the **visible** committed log
+- Exponential reconnect backoff with Connecting / Reconnecting / Connected UI
+- Duplicate committed-sequence suppression on the client
+- Global server-owned undo/redo via tombstones; append-only op log
+- Stalled provisional strokes expire after 30s (not persisted)
 - Remote cursors (ephemeral)
 - rAF-batched outgoing points; immediate local drawing
 - Two stacked canvas layers with brush/eraser/colour/width/clear
 - Dirty-layer paint API (no permanent render loop)
 - Scripts: `dev`, `dev:client`, `typecheck`, `test`, `build`, `deploy`
-- Vitest: isolation, protocol, live strokes, sequence/join/overlap/history undo
+- Vitest: isolation, protocol, live strokes, history, reconnect/expiry
 
 ## What is planned (not implemented)
 
-- Reconnect backoff / last-sequence resume UX (join already sends sync_state)
 - Deployed demo URL
 
 ## Quick start
@@ -77,7 +78,8 @@ and mobile passes are verified.
 
 - Clear is local-only (does not clear peers’ committed ops or history)
 - Live in-progress strokes are not undoable (only completed ops)
-- No exponential reconnect UI yet (fresh join still gets `sync_state`)
+- Reconnect assigns a new participant id (no sticky identity yet)
+- Reconnect uses a full visible `sync_state` snapshot (not a delta by last-seq)
 - Production deploy not run yet
 - Very long strokes are stored as one JSON blob (no checkpoint yet)
 
@@ -118,7 +120,7 @@ Leave unchecked until implemented **and** verified with evidence.
 - [x] Versioned, validated WebSocket protocol
 - [x] Server-authoritative operation ordering
 - [x] Global undo/redo without mutating the durable operation log incorrectly
-- [ ] Reconnect / snapshot recovery without duplicate sequence application
+- [x] Reconnect / snapshot recovery without duplicate sequence application
 - [x] Recoverable typed errors for invalid client messages
 
 ### Submission / demo

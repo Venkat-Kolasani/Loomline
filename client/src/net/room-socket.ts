@@ -1,3 +1,8 @@
+/**
+ * Room WebSocket with exponential reconnect after unexpected close.
+ * Intentional disconnect() does not reconnect.
+ */
+
 import {
   PROTOCOL_VERSION,
   type ClientMessage,
@@ -6,15 +11,20 @@ import {
   type StrokePoint,
 } from "../../../shared/protocol";
 import type { Participant } from "../../../shared/room";
+import { reconnectDelayMs } from "./reconnect-backoff";
 
 export type ConnectionState =
   | "disconnected"
   | "connecting"
+  | "reconnecting"
   | "connected"
   | "error";
 
 export interface RoomSocketHandlers {
-  onConnectionState: (state: ConnectionState) => void;
+  onConnectionState: (
+    state: ConnectionState,
+    detail?: { attempt?: number; delayMs?: number },
+  ) => void;
   onWelcome: (participant: Participant, roomId: string) => void;
   onPresence: (participants: Participant[], roomId: string) => void;
   onStrokeLive: (
@@ -37,17 +47,19 @@ export interface RoomSocketHandlers {
     canRedo: boolean,
   ) => void;
   onError: (code: string, message: string) => void;
+  /** Fired when an unexpected close schedules a reconnect (ephemeral UI reset). */
+  onReconnectScheduled?: (attempt: number, delayMs: number) => void;
 }
 
-/**
- * Room WebSocket: join, presence, live strokes, cursors, committed ops, history.
- */
 export class RoomSocket {
   private socket: WebSocket | null = null;
   private readonly roomId: string;
   private readonly handlers: RoomSocketHandlers;
   private readonly displayName?: string;
   private joined = false;
+  private intentionalClose = false;
+  private reconnectAttempt = 0;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     roomId: string,
@@ -60,72 +72,36 @@ export class RoomSocket {
   }
 
   connect(): void {
-    this.disconnect();
-    this.handlers.onConnectionState("connecting");
-
-    const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-    const url = `${protocol}//${location.host}/ws?room=${encodeURIComponent(this.roomId)}`;
-    const socket = new WebSocket(url);
-    this.socket = socket;
-
-    socket.addEventListener("open", () => {
-      if (this.socket !== socket) {
-        return;
-      }
-      this.send({
-        type: "join",
-        protocolVersion: PROTOCOL_VERSION,
-        roomId: this.roomId,
-        displayName: this.displayName,
-      });
-    });
-
-    socket.addEventListener("message", (event) => {
-      if (this.socket !== socket) {
-        return;
-      }
-      if (typeof event.data !== "string") {
-        return;
-      }
-      let message: ServerMessage;
-      try {
-        message = JSON.parse(event.data) as ServerMessage;
-      } catch {
-        this.handlers.onError("invalid_json", "Server sent invalid JSON.");
-        return;
-      }
-      this.handleServerMessage(message);
-    });
-
-    socket.addEventListener("close", () => {
-      if (this.socket !== socket) {
-        return;
-      }
-      this.socket = null;
-      this.joined = false;
-      this.handlers.onConnectionState("disconnected");
-    });
-
-    socket.addEventListener("error", () => {
-      if (this.socket !== socket) {
-        return;
-      }
-      this.handlers.onConnectionState("error");
-    });
+    this.intentionalClose = false;
+    this.clearReconnectTimer();
+    this.openSocket(false);
   }
 
+  /** Leave the room permanently — no automatic reconnect. */
   disconnect(): void {
-    const socket = this.socket;
+    this.intentionalClose = true;
+    this.clearReconnectTimer();
+    this.reconnectAttempt = 0;
     this.joined = false;
-    if (!socket) {
-      return;
-    }
+    const socket = this.socket;
     this.socket = null;
-    socket.close();
+    if (socket) {
+      socket.close(1000, "client disconnect");
+    }
   }
 
   isReady(): boolean {
     return this.joined && this.socket?.readyState === WebSocket.OPEN;
+  }
+
+  /** Test helper: force-close the socket as if the network dropped. */
+  simulateConnectionLoss(): void {
+    const socket = this.socket;
+    if (!socket) {
+      return;
+    }
+    this.intentionalClose = false;
+    socket.close(4000, "simulated loss");
   }
 
   sendStrokeStart(payload: {
@@ -192,6 +168,107 @@ export class RoomSocket {
     });
   }
 
+  private openSocket(isReconnect: boolean): void {
+    this.joined = false;
+    if (this.socket) {
+      const previous = this.socket;
+      this.socket = null;
+      try {
+        previous.close();
+      } catch {
+        // Ignore.
+      }
+    }
+
+    this.handlers.onConnectionState(isReconnect ? "reconnecting" : "connecting");
+
+    const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+    const url = `${protocol}//${location.host}/ws?room=${encodeURIComponent(this.roomId)}`;
+    const socket = new WebSocket(url);
+    this.socket = socket;
+
+    socket.addEventListener("open", () => {
+      if (this.socket !== socket) {
+        return;
+      }
+      this.send({
+        type: "join",
+        protocolVersion: PROTOCOL_VERSION,
+        roomId: this.roomId,
+        displayName: this.displayName,
+      });
+    });
+
+    socket.addEventListener("message", (event) => {
+      if (this.socket !== socket) {
+        return;
+      }
+      if (typeof event.data !== "string") {
+        return;
+      }
+      let message: ServerMessage;
+      try {
+        message = JSON.parse(event.data) as ServerMessage;
+      } catch {
+        this.handlers.onError("invalid_json", "Server sent invalid JSON.");
+        return;
+      }
+      this.handleServerMessage(message);
+    });
+
+    socket.addEventListener("close", () => {
+      if (this.socket !== socket) {
+        return;
+      }
+      this.socket = null;
+      this.joined = false;
+      if (this.intentionalClose) {
+        this.handlers.onConnectionState("disconnected");
+        return;
+      }
+      this.scheduleReconnect();
+    });
+
+    socket.addEventListener("error", () => {
+      if (this.socket !== socket) {
+        return;
+      }
+      // close follows; avoid flipping to permanent error during reconnect storms.
+      if (this.intentionalClose) {
+        this.handlers.onConnectionState("error");
+      }
+    });
+  }
+
+  private scheduleReconnect(): void {
+    if (this.intentionalClose) {
+      this.handlers.onConnectionState("disconnected");
+      return;
+    }
+    this.clearReconnectTimer();
+    this.reconnectAttempt += 1;
+    const delayMs = reconnectDelayMs(this.reconnectAttempt);
+    this.handlers.onConnectionState("reconnecting", {
+      attempt: this.reconnectAttempt,
+      delayMs,
+    });
+    this.handlers.onReconnectScheduled?.(this.reconnectAttempt, delayMs);
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      if (this.intentionalClose) {
+        return;
+      }
+      this.openSocket(true);
+    }, delayMs);
+  }
+
+  private clearReconnectTimer(): void {
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+  }
+
   private send(message: ClientMessage): void {
     const socket = this.socket;
     if (!socket || socket.readyState !== WebSocket.OPEN) {
@@ -204,6 +281,7 @@ export class RoomSocket {
     switch (message.type) {
       case "welcome":
         this.joined = true;
+        this.reconnectAttempt = 0;
         this.handlers.onConnectionState("connected");
         this.handlers.onWelcome(message.participant, message.roomId);
         break;

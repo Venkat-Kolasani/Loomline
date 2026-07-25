@@ -37,10 +37,14 @@ import {
 
 const ISOLATION_MARK_KEY = "isolationMark";
 
+/** Idle provisional strokes expire after this many ms (not persisted). */
+export const LIVE_STROKE_STALL_MS = 30_000;
+
 /**
  * One Durable Object instance per room id (via idFromName).
  * Live strokes are ephemeral; stroke:end persists one ordered operation.
  * Undo/redo uses tombstones; the operation log is never mutated.
+ * Constructor reloads SQLite schema/state safely after hibernation.
  */
 export class RoomDurableObject extends DurableObject<Env> {
   /**
@@ -51,10 +55,15 @@ export class RoomDurableObject extends DurableObject<Env> {
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
+    // Hibernation wake: durable ops/history live in SQLite; live map starts empty.
     ctx.blockConcurrencyWhile(async () => {
       ensureOperationSchema(this.ctx.storage.sql);
       ensureHistorySchema(this.ctx.storage.sql);
     });
+  }
+
+  async alarm(): Promise<void> {
+    await this.expireStaleLiveStrokes(Date.now());
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -84,6 +93,30 @@ export class RoomDurableObject extends DurableObject<Env> {
       return new Response(found ? "ok" : "not found", {
         status: found ? 200 : 404,
       });
+    }
+
+    if (url.pathname === "/test/durable-head" && request.method === "GET") {
+      const head = sequenceHead(this.ctx.storage.sql);
+      const ops = listOperations(this.ctx.storage.sql);
+      return Response.json({
+        sequenceHead: head,
+        operationCount: ops.length,
+        liveStrokeCount: this.liveStrokes.size,
+      });
+    }
+
+    if (url.pathname === "/test/expire-stale-strokes" && request.method === "POST") {
+      let now = Date.now();
+      try {
+        const body = (await request.json()) as { now?: number };
+        if (typeof body.now === "number" && Number.isFinite(body.now)) {
+          now = body.now;
+        }
+      } catch {
+        // Default to Date.now().
+      }
+      const expired = await this.expireStaleLiveStrokes(now);
+      return Response.json({ expired });
     }
 
     if (request.headers.get("Upgrade") !== "websocket") {
@@ -166,8 +199,8 @@ export class RoomDurableObject extends DurableObject<Env> {
     } catch {
       // Socket may already be closing.
     }
-    // Abandoned live strokes are discarded — they never become durable ops.
-    this.clearLiveStrokesForParticipant(attachment?.participantId);
+    // Abandoned live strokes: clear peers' overlays; never commit.
+    this.abandonLiveStrokesForParticipant(attachment?.participantId);
     this.refreshPresenceAfterDepart(ws, attachment);
   }
 
@@ -178,7 +211,7 @@ export class RoomDurableObject extends DurableObject<Env> {
     } catch {
       // Ignore.
     }
-    this.clearLiveStrokesForParticipant(attachment?.participantId);
+    this.abandonLiveStrokesForParticipant(attachment?.participantId);
     this.refreshPresenceAfterDepart(ws, attachment);
   }
 
@@ -307,7 +340,10 @@ export class RoomDurableObject extends DurableObject<Env> {
       color: message.color,
       width: message.width,
       points: [message.point],
+      lastActiveAt: Date.now(),
+      roomId,
     });
+    void this.scheduleLiveStrokeAlarm();
 
     this.broadcastStrokeLive(ws, {
       roomId,
@@ -335,6 +371,8 @@ export class RoomDurableObject extends DurableObject<Env> {
     }
 
     live.points.push(...message.points);
+    live.lastActiveAt = Date.now();
+    void this.scheduleLiveStrokeAlarm();
 
     this.broadcastStrokeLive(ws, {
       roomId,
@@ -471,17 +509,80 @@ export class RoomDurableObject extends DurableObject<Env> {
     });
   }
 
-  private clearLiveStrokesForParticipant(
+  /** Discard live strokes and tell peers to clear the overlay (no durable op). */
+  private abandonLiveStrokesForParticipant(
     participantId: string | undefined,
   ): void {
     if (!participantId) {
       return;
     }
-    for (const key of [...this.liveStrokes.keys()]) {
-      if (key.startsWith(`${participantId}:`)) {
-        this.liveStrokes.delete(key);
+    for (const [key, live] of [...this.liveStrokes.entries()]) {
+      if (!key.startsWith(`${participantId}:`)) {
+        continue;
+      }
+      this.liveStrokes.delete(key);
+      this.broadcastRaw(
+        JSON.stringify({
+          type: "stroke:live",
+          protocolVersion: PROTOCOL_VERSION,
+          roomId: live.roomId,
+          participantId: live.participantId,
+          strokeId: live.strokeId,
+          phase: "end",
+          points: [],
+        } satisfies ServerMessage),
+      );
+    }
+  }
+
+  private async expireStaleLiveStrokes(now: number): Promise<number> {
+    let expired = 0;
+    for (const [key, live] of [...this.liveStrokes.entries()]) {
+      if (now - live.lastActiveAt < LIVE_STROKE_STALL_MS) {
+        continue;
+      }
+      this.liveStrokes.delete(key);
+      expired += 1;
+      this.broadcastRaw(
+        JSON.stringify({
+          type: "stroke:live",
+          protocolVersion: PROTOCOL_VERSION,
+          roomId: live.roomId,
+          participantId: live.participantId,
+          strokeId: live.strokeId,
+          phase: "end",
+          points: [],
+        } satisfies ServerMessage),
+      );
+      // Notify the author socket if still connected.
+      for (const socket of this.ctx.getWebSockets()) {
+        const attachment = socket.deserializeAttachment() as SocketAttachment | null;
+        if (attachment?.participantId === live.participantId) {
+          this.sendError(
+            socket,
+            "stroke_expired",
+            "Provisional stroke expired after stall; not committed.",
+          );
+        }
       }
     }
+    await this.scheduleLiveStrokeAlarm();
+    return expired;
+  }
+
+  private async scheduleLiveStrokeAlarm(): Promise<void> {
+    if (this.liveStrokes.size === 0) {
+      await this.ctx.storage.deleteAlarm();
+      return;
+    }
+    let soonest = Number.POSITIVE_INFINITY;
+    for (const live of this.liveStrokes.values()) {
+      soonest = Math.min(soonest, live.lastActiveAt + LIVE_STROKE_STALL_MS);
+    }
+    if (!Number.isFinite(soonest)) {
+      return;
+    }
+    await this.ctx.storage.setAlarm(soonest);
   }
 
   private refreshPresenceAfterDepart(
@@ -580,6 +681,8 @@ interface LiveStrokeState {
   color: string;
   width: number;
   points: StrokePoint[];
+  lastActiveAt: number;
+  roomId: string;
 }
 
 function liveKey(participantId: string, strokeId: string): string {

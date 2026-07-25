@@ -69,7 +69,8 @@ and DO skeleton only.
 
 These will get full decision records when implemented:
 
-- Snapshot vs full replay for reconnect of large histories
+- Sticky participant identity across reconnect
+- Checkpoint / retention for very large operation logs
 
 ## D3 — rAF point batching for live stroke network sends
 
@@ -159,3 +160,35 @@ replay of the true log head.
 
 `test/history.test.ts` undo-peer / redo / redo-invalidation / rapid history /
 two-client convergence. Manual two-browser proof in [TESTING.md](./TESTING.md).
+
+## D6 — Full snapshot reconnect (not last-seq delta) + 30s live stall expiry
+
+### Problem / invariant
+
+A dropped client must restore the same committed canvas, never double-apply a
+sequence, and must not persist provisional pointer points. Hibernation must not
+assume in-memory live strokes survive.
+
+### Selected design
+
+- Client: exponential reconnect with jitter; UI Connecting / Reconnecting /
+  Connected; on schedule, clear ephemeral ink; on join, replace committed store
+  from full visible `sync_state`.
+- Client: `appliedSequences` set suppresses duplicate `operation:committed`.
+- Server: DO constructor re-ensures SQLite schemas; live map starts empty after
+  hibernation. Idle live strokes expire after 30s via alarm (or test hook);
+  peers get `stroke:live` end; author gets `stroke_expired`.
+
+### Rejected alternative
+
+**Delta sync by `lastSequence` only** (send ops with sequence > N).
+
+Rejected for this slice because undo tombstones change **visibility** without
+changing sequence head — a pure delta can revive hidden ops or miss visibility
+flips. Full visible snapshot is simpler and correct; delta remains a future
+optimization once a versioned visibility token exists.
+
+### Verification
+
+`test/reconnect.test.ts`, `test/reconnect-backoff.test.ts`, duplicate suppression
+in the committed store. Manual refresh reconnect in [TESTING.md](./TESTING.md).

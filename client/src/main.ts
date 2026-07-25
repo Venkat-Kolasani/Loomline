@@ -345,12 +345,16 @@ function enterRoom(roomId: string): void {
   updateEmptyState();
 
   const socket = new RoomSocket(roomId, {
-    onConnectionState: (state) => {
+    onConnectionState: (state, detail) => {
       if (roomSocket !== socket) {
         return;
       }
       if (state === "connecting") {
         connectionStatus.textContent = "Connecting…";
+      } else if (state === "reconnecting") {
+        const attempt = detail?.attempt ?? 0;
+        connectionStatus.textContent =
+          attempt > 0 ? `Reconnecting… (try ${attempt})` : "Reconnecting…";
       } else if (state === "connected") {
         connectionStatus.textContent = "Connected";
       } else if (state === "error") {
@@ -358,6 +362,18 @@ function enterRoom(roomId: string): void {
       } else {
         connectionStatus.textContent = "Disconnected";
       }
+    },
+    onReconnectScheduled: () => {
+      if (roomSocket !== socket) {
+        return;
+      }
+      // Ephemeral peer ink and provisional local ink cannot survive a drop.
+      liveStrokeTransport?.clear();
+      remoteStrokes.clearAll();
+      remoteCursors.clear();
+      drawing.abandonUncommitted();
+      surface.markDirty("live");
+      updateEmptyState();
     },
     onWelcome: (participant) => {
       if (roomSocket !== socket) {
@@ -401,6 +417,7 @@ function enterRoom(roomId: string): void {
       if (roomSocket !== socket) {
         return;
       }
+      // Full snapshot/replay after join or reconnect; replaces visible set.
       committedOps.applySyncState(sequenceHead, operations);
       setHistoryButtons(canUndo, canRedo);
       surface.markDirty("committed");
@@ -433,7 +450,11 @@ function enterRoom(roomId: string): void {
         return;
       }
       // Keep Connected for recoverable stroke errors (e.g. unknown_stroke).
-      if (code === "unknown_stroke" || code === "stroke_active") {
+      if (
+        code === "unknown_stroke" ||
+        code === "stroke_active" ||
+        code === "stroke_expired"
+      ) {
         console.warn("Room error", code, message);
         return;
       }

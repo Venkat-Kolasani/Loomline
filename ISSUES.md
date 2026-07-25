@@ -330,6 +330,11 @@ SQLite is not this local miniflare file lock path.
 Room `undo7a01` on `http://localhost:8787`: peer undo cleared both canvases;
 redo restored matching opaque counts on both tabs while Connected.
 
+Recurred 25 July during Prompt 8 reconnect proof after `npm run build` triggered
+`Reloading local server…` — same SQLITE_BUSY fatal. Workaround: avoid rebuilding
+while an active `wrangler dev` two-browser session is open; restart `npm run
+dev` cleanly for the next manual check.
+
 Copy this block when logging a future issue:
 
 ```markdown

@@ -224,9 +224,11 @@ unmeasured operation-log wipe.
 
 ### Selected design
 
-- Reject oversized text frames (`MAX_CLIENT_MESSAGE_BYTES = 16_384`) before parse.
+- Reject oversized text frames (`MAX_CLIENT_MESSAGE_BYTES = 16_384` **UTF-8
+  bytes** via `TextEncoder`) before parse.
 - Keep shape validation in `parseClientMessage` (unknown type, version, points).
-- Per-participant fixed window: `120` messages / `1s` → typed `rate_limited`.
+- Per-participant fixed window: `120` messages / `1s` → typed `rate_limited`,
+  applied to **every** frame once the socket has a participant id (before parse).
 - Process every accepted history request under DO serialization — **no debounce**.
 - On last participant leave: clear live map, expiry rows, rate counters, and
   `deleteAlarm`. Retain committed SQLite ops.
@@ -248,6 +250,7 @@ and has no measured threshold. Prefer a future checkpoint record once Prompt 10
 
 ### Verification
 
-`test/boundaries.test.ts` (malformed JSON, unknown type, oversized, rate limit,
+`test/boundaries.test.ts` (malformed JSON, unknown type, oversized ASCII +
+Unicode UTF-8 bypass, rate limit on valid / malformed / repeated-join frames,
 rapid history, zero-user cleanup). Prior `test/history.test.ts` rapid path.
 Gate recorded in [TESTING.md](./TESTING.md).

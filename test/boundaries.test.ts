@@ -75,6 +75,24 @@ describe("room input boundaries", () => {
     socket.close(1000, "done");
   });
 
+  it("rejects Unicode frames within JS length but over UTF-8 byte cap", async () => {
+    const roomId = "bbbb9020";
+    const socket = await openRoomSocket(roomId);
+    await joinAndDrain(socket, roomId, "Unicode");
+
+    // 😀 is 2 UTF-16 code units but 4 UTF-8 bytes → length 16384, bytes 32768.
+    const frame = "😀".repeat(8192);
+    expect(frame.length).toBe(MAX_CLIENT_MESSAGE_BYTES);
+    expect(new TextEncoder().encode(frame).byteLength).toBeGreaterThan(
+      MAX_CLIENT_MESSAGE_BYTES,
+    );
+
+    const err = waitForError(socket, "payload_too_large");
+    socket.send(frame);
+    await err;
+    socket.close(1000, "done");
+  });
+
   it("returns typed rate_limited after the per-participant frame budget", async () => {
     const roomId = "bbbb9013";
     const socket = await openRoomSocket(roomId);
@@ -91,6 +109,38 @@ describe("room input boundaries", () => {
           y: i,
         }),
       );
+    }
+    await err;
+    socket.close(1000, "done");
+  });
+
+  it("rate-limits a joined socket flooding malformed frames", async () => {
+    const roomId = "bbbb9021";
+    const socket = await openRoomSocket(roomId);
+    await joinAndDrain(socket, roomId, "Flood-JSON");
+
+    const err = waitForError(socket, "rate_limited");
+    for (let i = 0; i < MAX_MESSAGES_PER_WINDOW + 1; i += 1) {
+      socket.send("{not-json");
+    }
+    await err;
+    socket.close(1000, "done");
+  });
+
+  it("rate-limits a joined socket flooding repeated join frames", async () => {
+    const roomId = "bbbb9022";
+    const socket = await openRoomSocket(roomId);
+    await joinAndDrain(socket, roomId, "Flood-Join");
+
+    const err = waitForError(socket, "rate_limited");
+    const joinFrame = JSON.stringify({
+      type: "join",
+      protocolVersion: PROTOCOL_VERSION,
+      roomId,
+      displayName: "Flood-Join",
+    });
+    for (let i = 0; i < MAX_MESSAGES_PER_WINDOW + 1; i += 1) {
+      socket.send(joinFrame);
     }
     await err;
     socket.close(1000, "done");

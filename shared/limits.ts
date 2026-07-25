@@ -3,7 +3,7 @@
  * Sized to preserve normal rAF-batched drawing (≤1 points batch + cursor / frame).
  */
 
-/** Reject raw text frames larger than this before JSON.parse. */
+/** Reject raw text frames larger than this many UTF-8 bytes before JSON.parse. */
 export const MAX_CLIENT_MESSAGE_BYTES = 16_384;
 
 /**

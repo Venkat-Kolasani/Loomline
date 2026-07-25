@@ -185,7 +185,7 @@ restores via full visible `sync_state`.
 
 | Field | Limit |
 | --- | --- |
-| Raw text frame | ≤ `16_384` bytes (`MAX_CLIENT_MESSAGE_BYTES`) before `JSON.parse` |
+| Raw text frame | ≤ `16_384` **UTF-8 bytes** (`MAX_CLIENT_MESSAGE_BYTES`), measured with `TextEncoder` before `JSON.parse` (not JS string `.length`) |
 | `strokeId` | 1–64 characters |
 | `points` per `stroke:points` | 1–64 (`MAX_POINTS_PER_MESSAGE`) |
 | `width` | integer 1–32 |
@@ -195,20 +195,23 @@ restores via full visible `sync_state`.
 
 `120` frames/s is sized for normal rAF drawing: one `stroke:points` batch plus
 one `cursor` per ~60 Hz frame, with headroom for `start` / `end` / history.
-Exceeding the budget returns `error` `rate_limited`; the room stays alive.
-History is **not** debounced — each accepted `history:undo` / `history:redo`
-runs to completion under Durable Object serialization.
+Once a socket has a participant id, **every** incoming text frame counts toward
+that budget **before** size checks, JSON parse, or type dispatch — including
+malformed, oversized, unknown-type, and repeated `join` frames. Exceeding the
+budget returns `error` `rate_limited`; the room stays alive. History is **not**
+debounced — each accepted `history:undo` / `history:redo` runs to completion
+under Durable Object serialization.
 
 ### Typed boundary errors (non-exhaustive)
 
 | `code` | When |
 | --- | --- |
 | `invalid_json` | Non-JSON text frame |
-| `payload_too_large` | Frame longer than `MAX_CLIENT_MESSAGE_BYTES` |
+| `payload_too_large` | Frame longer than `MAX_CLIENT_MESSAGE_BYTES` UTF-8 bytes |
 | `unsupported_type` | Unknown `type` |
 | `protocol_mismatch` | Wrong `protocolVersion` |
 | `invalid_payload` | Bad shape / binary frames / field constraints |
-| `rate_limited` | Per-participant frame budget exceeded |
+| `rate_limited` | Per-participant frame budget exceeded (all post-join frames) |
 | `not_joined` / `room_mismatch` | Join / room binding failures |
 
 ## HTTP endpoints

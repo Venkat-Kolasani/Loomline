@@ -3,6 +3,22 @@
 Evidence log for Loomline. Record **exact commands and outcomes**. Do not claim
 untested behavior.
 
+## Latest gate (2026-07-25 — UTF-8 size + pre-parse rate limit)
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files  15 passed (15)
+→ Tests  62 passed (62)
+→ build exit 0
+```
+
+Regression coverage added:
+
+- Unicode frame with JS `.length ≤ 16384` but UTF-8 bytes over cap → `payload_too_large`
+- Joined socket flooding malformed JSON → `rate_limited`
+- Joined socket flooding repeated `join` → `rate_limited`
+
 ## Results — input boundaries / robustness (2026-07-25)
 
 Environment: macOS darwin 25.2.0, Node v24.12.0.

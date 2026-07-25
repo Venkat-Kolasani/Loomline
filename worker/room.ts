@@ -179,11 +179,33 @@ export class RoomDurableObject extends DurableObject<Env> {
       return;
     }
 
-    if (message.length > MAX_CLIENT_MESSAGE_BYTES) {
+    const attachment = ws.deserializeAttachment() as SocketAttachment | null;
+
+    // Joined sockets: every frame counts toward the budget before parse/dispatch
+    // so malformed, oversized, unknown-type, and repeated-join floods cannot bypass.
+    if (attachment?.participantId) {
+      if (
+        !allowParticipantMessage(
+          this.messageRates,
+          attachment.participantId,
+          Date.now(),
+        )
+      ) {
+        this.sendError(
+          ws,
+          "rate_limited",
+          "Too many messages; slow down while keeping the room alive.",
+        );
+        return;
+      }
+    }
+
+    const byteLength = new TextEncoder().encode(message).byteLength;
+    if (byteLength > MAX_CLIENT_MESSAGE_BYTES) {
       this.sendError(
         ws,
         "payload_too_large",
-        `Message exceeds ${MAX_CLIENT_MESSAGE_BYTES} bytes.`,
+        `Message exceeds ${MAX_CLIENT_MESSAGE_BYTES} UTF-8 bytes.`,
       );
       return;
     }
@@ -202,32 +224,10 @@ export class RoomDurableObject extends DurableObject<Env> {
       return;
     }
 
-    const attachment = ws.deserializeAttachment() as SocketAttachment | null;
     const roomId = attachment?.roomId ?? result.message.roomId;
     if (!isValidRoomId(roomId) || result.message.roomId !== roomId) {
       this.sendError(ws, "room_mismatch", "roomId does not match this socket.");
       return;
-    }
-
-    if (result.message.type !== "join") {
-      if (!attachment?.participantId) {
-        this.sendError(ws, "not_joined", "Join the room before sending strokes.");
-        return;
-      }
-      if (
-        !allowParticipantMessage(
-          this.messageRates,
-          attachment.participantId,
-          Date.now(),
-        )
-      ) {
-        this.sendError(
-          ws,
-          "rate_limited",
-          "Too many messages; slow down while keeping the room alive.",
-        );
-        return;
-      }
     }
 
     switch (result.message.type) {

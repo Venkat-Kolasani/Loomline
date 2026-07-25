@@ -72,8 +72,12 @@ Verified in `test/rooms.test.ts`.
 
 Local finished strokes stay provisional until `operation:committed`
 acknowledges them (brush on live; eraser on committed view), then the store
-owns the ink/hole (no double paint). Eraser width shares the brush width
-slider; the live canvas cursor shows a circle sized to that width.
+owns the ink/hole (no double paint). If a committed eraser arrives with fewer
+points than the provisional path (dropped batches), the provisional hole is
+kept so erased ink cannot reappear; leftovers clear on `sync_state` /
+`history:changed`. Eraser width shares the brush width slider; the live canvas
+cursor shows a circle sized to that width. Cursor messages are not sent while
+drawing so stroke point batches stay under the room rate limit.
 
 ### Storage
 

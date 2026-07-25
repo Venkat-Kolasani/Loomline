@@ -8,6 +8,7 @@ import {
   type Stroke,
 } from "./stroke";
 import type { LayeredCanvasSurface } from "./layers";
+import { retainProvisionalEraser } from "./eraser-retain";
 
 export interface LocalStrokeStartEvent {
   strokeId: string;
@@ -144,19 +145,49 @@ export class LocalDrawingController {
     this.width = Math.min(32, Math.max(1, Math.round(width)));
   }
 
-  /** Drop a locally ended stroke once the server has committed it. */
-  acknowledgeCommitted(strokeId: string): boolean {
+  /**
+   * Drop a locally ended stroke once the server has committed it.
+   * Erasers with a shorter committed point list stay provisional so the hole
+   * cannot shrink (ink "growing back") when the last points batch was lost.
+   */
+  acknowledgeCommitted(
+    strokeId: string,
+    committedPointCount?: number,
+  ): boolean {
     const removed = this.awaitingCommit.find((s) => s.strokeId === strokeId);
-    const before = this.awaitingCommit.length;
+    if (!removed) {
+      return false;
+    }
+    if (
+      removed.tool === "eraser" &&
+      committedPointCount !== undefined &&
+      retainProvisionalEraser(removed.points.length, committedPointCount)
+    ) {
+      return false;
+    }
     this.awaitingCommit = this.awaitingCommit.filter(
       (stroke) => stroke.strokeId !== strokeId,
     );
-    if (this.awaitingCommit.length !== before) {
-      this.markStrokeLayersDirty(removed?.tool ?? "brush");
-      this.notify();
-      return true;
+    this.markStrokeLayersDirty(removed.tool);
+    this.notify();
+    return true;
+  }
+
+  /** Drop awaiting-commit ink (history/sync replaces the committed view). */
+  dropAwaitingCommit(): void {
+    if (this.awaitingCommit.length === 0) {
+      return;
     }
-    return false;
+    const hadEraser = this.awaitingCommit.some((s) => s.tool === "eraser");
+    const hadBrush = this.awaitingCommit.some((s) => s.tool === "brush");
+    this.awaitingCommit = [];
+    if (hadEraser) {
+      this.surface.markDirty("committed");
+    }
+    if (hadBrush) {
+      this.surface.markDirty("live");
+    }
+    this.notify();
   }
 
   clearLocal(): void {
@@ -228,7 +259,11 @@ export class LocalDrawingController {
 
   private readonly onPointerMove = (event: PointerEvent): void => {
     const point = this.toCanvasPoint(event);
-    this.network?.onCursor(point);
+    // Skip cursor while drawing so points+cursor do not saturate the room
+    // rate limit (120/s) and drop trailing stroke:points batches.
+    if (!this.drawing) {
+      this.network?.onCursor(point);
+    }
 
     if (!this.drawing || event.pointerId !== this.activePointerId || !this.active) {
       return;
@@ -254,17 +289,17 @@ export class LocalDrawingController {
       return;
     }
     event.preventDefault();
-    this.finishStroke(event.pointerId);
+    this.finishStroke(event.pointerId, event);
   };
 
   private readonly onLostCapture = (event: PointerEvent): void => {
     if (!this.drawing || event.pointerId !== this.activePointerId) {
       return;
     }
-    this.finishStroke(event.pointerId);
+    this.finishStroke(event.pointerId, event);
   };
 
-  private finishStroke(pointerId: number): void {
+  private finishStroke(pointerId: number, endEvent?: PointerEvent): void {
     try {
       if (this.liveCanvas.hasPointerCapture(pointerId)) {
         this.liveCanvas.releasePointerCapture(pointerId);
@@ -275,7 +310,21 @@ export class LocalDrawingController {
 
     const active = this.active;
     if (active && active.points.length > 0) {
-      const willCommit = this.network?.onStrokeEnd(active.strokeId) ?? false;
+      let endPoint: StrokePoint | undefined;
+      if (endEvent) {
+        const tip = this.toCanvasPoint(endEvent);
+        const nextPoints = appendFilteredPoint(
+          active.points,
+          tip,
+          this.minPointDistance,
+        );
+        if (nextPoints.length !== active.points.length) {
+          active.points = nextPoints as Point[];
+          endPoint = tip;
+        }
+      }
+      const willCommit =
+        this.network?.onStrokeEnd(active.strokeId, endPoint) ?? false;
       if (willCommit) {
         this.awaitingCommit = [...this.awaitingCommit, active];
       }

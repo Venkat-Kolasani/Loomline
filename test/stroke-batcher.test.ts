@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { StrokePointBatcher } from "../client/src/net/stroke-batcher";
+import { MAX_POINTS_PER_MESSAGE } from "../shared/protocol";
 
 describe("StrokePointBatcher", () => {
   beforeEach(() => {
@@ -65,5 +66,22 @@ describe("StrokePointBatcher", () => {
       { strokeId: "s1", count: 1 },
       { strokeId: "s2", count: 2 },
     ]);
+  });
+
+  it("chunks flushes larger than MAX_POINTS_PER_MESSAGE", () => {
+    const sent: number[] = [];
+    const batcher = new StrokePointBatcher({
+      sendPoints: (_strokeId, points) => {
+        sent.push(points.length);
+      },
+    });
+
+    const points = Array.from({ length: MAX_POINTS_PER_MESSAGE + 10 }, (_, i) => ({
+      x: i,
+      y: i,
+    }));
+    batcher.enqueue("s1", points);
+    batcher.flushNow();
+    expect(sent).toEqual([MAX_POINTS_PER_MESSAGE, 10]);
   });
 });

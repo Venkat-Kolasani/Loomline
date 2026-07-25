@@ -4,6 +4,7 @@ import {
   type DrawingTool,
   type Stroke,
 } from "./stroke";
+import { retainProvisionalEraser } from "./eraser-retain";
 
 export interface RemoteLiveStroke extends Stroke {
   strokeId: string;
@@ -54,21 +55,39 @@ export class RemoteStrokeStore {
 
     // phase === "end" — brush leaves live; eraser stays provisional until
     // operation:committed (avoids a one-frame hole flash of restored ink).
+    // Append any trailing end-point so the provisional hole matches commit.
+    if (message.points.length > 0) {
+      existing.points = [...existing.points, ...message.points];
+    }
     if (existing.tool === "eraser") {
-      return { liveDirty: false, committedDirty: false };
+      return message.points.length > 0
+        ? dirtyForTool("eraser")
+        : { liveDirty: false, committedDirty: false };
     }
     this.active.delete(key);
     return dirtyForTool("brush");
   }
 
-  /** Drop a remote live/provisional stroke after the server commits it. */
+  /**
+   * Drop a remote live/provisional stroke after the server commits it.
+   * When `committedPointCount` is set for an eraser and is shorter than the
+   * provisional path, keep the provisional hole (ink must not grow back).
+   */
   removeStroke(
     participantId: string,
     strokeId: string,
+    committedPointCount?: number,
   ): { liveDirty: boolean; committedDirty: boolean } {
     const key = remoteKey(participantId, strokeId);
     const existing = this.active.get(key);
     if (!existing) {
+      return { liveDirty: false, committedDirty: false };
+    }
+    if (
+      existing.tool === "eraser" &&
+      committedPointCount !== undefined &&
+      retainProvisionalEraser(existing.points.length, committedPointCount)
+    ) {
       return { liveDirty: false, committedDirty: false };
     }
     this.active.delete(key);
@@ -96,6 +115,18 @@ export class RemoteStrokeStore {
 
   clearAll(): void {
     this.active.clear();
+  }
+
+  /** Drop provisional erasers after history/sync (store is source of truth). */
+  clearProvisionalErasers(): boolean {
+    let removed = false;
+    for (const [key, stroke] of [...this.active.entries()]) {
+      if (stroke.tool === "eraser") {
+        this.active.delete(key);
+        removed = true;
+      }
+    }
+    return removed;
   }
 
   getActiveStrokes(): readonly RemoteLiveStroke[] {

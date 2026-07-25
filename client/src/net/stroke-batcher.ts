@@ -1,4 +1,7 @@
-import type { StrokePoint } from "../../../shared/protocol";
+import {
+  MAX_POINTS_PER_MESSAGE,
+  type StrokePoint,
+} from "../../../shared/protocol";
 
 export interface StrokeBatchHandlers {
   sendPoints: (strokeId: string, points: StrokePoint[]) => void;
@@ -7,6 +10,8 @@ export interface StrokeBatchHandlers {
 /**
  * Batches outgoing stroke points to at most one WebSocket send per
  * requestAnimationFrame. Local rendering stays independent and immediate.
+ * Flushes are chunked to MAX_POINTS_PER_MESSAGE so end-of-stroke dumps are
+ * never rejected as invalid_payload.
  */
 export class StrokePointBatcher {
   private readonly handlers: StrokeBatchHandlers;
@@ -69,6 +74,11 @@ export class StrokePointBatcher {
     const points = this.pendingPoints;
     this.pendingStrokeId = null;
     this.pendingPoints = [];
-    this.handlers.sendPoints(strokeId, points);
+    for (let i = 0; i < points.length; i += MAX_POINTS_PER_MESSAGE) {
+      this.handlers.sendPoints(
+        strokeId,
+        points.slice(i, i + MAX_POINTS_PER_MESSAGE),
+      );
+    }
   }
 }

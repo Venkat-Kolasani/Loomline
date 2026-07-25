@@ -449,6 +449,44 @@ collaborative history.
 `npm run typecheck && npm run test && npm run build`; manual: brush ink → eraser
 drag punches through at multiple widths.
 
+## I11 — Erased ink bits reappeared after commit
+
+**When:** Immediately after punch-through eraser (I10), 2026-07-26
+
+**What the issue was**
+Dragging the eraser punched a clean hole, then after `operation:committed` a
+few bits of the erased ink came back along the path.
+
+**Root cause**
+Local/provisional eraser often had more points than the durable op. During a
+stroke the client sent ~1 `stroke:points` + ~1 `cursor` per frame (≈120/s),
+saturating `MAX_MESSAGES_PER_WINDOW`, so some point batches were dropped while
+local ink kept the full path. On acknowledge the shorter committed eraser
+replaced the provisional hole and ink "grew back." Trailing tip loss (no
+pointerup point on `stroke:end`) and unchunked >64-point flushes could also
+shorten the commit.
+
+**What we fixed**
+- Skip cursor sends while drawing (rate-limit headroom for points).
+- Chunk `StrokePointBatcher` flushes to `MAX_POINTS_PER_MESSAGE`.
+- Include filtered pointerup tip on local stroke + `stroke:end`.
+- Keep provisional eraser (local + remote) when committed point count is
+  shorter; clear leftovers on `sync_state` / `history:changed`.
+- Append remote `stroke:live` end points onto provisional erasers.
+
+**Why this way**
+Preserves server-owned eraser ops (no local-only wipe). Rejected only
+re-painting from local geometry into the store — that would diverge peers and
+undo. Keeping the longer provisional hole until coverage matches (or history
+resync) is safe `destination-out` layering.
+
+**Verification**
+`test/eraser-retain.test.ts`, `test/stroke-batcher.test.ts` chunk case;
+`npm run typecheck && npm run test && npm run build`; manual: brush then erase
+a long stroke — hole must not shrink after the stroke commits.
+
+---
+
 Copy this block when logging a future issue:
 
 ```markdown

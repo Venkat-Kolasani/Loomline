@@ -3,7 +3,20 @@
 Evidence log for Loomline. Record **exact commands and outcomes**. Do not claim
 untested behavior.
 
-## Latest gate (2026-07-26 — punch-through eraser)
+## Latest gate (2026-07-26 — eraser hole must not shrink)
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck ok; 77 tests passed (incl. eraser-retain + batcher chunking);
+  client build ok
+```
+
+Manual: paint a brush stroke, erase along it with a continuous drag, release.
+The punched hole must stay after `operation:committed` (no ink bits returning
+along the path). Cursor messages are suppressed while drawing so point batches
+are not rate-limited away.
+
+## Previous gate (2026-07-26 — punch-through eraser)
 
 ```text
 npm run typecheck && npm run test && npm run build
@@ -319,11 +332,11 @@ Also fixed I6: author `.app { display: grid }` overrode UA `[hidden]`; added
 **Fix:** `LiveStrokeTransport` only forwards points/end for stroke ids whose
 start was accepted while ready. Test: `test/live-stroke-transport.test.ts`.
 
-### Prompt 9 hardening note (not done here)
+### Prompt 9 hardening note (addressed 2026-07-26)
 
-`StrokePointBatcher` does not yet chunk or enforce the documented 64-point
-maximum client-side. Normal pointer rates stay under the limit; add an explicit
-chunking/size-limit test before claiming the payload boundary is fully hardened.
+`StrokePointBatcher` chunks flushes at `MAX_POINTS_PER_MESSAGE` (see
+`test/stroke-batcher.test.ts`). Combined with suppressing cursor while drawing
+so point batches are not rate-limited away (I11).
 
 ## Results — durable ordered operations (2026-07-25)
 

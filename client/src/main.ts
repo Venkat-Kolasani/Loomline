@@ -469,6 +469,10 @@ function enterRoom(roomId: string): void {
       }
       // Full snapshot/replay after join or reconnect; replaces visible set.
       committedOps.applySyncState(sequenceHead, operations);
+      drawing.dropAwaitingCommit();
+      if (remoteStrokes.clearProvisionalErasers()) {
+        surface.markDirty("committed");
+      }
       diagnostics?.setSequenceHead(sequenceHead);
       setHistoryButtons(canUndo, canRedo);
       surface.markDirty("committed");
@@ -485,16 +489,24 @@ function enterRoom(roomId: string): void {
       diagnostics?.setSequenceHead(committedOps.getSequenceHead());
       // New commits clear the server redo branch.
       setHistoryButtons(committedOps.getOperations().length > 0, false);
-      drawing.acknowledgeCommitted(operation.strokeId);
-      const remoteDirty = remoteStrokes.removeStroke(
-        operation.participantId,
-        operation.strokeId,
-      );
-      if (remoteDirty.liveDirty) {
-        surface.markDirty("live");
-      }
-      if (remoteDirty.committedDirty) {
-        surface.markDirty("committed");
+      // Drop provisional only after the store owns the stroke; keep a longer
+      // local/remote eraser hole if the committed op arrived with fewer points.
+      if (applied || committedOps.hasStrokeId(operation.strokeId)) {
+        drawing.acknowledgeCommitted(
+          operation.strokeId,
+          operation.points.length,
+        );
+        const remoteDirty = remoteStrokes.removeStroke(
+          operation.participantId,
+          operation.strokeId,
+          operation.points.length,
+        );
+        if (remoteDirty.liveDirty) {
+          surface.markDirty("live");
+        }
+        if (remoteDirty.committedDirty) {
+          surface.markDirty("committed");
+        }
       }
       updateEmptyState();
     },
@@ -503,6 +515,10 @@ function enterRoom(roomId: string): void {
         return;
       }
       committedOps.applySyncState(sequenceHead, operations);
+      drawing.dropAwaitingCommit();
+      if (remoteStrokes.clearProvisionalErasers()) {
+        surface.markDirty("committed");
+      }
       diagnostics?.setSequenceHead(sequenceHead);
       setHistoryButtons(canUndo, canRedo);
       surface.markDirty("committed");

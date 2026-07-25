@@ -96,8 +96,7 @@ and mobile passes are verified.
   compaction yet — see DECISIONS D7)
 - Per-participant rate limit is in-memory (resets if the DO is evicted mid-abuse;
   anti-spam, not auth)
-- Client does not yet chunk outgoing `stroke:points` if a batch somehow exceeds
-  64 points (server still rejects with `invalid_payload`)
+- Client chunks outgoing `stroke:points` at `MAX_POINTS_PER_MESSAGE` (64)
 - Room operation-log size under heavy load is **not** load-tested; there is no
   arbitrary reset. Future: checkpoint + retention after a measured threshold.
 

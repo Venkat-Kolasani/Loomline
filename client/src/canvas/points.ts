@@ -30,10 +30,10 @@ export function appendFilteredPoint(
   points: readonly Point[],
   next: Point,
   minDistance: number,
-): Point[] {
+): readonly Point[] {
   const previous = points.length > 0 ? points[points.length - 1]! : null;
   if (!shouldAcceptPoint(previous, next, minDistance)) {
-    return points.slice();
+    return points;
   }
   return [...points, next];
 }

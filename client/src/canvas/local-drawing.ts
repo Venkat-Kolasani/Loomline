@@ -1,6 +1,6 @@
 import type { CanvasBackingSize } from "./sizing";
 import { clientToCssPoint } from "./sizing";
-import { appendFilteredPoint } from "./points";
+import { appendFilteredPoint, type Point } from "./points";
 import {
   paintStroke,
   paintStrokes,
@@ -51,11 +51,11 @@ export class LocalDrawingController {
   getPainters(): {
     paintCommitted: (
       ctx: CanvasRenderingContext2D,
-      size: CanvasBackingSize,
+      _size: CanvasBackingSize,
     ) => void;
     paintLive: (
       ctx: CanvasRenderingContext2D,
-      size: CanvasBackingSize,
+      _size: CanvasBackingSize,
     ) => void;
   } {
     return {
@@ -79,12 +79,7 @@ export class LocalDrawingController {
   }
 
   setWidth(width: number): void {
-    const next = Math.min(32, Math.max(1, Math.round(width)));
-    this.width = next;
-  }
-
-  getTool(): DrawingTool {
-    return this.tool;
+    this.width = Math.min(32, Math.max(1, Math.round(width)));
   }
 
   clearLocal(): void {
@@ -98,14 +93,6 @@ export class LocalDrawingController {
 
   hasInk(): boolean {
     return this.completed.length > 0 || this.active !== null;
-  }
-
-  destroy(): void {
-    this.liveCanvas.removeEventListener("pointerdown", this.onPointerDown);
-    this.liveCanvas.removeEventListener("pointermove", this.onPointerMove);
-    this.liveCanvas.removeEventListener("pointerup", this.onPointerUp);
-    this.liveCanvas.removeEventListener("pointercancel", this.onPointerUp);
-    this.liveCanvas.removeEventListener("lostpointercapture", this.onLostCapture);
   }
 
   private readonly onPointerDown = (event: PointerEvent): void => {
@@ -152,7 +139,7 @@ export class LocalDrawingController {
       return;
     }
 
-    this.active = { ...this.active, points: nextPoints };
+    this.active.points = nextPoints as Point[];
     this.surface.markDirty("live");
   };
 

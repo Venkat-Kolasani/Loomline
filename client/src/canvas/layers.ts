@@ -48,10 +48,6 @@ export class LayeredCanvasSurface {
     this.getDpr = options.getDpr ?? (() => window.devicePixelRatio || 1);
   }
 
-  getSize(): CanvasBackingSize | null {
-    return this.size;
-  }
-
   markDirty(layer: CanvasLayerId): void {
     if (layer === "committed") {
       this.dirtyCommitted = true;
@@ -92,13 +88,6 @@ export class LayeredCanvasSurface {
       this.rafHandle = null;
     }
     this.flushDirtyLayers();
-  }
-
-  destroy(): void {
-    if (this.rafHandle !== null) {
-      cancelAnimationFrame(this.rafHandle);
-      this.rafHandle = null;
-    }
   }
 
   private schedulePaint(): void {

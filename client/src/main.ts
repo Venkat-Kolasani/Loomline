@@ -58,6 +58,7 @@ const widthValue = requireElement(
   (node): node is HTMLElement => node instanceof HTMLElement,
 );
 
+// Created after `surface` so painters can close over `drawing`.
 let drawing!: LocalDrawingController;
 
 const surface = new LayeredCanvasSurface({
@@ -130,33 +131,10 @@ syncWidthLabel();
 resizeSurface();
 surface.paintNow();
 
-const resizeObserver = new ResizeObserver(() => {
+new ResizeObserver(() => {
   resizeSurface();
-});
-resizeObserver.observe(stage);
+}).observe(stage);
 
-window.addEventListener(
-  "resize",
-  () => {
-    resizeSurface();
-  },
-  { passive: true },
-);
-
+// Room WebSocket is not wired yet.
 connectionStatus.textContent = "Disconnected";
 emptyState.hidden = false;
-
-async function refreshConnectionPlaceholder(): Promise<void> {
-  try {
-    const response = await fetch("/api/health");
-    if (!response.ok) {
-      connectionStatus.textContent = "Disconnected";
-      return;
-    }
-    connectionStatus.textContent = "Disconnected";
-  } catch {
-    connectionStatus.textContent = "Disconnected";
-  }
-}
-
-void refreshConnectionPlaceholder();

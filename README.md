@@ -120,7 +120,7 @@ Leave unchecked until implemented **and** verified with evidence.
 - [ ] Multi-user test instructions verified
 - [ ] Demo recording shows two-client draw, reconnect, and global undo
 - [ ] Mobile / touch drawing verified
-- [ ] ARCHITECTURE.md / PROTOCOL.md / DECISIONS.md / TESTING.md kept truthful
+- [ ] ARCHITECTURE.md / PROTOCOL.md / DECISIONS.md / ISSUES.md / TESTING.md kept truthful
 
 ### Documentation completeness
 
@@ -134,6 +134,7 @@ Leave unchecked until implemented **and** verified with evidence.
 - [ARCHITECTURE.md](./ARCHITECTURE.md)
 - [PROTOCOL.md](./PROTOCOL.md)
 - [DECISIONS.md](./DECISIONS.md)
+- [ISSUES.md](./ISSUES.md) — interview prep: real bugs and how we fixed them
 - [TESTING.md](./TESTING.md)
 - [AI_USAGE.md](./AI_USAGE.md)
 - [PROJECT_BLUEPRINT.md](./PROJECT_BLUEPRINT.md)

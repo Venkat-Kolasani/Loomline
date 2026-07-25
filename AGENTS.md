@@ -97,6 +97,12 @@ Maintain these files as their concerns become implemented:
   idempotency contract, plus examples.
 - `DECISIONS.md`: trade-offs and rejected designs, especially global undo/redo,
   ordering, conflict policy, and Workers versus a Node server.
+- `ISSUES.md`: interview-facing log of real problems hit while building (bugs,
+  platform surprises, tooling failures). For each entry record the symptom,
+  root cause, what we fixed, **why that fix** (vs at least one alternative),
+  and how it was verified. Append when an issue is discovered or fixed; do not
+  wait for end-of-project cleanup. This is the cheat-sheet for
+  “What issues did you run into?”
 - `AI_USAGE.md`: what AI assisted with, what was manually reviewed/changed, and
   confirmation that the author can explain every retained line.
 - `TESTING.md`: automated test commands, manual two-browser checklist, deployed
@@ -116,6 +122,20 @@ For every behavioral decision, write down:
 Keep documentation truthful. Do not claim benchmarks, scale, browser support,
 or failure handling that was not actually tested.
 
+## Interview issues log (mandatory)
+
+Interviewers may ask what went wrong during development. Treat that as a
+first-class documentation obligation:
+
+1. When you discover a real bug, flaky local failure, or surprising Workers /
+   WebSocket / Canvas behavior, add or update an entry in `ISSUES.md` in the
+   same slice that fixes or works around it.
+2. Each entry must answer: what broke, what we changed, why that approach, and
+   how we proved it.
+3. Do not invent issues for drama. Do not leave fixed bugs only in chat history
+   or commit messages.
+4. Prefer concrete, rehearse-able language over internal ticket jargon.
+
 ## Verification gate
 
 Before declaring a unit of work complete:
@@ -126,6 +146,8 @@ Before declaring a unit of work complete:
 3a. If the change touches pointer/input handling, test touch emulation or a real
     mobile device in the same session; never defer that proof to a later prompt.
 4. Update the required documentation and `TESTING.md` with actual results.
+   If the slice fixed a real bug or surprising failure mode, update `ISSUES.md`
+   in the same slice.
 5. Inspect `git diff` and `git status`; do not stage unrelated files.
 6. Explain in the commit body or docs what invariant was protected and how.
 

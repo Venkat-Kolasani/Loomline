@@ -139,9 +139,16 @@ Adversarial coverage in the same suite / prior transport tests:
 
 ### Local two-browser proof
 
-Recorded after `npm run build` + `npm run dev` on
-`http://127.0.0.1:8787/` (`phase: "durable-ops"`): two tabs draw overlapping
-strokes; third join sees both via sync_state. Details filled after browser run.
+```text
+GET /api/health → {"ok":true,"service":"loomline","phase":"durable-ops"}
+Room 26a9b7be
+```
+
+1. Tab A (`Artist-3f37`) drew a completed stroke; Tab B (`Artist-8251`) showed
+   **5374** opaque pixels on **committed-canvas** and **0** on live (durable).
+2. Tab C (`Artist-3349`) joined later — same **5374** committed opaque pixels
+   via `sync_state`; presence = 3.
+3. Undo/Redo remain disabled (out of scope).
 
 ## Results — rooms + presence (2026-07-25)
 

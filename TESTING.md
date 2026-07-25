@@ -90,6 +90,20 @@ live overlay only; no durable sequence in this slice.
 Also fixed I6: author `.app { display: grid }` overrode UA `[hidden]`; added
 `[hidden] { display: none !important; }` so landing/room do not stack.
 
+### P1 — Connecting race gate (2026-07-25)
+
+**Bug:** stroke started before `welcome` dropped `stroke:start` but still queued
+`stroke:points`; after join, batches hit `unknown_stroke`.
+
+**Fix:** `LiveStrokeTransport` only forwards points/end for stroke ids whose
+start was accepted while ready. Test: `test/live-stroke-transport.test.ts`.
+
+### Prompt 9 hardening note (not done here)
+
+`StrokePointBatcher` does not yet chunk or enforce the documented 64-point
+maximum client-side. Normal pointer rates stay under the limit; add an explicit
+chunking/size-limit test before claiming the payload boundary is fully hardened.
+
 ## Results — rooms + presence (2026-07-25)
 
 Environment: macOS darwin 25.2.0, Node v24.12.0, npm 11.6.2.

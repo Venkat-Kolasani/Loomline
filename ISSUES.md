@@ -190,6 +190,43 @@ Pointer / touch-emulation drawing still completes strokes on the live layer.
 
 ---
 
+## I7 — Stroke started while Connecting… orphaned points after welcome
+
+**When:** Prompt 5 review (P1), before durable history.
+
+**What the issue was**
+
+Drawing during “Connecting…” kept local ink. `stroke:start` was dropped because
+the socket was not ready, but later `stroke:points` still entered the rAF
+batcher. After `welcome`, those batches (and sometimes `stroke:end`) reached the
+server without an active stroke → `unknown_stroke`. Peers never saw the stroke.
+
+**Root cause**
+
+Network hooks gated **start** (and end) on `isReady()`, but **points** only
+checked that the socket instance was current, so the batcher could flush after
+join.
+
+**What we fixed**
+
+`LiveStrokeTransport` records stroke ids whose `stroke:start` was actually sent
+while ready. Points and end are suppressed unless that stroke id was accepted.
+Regression: `test/live-stroke-transport.test.ts`.
+
+**Why this way**
+
+- Keeps local drawing enabled during connect (responsive UX).
+- Rejected only “disable pointer until welcome” — still need the accepted-start
+  gate if hooks are wired mid-stroke after welcome.
+- Rejected buffering start until welcome — more state, easy to mis-order with end.
+
+**Verification**
+
+Unit regression: start while not ready → welcome → points/end send nothing.
+`npm run typecheck && npm run test && npm run build`.
+
+---
+
 ## I6 — Landing and room views both painted because `[hidden]` lost to `.app`
 
 **When:** Prompt 5 (live strokes), first browser proof on `/`.

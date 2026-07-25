@@ -2,9 +2,9 @@ import { LayeredCanvasSurface } from "./canvas/layers";
 import { LocalDrawingController } from "./canvas/local-drawing";
 import { RemoteStrokeStore } from "./canvas/remote-strokes";
 import type { DrawingTool } from "./canvas/stroke";
+import { LiveStrokeTransport } from "./net/live-stroke-transport";
 import { RemoteCursorLayer } from "./net/remote-cursors";
 import { RoomSocket } from "./net/room-socket";
-import { StrokePointBatcher } from "./net/stroke-batcher";
 import type { Participant } from "../../shared/room";
 import { createRoomId, isValidRoomId } from "../../shared/room";
 import type { StrokePoint } from "../../shared/protocol";
@@ -116,7 +116,7 @@ let selfParticipant: Participant | null = null;
 const remoteStrokes = new RemoteStrokeStore();
 const remoteCursors = new RemoteCursorLayer(cursorLayerRoot);
 
-let strokeBatcher: StrokePointBatcher | null = null;
+let liveStrokeTransport: LiveStrokeTransport | null = null;
 let pendingCursor: StrokePoint | null = null;
 let cursorRaf: number | null = null;
 
@@ -180,8 +180,8 @@ function parseRoomPath(pathname: string): string | null {
 }
 
 function clearNetworkHelpers(): void {
-  strokeBatcher?.clear();
-  strokeBatcher = null;
+  liveStrokeTransport?.clear();
+  liveStrokeTransport = null;
   if (cursorRaf !== null) {
     cancelAnimationFrame(cursorRaf);
     cursorRaf = null;
@@ -256,35 +256,38 @@ function scheduleCursorSend(point: StrokePoint): void {
 }
 
 function wireDrawingNetwork(socket: RoomSocket): void {
-  strokeBatcher = new StrokePointBatcher({
-    sendPoints: (strokeId, points) => {
-      if (roomSocket !== socket || !socket.isReady()) {
-        return;
-      }
+  const transport = new LiveStrokeTransport({
+    isReady: () => roomSocket === socket && socket.isReady(),
+    sendStrokeStart: (event) => {
+      socket.sendStrokeStart(event);
+    },
+    sendStrokePoints: (strokeId, points) => {
       socket.sendStrokePoints(strokeId, points);
     },
+    sendStrokeEnd: (strokeId, point) => {
+      socket.sendStrokeEnd(strokeId, point);
+    },
   });
+  liveStrokeTransport = transport;
 
   drawing.setNetworkHooks({
     onStrokeStart: (event) => {
-      if (roomSocket !== socket || !socket.isReady()) {
+      if (roomSocket !== socket) {
         return;
       }
-      strokeBatcher?.flushNow();
-      socket.sendStrokeStart(event);
+      transport.onStrokeStart(event);
     },
     onStrokePoints: (strokeId, points) => {
       if (roomSocket !== socket) {
         return;
       }
-      strokeBatcher?.enqueue(strokeId, points);
+      transport.onStrokePoints(strokeId, points);
     },
     onStrokeEnd: (strokeId, point) => {
-      if (roomSocket !== socket || !socket.isReady()) {
+      if (roomSocket !== socket) {
         return;
       }
-      strokeBatcher?.flushNow();
-      socket.sendStrokeEnd(strokeId, point);
+      transport.onStrokeEnd(strokeId, point);
     },
     onCursor: (point) => {
       if (roomSocket !== socket) {

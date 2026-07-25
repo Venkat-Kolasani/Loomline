@@ -51,6 +51,10 @@ not authoritative.
 Clients must batch `stroke:points` at most once per `requestAnimationFrame`.
 Local pixels still update immediately on each accepted pointer sample.
 
+Clients must not send `stroke:points` / `stroke:end` for a `strokeId` unless
+`stroke:start` was successfully sent while joined. Strokes begun during
+Connecting… stay local-only (see `LiveStrokeTransport`).
+
 ### Join example
 
 ```json

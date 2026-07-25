@@ -71,3 +71,14 @@ Product name is **Loomline** (repository and Worker name match).
 - Confirms `stroke:end` does **not** persist or sequence in this slice
 - Owns two-browser mid-stroke proof and typed-error recovery evidence
 
+## Connecting race gate (`fix(realtime): gate strokes until start accepted`)
+
+### Assisted by AI
+
+- `LiveStrokeTransport` accepted-start set; regression test for Connecting… race
+
+### Manually reviewed / owned by the author
+
+- Explains why points must not flush after welcome for a stroke that never started
+  on the wire
+

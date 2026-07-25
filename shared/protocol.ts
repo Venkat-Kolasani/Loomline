@@ -72,6 +72,16 @@ export type ClientMessage =
       roomId: string;
       x: number;
       y: number;
+    }
+  | {
+      type: "history:undo";
+      protocolVersion: typeof PROTOCOL_VERSION;
+      roomId: string;
+    }
+  | {
+      type: "history:redo";
+      protocolVersion: typeof PROTOCOL_VERSION;
+      roomId: string;
     };
 
 export type ServerMessage =
@@ -119,6 +129,17 @@ export type ServerMessage =
       roomId: string;
       sequenceHead: number;
       operations: CommittedOperation[];
+      canUndo: boolean;
+      canRedo: boolean;
+    }
+  | {
+      type: "history:changed";
+      protocolVersion: typeof PROTOCOL_VERSION;
+      roomId: string;
+      sequenceHead: number;
+      operations: CommittedOperation[];
+      canUndo: boolean;
+      canRedo: boolean;
     }
   | {
       type: "error";
@@ -182,6 +203,16 @@ export function parseClientMessage(value: unknown): ParseClientResult {
       return parseStrokeEnd(record);
     case "cursor":
       return parseCursor(record);
+    case "history:undo":
+    case "history:redo":
+      return {
+        ok: true,
+        message: {
+          type: record.type,
+          protocolVersion: PROTOCOL_VERSION,
+          roomId: record.roomId as string,
+        },
+      };
     default:
       return {
         ok: false,

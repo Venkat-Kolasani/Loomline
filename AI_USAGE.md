@@ -95,3 +95,15 @@ Product name is **Loomline** (repository and Worker name match).
   mid-stroke close must not commit
 - Owns overlap/join/abandon test evidence
 
+## Undo/redo (`feat(history): add global tombstone-based undo redo`)
+
+### Assisted by AI
+
+- `worker/history.ts` tombstone helpers, DO undo/redo handlers, protocol
+  `history:*` messages, client button wiring, history tests, docs
+
+### Manually reviewed / owned by the author
+
+- Explains why redo clears on new commit while hidden ops stay hidden
+- Owns global-versus-per-user decision and two-browser undo proof
+

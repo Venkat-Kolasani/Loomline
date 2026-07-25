@@ -1,8 +1,8 @@
 # Protocol
 
 **Protocol version:** `1`  
-**Status:** presence, live strokes/cursors, and **durable ordered operations**
-are implemented. Undo/redo remain planned.
+**Status:** presence, live strokes, durable ordered operations, and **global
+tombstone undo/redo** are implemented. Reconnect backoff remains planned.
 
 ## Transport
 
@@ -28,13 +28,16 @@ Validation lives in `shared/protocol.ts` (`parseClientMessage`).
 | --- | --- | --- |
 | `join` | client → server | Enter the room (optional `displayName`) |
 | `welcome` | server → client | Assigned participant id, colour, display name |
-| `sync_state` | server → client | Snapshot/replay of committed ops + `sequenceHead` after join |
+| `sync_state` | server → client | Visible committed ops + `sequenceHead` + undo/redo flags after join |
 | `presence` | server → all | Full participant list for the room |
 | `stroke:start` | client → server | Begin a provisional stroke |
 | `stroke:points` | client → server | Batched additional points (≤ 64 per message) |
 | `stroke:end` | client → server | Finish provisional stroke; server may commit one op |
 | `stroke:live` | server → peers | Fan-out of start / points / end for live overlay |
 | `operation:committed` | server → **all** | Durable op with authoritative increasing `sequence` |
+| `history:undo` | client → server | Tombstone latest **visible** completed op |
+| `history:redo` | client → server | Remove newest redoable tombstone |
+| `history:changed` | server → **all** | Visible op set after undo/redo; clients rebuild |
 | `cursor` | client → server → peers | Ephemeral pointer position |
 | `error` | server → client | Recoverable typed failure |
 
@@ -48,7 +51,20 @@ Validation lives in `shared/protocol.ts` (`parseClientMessage`).
 3. Clients apply ops by sequence and ignore duplicate sequences.
 4. Overlapping strokes are valid; later sequence paints later (stable layering).
 5. Mid-stroke disconnect discards the live stroke — it never becomes durable.
-6. Undo/redo are not implemented in this slice.
+6. Undo/redo never DELETE or UPDATE rows in `operations`.
+
+### History contract (implemented)
+
+1. Undo hides the latest visible completed operation (highest sequence not
+   currently tombstoned). Live strokes are not in the log and cannot be undone.
+2. Undo pushes that sequence onto a durable redo stack and into `history_hidden`.
+3. Redo pops the top of the redo stack and removes that sequence from
+   `history_hidden`.
+4. A newly committed operation **clears the redo stack** but leaves existing
+   tombstones in `history_hidden` (undone ops stay gone; redo is invalidated).
+5. `sync_state` and `history:changed` send only **visible** operations.
+   `sequenceHead` is still `MAX(sequence)` over the full append-only log.
+6. Any joined participant may undo/redo globally; author identity does not matter.
 
 ### Stroke batching contract
 
@@ -78,7 +94,35 @@ Clients must not send `stroke:points` / `stroke:end` for a `strokeId` unless
       "points": [{ "x": 10, "y": 10 }, { "x": 20, "y": 25 }],
       "createdAt": 1720000000000
     }
-  ]
+  ],
+  "canUndo": true,
+  "canRedo": false
+}
+```
+
+### history:changed example
+
+```json
+{
+  "type": "history:changed",
+  "protocolVersion": 1,
+  "roomId": "abcd1234",
+  "sequenceHead": 2,
+  "operations": [
+    {
+      "sequence": 1,
+      "opId": "…",
+      "participantId": "…",
+      "strokeId": "stroke-a",
+      "tool": "brush",
+      "color": "#0f6a5a",
+      "width": 4,
+      "points": [{ "x": 10, "y": 10 }],
+      "createdAt": 1720000000000
+    }
+  ],
+  "canUndo": true,
+  "canRedo": true
 }
 ```
 
@@ -105,10 +149,8 @@ Clients must not send `stroke:points` / `stroke:end` for a `strokeId` unless
 
 ## Planned message catalogue
 
-| Message | Direction | Meaning |
-| --- | --- | --- |
-| `history:undo` / `history:redo` | client → server | Global history transition |
-| `history:changed` | server → all | Rebuild committed layer after undo/redo |
+Reconnect-oriented resume fields (last-sequence delta) remain planned; join
+already delivers a full visible `sync_state`.
 
 ## Payload limits (current)
 
@@ -124,6 +166,6 @@ Clients must not send `stroke:points` / `stroke:end` for a `strokeId` unless
 
 | Endpoint | Transport | Behavior |
 | --- | --- | --- |
-| `GET /api/health` | HTTP | `{ ok, service: "loomline", phase: "durable-ops" }` |
-| `GET /ws?room=` | WebSocket | Room join + live + committed sync |
+| `GET /api/health` | HTTP | `{ ok, service: "loomline", phase: "undo-redo" }` |
+| `GET /ws?room=` | WebSocket | Room join + live + committed sync + history |
 | Static assets | HTTP via `ASSETS` | Landing + `/r/:roomId` SPA |

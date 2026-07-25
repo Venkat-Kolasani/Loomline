@@ -25,13 +25,22 @@ export interface RoomSocketHandlers {
     sequenceHead: number,
     operations: CommittedOperation[],
     roomId: string,
+    canUndo: boolean,
+    canRedo: boolean,
   ) => void;
   onOperationCommitted: (operation: CommittedOperation, roomId: string) => void;
+  onHistoryChanged: (
+    sequenceHead: number,
+    operations: CommittedOperation[],
+    roomId: string,
+    canUndo: boolean,
+    canRedo: boolean,
+  ) => void;
   onError: (code: string, message: string) => void;
 }
 
 /**
- * Room WebSocket: join, presence, live strokes, cursors, committed ops.
+ * Room WebSocket: join, presence, live strokes, cursors, committed ops, history.
  */
 export class RoomSocket {
   private socket: WebSocket | null = null;
@@ -167,6 +176,22 @@ export class RoomSocket {
     });
   }
 
+  sendHistoryUndo(): void {
+    this.send({
+      type: "history:undo",
+      protocolVersion: PROTOCOL_VERSION,
+      roomId: this.roomId,
+    });
+  }
+
+  sendHistoryRedo(): void {
+    this.send({
+      type: "history:redo",
+      protocolVersion: PROTOCOL_VERSION,
+      roomId: this.roomId,
+    });
+  }
+
   private send(message: ClientMessage): void {
     const socket = this.socket;
     if (!socket || socket.readyState !== WebSocket.OPEN) {
@@ -196,10 +221,21 @@ export class RoomSocket {
           message.sequenceHead,
           message.operations,
           message.roomId,
+          message.canUndo,
+          message.canRedo,
         );
         break;
       case "operation:committed":
         this.handlers.onOperationCommitted(message.operation, message.roomId);
+        break;
+      case "history:changed":
+        this.handlers.onHistoryChanged(
+          message.sequenceHead,
+          message.operations,
+          message.roomId,
+          message.canUndo,
+          message.canRedo,
+        );
         break;
       case "error":
         this.handlers.onError(message.code, message.message);

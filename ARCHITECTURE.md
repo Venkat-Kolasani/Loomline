@@ -54,13 +54,14 @@ Verified in `test/rooms.test.ts`.
 | Landing / room client | Presence, cursors, live + committed sync |
 | Canvas layers | `committed-canvas` = server ops; `live-canvas` = in-progress |
 | Point batching | ≤ one `stroke:points` per animation frame |
-| `RoomDurableObject` | Live fan-out + SQLite ordered ops + `sync_state` |
+| `RoomDurableObject` | Live fan-out + SQLite ordered ops + tombstone history + `sync_state` |
 | Shared protocol | Validated versioned messages |
 
 ### Rendering layers (current)
 
-1. **committed-canvas** — deterministic replay of `CommittedOperation`s ordered
-   by server `sequence`. Dirty only when sync_state / operation:committed changes.
+1. **committed-canvas** — deterministic replay of **visible**
+   `CommittedOperation`s ordered by server `sequence`. Dirty on sync_state /
+   operation:committed / history:changed.
 2. **live-canvas** — local active + awaiting-commit strokes, remote in-progress.
 3. **cursor-layer** (DOM) — remote cursors.
 
@@ -70,15 +71,50 @@ acknowledges them, then move into the committed store (no double paint).
 ### Storage
 
 - Table `operations`: one row per completed stroke (`sequence` PK, full
-  `points_json`).
+  `points_json`). Never updated or deleted by undo/redo.
+- Tables `history_hidden` / `history_redo_stack`: durable visibility + redo.
 - Schema created in the DO constructor via `blockConcurrencyWhile`.
 - Live pointer points are never written as individual rows.
 
 ## Planned
 
-- Global tombstone undo/redo
 - Reconnect backoff + last-sequence resume (join already sends full sync_state)
 - Payload rate limits / client-side 64-point chunking enforcement
+
+## Global tombstone undo/redo (implemented)
+
+History is **server-owned and global**. The `operations` table is append-only.
+
+| Store | Role |
+| --- | --- |
+| `operations` | Every completed stroke forever (`sequence` PK) |
+| `history_hidden` | Sequences currently not painted |
+| `history_redo_stack` | LIFO of redoable undos (`position` + `sequence`) |
+
+### Worked example
+
+Start: ops `{1:A, 2:B, 3:C}` all visible. Redo stack empty.
+
+1. **Undo** → tombstone `3`. Hidden `{3}`. Redo stack `[3]`. Visible `{1:A, 2:B}`.
+2. **Undo** → tombstone `2`. Hidden `{3,2}`. Redo stack `[3,2]`. Visible `{1:A}`.
+3. **Redo** → pop `2`. Hidden `{3}`. Redo stack `[3]`. Visible `{1:A, 2:B}`.
+4. **Commit D** as sequence `4` → **clear redo stack**. Hidden still `{3}` so `C`
+   stays gone. Visible `{1:A, 2:B, 4:D}`. A further **Redo** is a no-op.
+5. Clients rebuild committed-canvas from the visible list in `history:changed`
+   or `sync_state` (joiners never see tombstoned strokes).
+
+Live strokes never enter `operations`, so they are not undoable.
+
+```mermaid
+sequenceDiagram
+  participant A as Client A
+  participant DO as Room DO
+  participant B as Client B
+  A->>DO: history:undo
+  DO->>DO: hide latest visible seq + push redo stack
+  DO->>A: history:changed (visible ops)
+  DO->>B: history:changed (same visible ops)
+```
 
 ## Explicit runtime note
 

@@ -38,13 +38,31 @@ describe("parseClientMessage", () => {
 
   it("rejects unknown message types", () => {
     const result = parseClientMessage({
-      type: "history:undo",
+      type: "foo:bar",
       protocolVersion: PROTOCOL_VERSION,
       roomId: "abcd1234",
     });
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.code).toBe("unsupported_type");
+    }
+  });
+
+  it("accepts history:undo and history:redo", () => {
+    for (const type of ["history:undo", "history:redo"] as const) {
+      const result = parseClientMessage({
+        type,
+        protocolVersion: PROTOCOL_VERSION,
+        roomId: "abcd1234",
+      });
+      expect(result).toEqual({
+        ok: true,
+        message: {
+          type,
+          protocolVersion: 1,
+          roomId: "abcd1234",
+        },
+      });
     }
   });
 

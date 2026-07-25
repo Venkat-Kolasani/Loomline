@@ -252,6 +252,244 @@ describe("durable ordered operations", () => {
   });
 });
 
+describe("global tombstone undo/redo", () => {
+  it("lets a client undo another participant's completed stroke", async () => {
+    const roomId = "mmmm6666";
+    const socketA = await openRoomSocket(roomId);
+    const socketB = await openRoomSocket(roomId);
+    await joinAndDrain(socketA, roomId, "Artist-A");
+    await joinAndDrain(socketB, roomId, "Artist-B");
+    await waitForPresence(socketB, (p) => p.length === 2);
+
+    await completeStroke(socketA, roomId, "peer-stroke", "#0f6a5a", [
+      { x: 10, y: 10 },
+      { x: 20, y: 20 },
+    ]);
+
+    const historyOnB = waitForMessage(
+      socketB,
+      (message): message is Extract<ServerMessage, { type: "history:changed" }> =>
+        message.type === "history:changed" && message.operations.length === 0,
+    );
+    const historyOnA = waitForMessage(
+      socketA,
+      (message): message is Extract<ServerMessage, { type: "history:changed" }> =>
+        message.type === "history:changed" && message.operations.length === 0,
+    );
+
+    socketB.send(
+      JSON.stringify({
+        type: "history:undo",
+        protocolVersion: PROTOCOL_VERSION,
+        roomId,
+      }),
+    );
+
+    const [changedB, changedA] = await Promise.all([historyOnB, historyOnA]);
+    expect(changedB.sequenceHead).toBe(1);
+    expect(changedB.canUndo).toBe(false);
+    expect(changedB.canRedo).toBe(true);
+    expect(changedA.operations).toEqual([]);
+    expect(changedB.operations).toEqual([]);
+
+    socketA.close(1000, "done");
+    socketB.close(1000, "done");
+  });
+
+  it("redoes the latest tombstone and converges for two clients", async () => {
+    const roomId = "nnnn7777";
+    const socketA = await openRoomSocket(roomId);
+    const socketB = await openRoomSocket(roomId);
+    await joinAndDrain(socketA, roomId, "Artist-A");
+    await joinAndDrain(socketB, roomId, "Artist-B");
+    await waitForPresence(socketB, (p) => p.length === 2);
+
+    await completeStroke(socketA, roomId, "s1", "#0f6a5a", [
+      { x: 1, y: 1 },
+      { x: 2, y: 2 },
+    ]);
+    await completeStroke(socketB, roomId, "s2", "#be123c", [
+      { x: 3, y: 3 },
+      { x: 4, y: 4 },
+    ]);
+
+    const undoA = waitForMessage(
+      socketA,
+      (message): message is Extract<ServerMessage, { type: "history:changed" }> =>
+        message.type === "history:changed" &&
+        message.operations.map((op) => op.strokeId).join(",") === "s1",
+    );
+    socketA.send(
+      JSON.stringify({
+        type: "history:undo",
+        protocolVersion: PROTOCOL_VERSION,
+        roomId,
+      }),
+    );
+    await undoA;
+
+    const redoOnA = waitForMessage(
+      socketA,
+      (message): message is Extract<ServerMessage, { type: "history:changed" }> =>
+        message.type === "history:changed" &&
+        message.operations.map((op) => op.strokeId).join(",") === "s1,s2",
+    );
+    const redoOnB = waitForMessage(
+      socketB,
+      (message): message is Extract<ServerMessage, { type: "history:changed" }> =>
+        message.type === "history:changed" &&
+        message.operations.map((op) => op.strokeId).join(",") === "s1,s2",
+    );
+    socketB.send(
+      JSON.stringify({
+        type: "history:redo",
+        protocolVersion: PROTOCOL_VERSION,
+        roomId,
+      }),
+    );
+    const [restoredA, restoredB] = await Promise.all([redoOnA, redoOnB]);
+    expect(restoredA.canUndo).toBe(true);
+    expect(restoredA.canRedo).toBe(false);
+    expect(restoredB.operations.map((op) => op.sequence)).toEqual([1, 2]);
+
+    socketA.close(1000, "done");
+    socketB.close(1000, "done");
+  });
+
+  it("clears the redo branch when a new operation is committed", async () => {
+    const roomId = "oooo8888";
+    const socketA = await openRoomSocket(roomId);
+    await joinAndDrain(socketA, roomId, "Artist-A");
+
+    await completeStroke(socketA, roomId, "old", "#0f6a5a", [
+      { x: 1, y: 1 },
+      { x: 2, y: 2 },
+    ]);
+
+    const undone = waitForMessage(
+      socketA,
+      (message): message is Extract<ServerMessage, { type: "history:changed" }> =>
+        message.type === "history:changed" && message.canRedo === true,
+    );
+    socketA.send(
+      JSON.stringify({
+        type: "history:undo",
+        protocolVersion: PROTOCOL_VERSION,
+        roomId,
+      }),
+    );
+    await undone;
+
+    await completeStroke(socketA, roomId, "new-branch", "#1d4ed8", [
+      { x: 5, y: 5 },
+      { x: 6, y: 6 },
+    ]);
+
+    // Redo must be a no-op after the new commit cleared the redo branch.
+    let historyAfterRedo = 0;
+    const countHistory = (event: MessageEvent): void => {
+      const message = parseServer(event);
+      if (message?.type === "history:changed") {
+        historyAfterRedo += 1;
+      }
+    };
+    socketA.addEventListener("message", countHistory);
+    socketA.send(
+      JSON.stringify({
+        type: "history:redo",
+        protocolVersion: PROTOCOL_VERSION,
+        roomId,
+      }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    socketA.removeEventListener("message", countHistory);
+    expect(historyAfterRedo).toBe(0);
+
+    const socketB = await openRoomSocket(roomId);
+    const sync = waitForMessage(
+      socketB,
+      (message): message is Extract<ServerMessage, { type: "sync_state" }> =>
+        message.type === "sync_state",
+    );
+    await joinAndWaitWelcome(socketB, roomId, "Artist-B");
+    const snapshot = await sync;
+    expect(snapshot.operations.map((op) => op.strokeId)).toEqual(["new-branch"]);
+    expect(snapshot.canRedo).toBe(false);
+    expect(snapshot.canUndo).toBe(true);
+    // Append-only log still has both sequences; head stays at 2.
+    expect(snapshot.sequenceHead).toBe(2);
+
+    socketA.close(1000, "done");
+    socketB.close(1000, "done");
+  });
+
+  it("serializes rapid sequential undo/redo without corrupting visibility", async () => {
+    const roomId = "pppp9999";
+    const socketA = await openRoomSocket(roomId);
+    await joinAndDrain(socketA, roomId, "Rapid");
+
+    await completeStroke(socketA, roomId, "a", "#0f6a5a", [
+      { x: 1, y: 1 },
+      { x: 2, y: 2 },
+    ]);
+    await completeStroke(socketA, roomId, "b", "#be123c", [
+      { x: 3, y: 3 },
+      { x: 4, y: 4 },
+    ]);
+    await completeStroke(socketA, roomId, "c", "#1d4ed8", [
+      { x: 5, y: 5 },
+      { x: 6, y: 6 },
+    ]);
+
+    const changes: Extract<ServerMessage, { type: "history:changed" }>[] = [];
+    const collect = (event: MessageEvent): void => {
+      const message = parseServer(event);
+      if (message?.type === "history:changed") {
+        changes.push(message);
+      }
+    };
+    socketA.addEventListener("message", collect);
+
+    // Fire undo×2 then redo without awaiting between requests.
+    socketA.send(
+      JSON.stringify({
+        type: "history:undo",
+        protocolVersion: PROTOCOL_VERSION,
+        roomId,
+      }),
+    );
+    socketA.send(
+      JSON.stringify({
+        type: "history:undo",
+        protocolVersion: PROTOCOL_VERSION,
+        roomId,
+      }),
+    );
+    socketA.send(
+      JSON.stringify({
+        type: "history:redo",
+        protocolVersion: PROTOCOL_VERSION,
+        roomId,
+      }),
+    );
+
+    await waitUntil(() => changes.length >= 3);
+    socketA.removeEventListener("message", collect);
+
+    expect(changes.map((m) => m.operations.map((op) => op.strokeId).join(","))).toEqual([
+      "a,b",
+      "a",
+      "a,b",
+    ]);
+    const last = changes[changes.length - 1]!;
+    expect(last.canUndo).toBe(true);
+    expect(last.canRedo).toBe(true);
+    expect(last.sequenceHead).toBe(3);
+
+    socketA.close(1000, "done");
+  });
+});
+
 function sendStrokeLifecycle(
   socket: WebSocket,
   roomId: string,

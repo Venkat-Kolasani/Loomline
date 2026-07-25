@@ -3,7 +3,7 @@
 Real-time collaborative drawing canvas for the Flam Frontend R&D assignment.
 
 **Live URL:** _not deployed yet_  
-**Status:** durable ordered room operations + live stroke streaming
+**Status:** global tombstone undo/redo + durable ordered operations
 
 This repository intentionally uses **Cloudflare Workers + Durable Objects** (edge
 JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
@@ -16,17 +16,18 @@ JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
 - Presence: join/leave list with deterministic participant colours
 - Live stroke fan-out (`stroke:start` / `points` / `end` → `stroke:live`)
 - Durable `operation:committed` with SQLite + strictly increasing sequence
-- Join `sync_state` snapshot/replay of the committed log
+- Join `sync_state` snapshot/replay of the **visible** committed log
+- Global server-owned undo/redo via tombstones (`history:undo` / `redo` /
+  `history:changed`); append-only op log is never mutated
 - Remote cursors (ephemeral)
 - rAF-batched outgoing points; immediate local drawing
 - Two stacked canvas layers with brush/eraser/colour/width/clear
 - Dirty-layer paint API (no permanent render loop)
 - Scripts: `dev`, `dev:client`, `typecheck`, `test`, `build`, `deploy`
-- Vitest: isolation, protocol, live strokes, sequence/join/overlap history
+- Vitest: isolation, protocol, live strokes, sequence/join/overlap/history undo
 
 ## What is planned (not implemented)
 
-- Global undo/redo
 - Reconnect backoff / last-sequence resume UX (join already sends sync_state)
 - Deployed demo URL
 
@@ -74,8 +75,8 @@ and mobile passes are verified.
 
 ## Known limitations
 
-- Undo/Redo disabled until server history lands
-- Clear is local-only (does not clear peers’ committed ops)
+- Clear is local-only (does not clear peers’ committed ops or history)
+- Live in-progress strokes are not undoable (only completed ops)
 - No exponential reconnect UI yet (fresh join still gets `sync_state`)
 - Production deploy not run yet
 - Very long strokes are stored as one JSON blob (no checkpoint yet)
@@ -99,7 +100,7 @@ Leave unchecked until implemented **and** verified with evidence.
 - [x] Real-time sync: peers see in-progress strokes, not only finished strokes
 - [x] User indicators: remote cursor / drawing position
 - [x] Conflict resolution: overlapping strokes remain stable via server sequence
-- [ ] Global undo/redo across all users
+- [x] Global undo/redo across all users
 - [x] User management: online presence and deterministic participant colours
 
 ### Technical stack
@@ -116,7 +117,7 @@ Leave unchecked until implemented **and** verified with evidence.
 - [x] Layered committed vs live overlay model
 - [x] Versioned, validated WebSocket protocol
 - [x] Server-authoritative operation ordering
-- [ ] Global undo/redo without mutating the durable operation log incorrectly
+- [x] Global undo/redo without mutating the durable operation log incorrectly
 - [ ] Reconnect / snapshot recovery without duplicate sequence application
 - [x] Recoverable typed errors for invalid client messages
 

@@ -24,12 +24,23 @@ import {
   sequenceHead,
   type StoredOperation,
 } from "./operations";
+import {
+  applyRedo,
+  applyUndo,
+  canRedo,
+  canUndo,
+  clearRedoBranch,
+  ensureHistorySchema,
+  filterVisibleOperations,
+  listHiddenSequences,
+} from "./history";
 
 const ISOLATION_MARK_KEY = "isolationMark";
 
 /**
  * One Durable Object instance per room id (via idFromName).
  * Live strokes are ephemeral; stroke:end persists one ordered operation.
+ * Undo/redo uses tombstones; the operation log is never mutated.
  */
 export class RoomDurableObject extends DurableObject<Env> {
   /**
@@ -42,6 +53,7 @@ export class RoomDurableObject extends DurableObject<Env> {
     super(ctx, env);
     ctx.blockConcurrencyWhile(async () => {
       ensureOperationSchema(this.ctx.storage.sql);
+      ensureHistorySchema(this.ctx.storage.sql);
     });
   }
 
@@ -135,6 +147,8 @@ export class RoomDurableObject extends DurableObject<Env> {
       case "stroke:points":
       case "stroke:end":
       case "cursor":
+      case "history:undo":
+      case "history:redo":
         this.handleJoinedMessage(ws, attachment, result.message, roomId);
         return;
     }
@@ -219,13 +233,16 @@ export class RoomDurableObject extends DurableObject<Env> {
       participant,
     });
 
-    const operations = listOperations(this.ctx.storage.sql).map(toCommitted);
+    const operations = this.visibleOperations();
+    const head = sequenceHead(this.ctx.storage.sql);
     this.send(ws, {
       type: "sync_state",
       protocolVersion: PROTOCOL_VERSION,
       roomId,
-      sequenceHead: sequenceHead(this.ctx.storage.sql),
+      sequenceHead: head,
       operations,
+      canUndo: canUndo(this.ctx.storage.sql, head),
+      canRedo: canRedo(this.ctx.storage.sql),
     });
 
     this.broadcastPresence(roomId);
@@ -261,6 +278,12 @@ export class RoomDurableObject extends DurableObject<Env> {
           x: message.x,
           y: message.y,
         });
+        return;
+      case "history:undo":
+        this.handleHistoryUndo(roomId);
+        return;
+      case "history:redo":
+        this.handleHistoryRedo(roomId);
         return;
     }
   }
@@ -353,6 +376,9 @@ export class RoomDurableObject extends DurableObject<Env> {
       return;
     }
 
+    // New durable ops clear the redo branch; prior tombstones stay hidden.
+    clearRedoBranch(this.ctx.storage.sql);
+
     const stored: StoredOperation = {
       sequence: nextSequence(this.ctx.storage.sql),
       opId: crypto.randomUUID(),
@@ -375,6 +401,46 @@ export class RoomDurableObject extends DurableObject<Env> {
         roomId,
         operation,
       } satisfies ServerMessage),
+    );
+  }
+
+  private handleHistoryUndo(roomId: string): void {
+    const head = sequenceHead(this.ctx.storage.sql);
+    const tombstoned = applyUndo(this.ctx.storage.sql, head);
+    if (tombstoned === null) {
+      return;
+    }
+    this.broadcastHistoryChanged(roomId);
+  }
+
+  private handleHistoryRedo(roomId: string): void {
+    const restored = applyRedo(this.ctx.storage.sql);
+    if (restored === null) {
+      return;
+    }
+    this.broadcastHistoryChanged(roomId);
+  }
+
+  private broadcastHistoryChanged(roomId: string): void {
+    const head = sequenceHead(this.ctx.storage.sql);
+    this.broadcastRaw(
+      JSON.stringify({
+        type: "history:changed",
+        protocolVersion: PROTOCOL_VERSION,
+        roomId,
+        sequenceHead: head,
+        operations: this.visibleOperations(),
+        canUndo: canUndo(this.ctx.storage.sql, head),
+        canRedo: canRedo(this.ctx.storage.sql),
+      } satisfies ServerMessage),
+    );
+  }
+
+  private visibleOperations(): CommittedOperation[] {
+    const hidden = listHiddenSequences(this.ctx.storage.sql);
+    return filterVisibleOperations(
+      listOperations(this.ctx.storage.sql).map(toCommitted),
+      hidden,
     );
   }
 

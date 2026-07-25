@@ -106,6 +106,14 @@ const clearButton = requireElement(
   "#tool-clear",
   (node): node is HTMLButtonElement => node instanceof HTMLButtonElement,
 );
+const undoButton = requireElement(
+  "#tool-undo",
+  (node): node is HTMLButtonElement => node instanceof HTMLButtonElement,
+);
+const redoButton = requireElement(
+  "#tool-redo",
+  (node): node is HTMLButtonElement => node instanceof HTMLButtonElement,
+);
 const widthValue = requireElement(
   "#tool-width-value",
   (node): node is HTMLElement => node instanceof HTMLElement,
@@ -146,6 +154,11 @@ function updateEmptyState(): void {
   const hasRemote = remoteStrokes.getActiveStrokes().length > 0;
   const hasCommitted = committedOps.getOperations().length > 0;
   emptyState.hidden = drawing.hasInk() || hasRemote || hasCommitted;
+}
+
+function setHistoryButtons(canUndo: boolean, canRedo: boolean): void {
+  undoButton.disabled = !canUndo;
+  redoButton.disabled = !canRedo;
 }
 
 function resizeSurface(): void {
@@ -201,6 +214,7 @@ function showLanding(): void {
   renderPresence([]);
   selfBadge.hidden = true;
   drawing.clearLocal();
+  setHistoryButtons(false, false);
   landingView.hidden = false;
   roomView.hidden = true;
   document.title = "Loomline";
@@ -319,6 +333,7 @@ function enterRoom(roomId: string): void {
   roomLink.textContent = shareUrl;
   connectionStatus.textContent = "Connecting…";
   selfBadge.hidden = true;
+  setHistoryButtons(false, false);
   renderPresence([]);
 
   drawing.setColor(colorInput.value);
@@ -382,11 +397,12 @@ function enterRoom(roomId: string): void {
         selfParticipant?.id ?? null,
       );
     },
-    onSyncState: (sequenceHead, operations) => {
+    onSyncState: (sequenceHead, operations, _roomId, canUndo, canRedo) => {
       if (roomSocket !== socket) {
         return;
       }
       committedOps.applySyncState(sequenceHead, operations);
+      setHistoryButtons(canUndo, canRedo);
       surface.markDirty("committed");
       updateEmptyState();
     },
@@ -398,7 +414,18 @@ function enterRoom(roomId: string): void {
       if (applied) {
         surface.markDirty("committed");
       }
+      // New commits clear the server redo branch.
+      setHistoryButtons(committedOps.getOperations().length > 0, false);
       drawing.acknowledgeCommitted(operation.strokeId);
+      updateEmptyState();
+    },
+    onHistoryChanged: (sequenceHead, operations, _roomId, canUndo, canRedo) => {
+      if (roomSocket !== socket) {
+        return;
+      }
+      committedOps.applySyncState(sequenceHead, operations);
+      setHistoryButtons(canUndo, canRedo);
+      surface.markDirty("committed");
       updateEmptyState();
     },
     onError: (code, message) => {
@@ -470,6 +497,20 @@ widthInput.addEventListener("input", () => {
 clearButton.addEventListener("click", () => {
   drawing.clearLocal();
   updateEmptyState();
+});
+
+undoButton.addEventListener("click", () => {
+  if (!roomSocket?.isReady() || undoButton.disabled) {
+    return;
+  }
+  roomSocket.sendHistoryUndo();
+});
+
+redoButton.addEventListener("click", () => {
+  if (!roomSocket?.isReady() || redoButton.disabled) {
+    return;
+  }
+  roomSocket.sendHistoryRedo();
 });
 
 new ResizeObserver(() => {

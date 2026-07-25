@@ -3,6 +3,16 @@
 Evidence log for Loomline. Record **exact commands and outcomes**. Do not claim
 untested behavior.
 
+## Latest gate (2026-07-25 — undo/redo)
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files  11 passed (11)
+→ Tests  46 passed (46)
+→ build exit 0
+```
+
 ## Automated commands
 
 | Command | Purpose |
@@ -23,7 +33,7 @@ untested behavior.
 - [x] Live strokes sync mid-stroke (peer sees ink before pointer up)
 - [x] Finished strokes persist via operation:committed (same sequence on both)
 - [x] Joining client receives sync_state matching committed log
-- [ ] Global undo/redo matches on both
+- [x] Global undo/redo matches on both
 - [x] Refresh/rejoin restores committed canvas via sync_state (full snapshot on
   join; reconnect backoff / last-sequence resume deferred to Prompt 8)
 - [x] Malformed stroke payload returns typed error; room survives (automated)
@@ -153,6 +163,50 @@ Room 26a9b7be
 2. Tab C (`Artist-3349`) joined later — same **5374** committed opaque pixels
    via `sync_state`; presence = 3.
 3. Undo/Redo remain disabled (out of scope).
+
+## Results — global tombstone undo/redo (2026-07-25)
+
+Environment: macOS darwin 25.2.0, Node v24.12.0.
+
+### Automated
+
+```text
+typecheck exit 0
+Test Files  11 passed (11)
+Tests  46 passed (46)
+build exit 0
+```
+
+New / extended coverage in `test/history.test.ts` + `test/history-helpers.test.ts`:
+
+- Client B undoes Client A’s completed stroke; both see empty visible set
+- Redo restores the tombstone; both clients converge on the same sequences
+- New commit after undo clears redo (redo is a no-op; join sees only new branch;
+  `sequenceHead` still reflects the full append-only log)
+- Rapid undo/undo/redo without awaits yields visible sets `a,b` → `a` → `a,b`
+- `filterVisibleOperations` unit helper
+
+### Local two-browser proof
+
+```text
+GET /api/health → {"ok":true,"service":"loomline","phase":"undo-redo"}
+Room undo7a01 @ http://localhost:8787
+```
+
+1. Tab A (`Artist-6283`) drew a completed stroke → **3574** opaque pixels on
+   committed-canvas; Undo enabled / Redo disabled. Tab B (`Artist-30b9`) matched
+   **3574** via `operation:committed` (presence = 2, both Connected).
+2. Tab B clicked **Undo** (peer undoing A’s stroke) → both tabs **0** committed
+   opaque pixels; Undo disabled / Redo enabled.
+3. Tab A clicked **Redo** → both tabs **3748** opaque pixels (same rebuild);
+   Undo enabled / Redo disabled.
+
+Note: opaque counts after redo can differ slightly from the pre-undo sample when
+the stage resizes between paints; both clients agreed on the rebuilt count.
+
+During an earlier attempt, local `wrangler dev` crashed with
+`SQLITE_BUSY_RECOVERY` after a hot reload while sockets were open (see
+`ISSUES.md`). Restarted cleanly before the successful proof above.
 
 ## Results — rooms + presence (2026-07-25)
 

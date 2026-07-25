@@ -69,8 +69,6 @@ and DO skeleton only.
 
 These will get full decision records when implemented:
 
-- Global tombstone undo/redo vs mutating/deleting ops
-- Overlap policy = server sequence stacking (not pixel merge / CRDT)
 - Snapshot vs full replay for reconnect of large histories
 
 ## D3 — rAF point batching for live stroke network sends
@@ -130,3 +128,34 @@ per-point rows violate the blueprint storage rule.
 
 `test/history.test.ts` (sequence equality, join snapshot, abandon, brush/eraser
 overlap). See [TESTING.md](./TESTING.md).
+
+## D5 — Global tombstone undo/redo (not per-user, not mutating the log)
+
+### Problem / invariant
+
+Completed strokes must be undoable across participants without forking the room
+or rewriting history. Live strokes must not be undoable. A new draw after undo
+must clear redo (classic linear history branch).
+
+### Selected design
+
+- **Global** undo/redo: any joined client may tombstone the latest **visible**
+  completed op; peers all rebuild from `history:changed`.
+- Tombstones live in SQLite (`history_hidden` + `history_redo_stack`). The
+  `operations` table stays append-only.
+- New `operation:committed` clears the redo stack only; prior hidden sequences
+  stay hidden.
+
+### Rejected alternative
+
+**Per-user undo stacks** (each participant only undoes their own strokes).
+
+Rejected because the assignment asks for global undo (User A undoes User B) and
+per-user stacks diverge room state under concurrent history edits. Mutating or
+deleting operation rows was also rejected: it breaks auditability and join
+replay of the true log head.
+
+### Verification
+
+`test/history.test.ts` undo-peer / redo / redo-invalidation / rapid history /
+two-client convergence. Manual two-browser proof in [TESTING.md](./TESTING.md).

@@ -295,6 +295,41 @@ Add an explicit author rule:
 Reload `/` → only landing visible; create room → only room visible. Live stroke
 proof proceeds on that layout.
 
+## I7 — Local wrangler crash: `SQLITE_BUSY_RECOVERY` mid two-browser proof
+
+**When:** Prompt 7 (undo/redo) two-browser proof, 25 July 2026.
+
+**What the issue was**
+
+During an earlier local session, both browser tabs flipped to Disconnected and
+`wrangler dev` exited. Runtime stderr:
+
+`SQLite failed; database is locked: SQLITE_BUSY (extended: SQLITE_BUSY_RECOVERY)`
+followed by “The Workers runtime failed to start.”
+
+**Root cause**
+
+Local workerd DO SQLite became busy/recovering while the miniflare isolate was
+reloading (log showed `Reloading local server…` immediately before the fatal
+exception). Open WebSockets dropped when the runtime died — not an application
+protocol bug in undo/redo.
+
+**What we fixed**
+
+No product code change. Restarted `npm run dev` on a clean local state and
+re-ran the two-browser undo/redo proof successfully (`TESTING.md`).
+
+**Why this way**
+
+Restarting local DO storage is appropriate for a tooling lock; rewriting
+history to avoid SQLite would weaken the durable-op contract. Production Workers
+SQLite is not this local miniflare file lock path.
+
+**Verification**
+
+Room `undo7a01` on `http://localhost:8787`: peer undo cleared both canvases;
+redo restored matching opaque counts on both tabs while Connected.
+
 Copy this block when logging a future issue:
 
 ```markdown

@@ -7,16 +7,55 @@
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
-    <div class="app">
+    <div id="view-landing" class="landing">
+      <p class="eyebrow">Loomline</p>
+      <h1>Collaborative canvas rooms</h1>
+      <p class="lede">
+        Create a shareable room link. Each room id maps to its own Durable
+        Object — drawing sync arrives in a later slice; presence is live now.
+      </p>
+      <div class="landing-actions">
+        <button type="button" id="create-room">Create room</button>
+        <form id="join-form" class="join-form">
+          <label>
+            <span>Join room id</span>
+            <input
+              id="join-room-id"
+              name="roomId"
+              maxlength="8"
+              minlength="8"
+              pattern="[a-z0-9]{8}"
+              placeholder="abcd1234"
+              autocomplete="off"
+              spellcheck="false"
+              required
+            />
+          </label>
+          <button type="submit">Join</button>
+        </form>
+      </div>
+      <p id="join-error" class="join-error" hidden></p>
+    </div>
+
+    <div id="view-room" class="app" hidden>
       <header class="topbar">
         <div class="brand-block">
           <p class="eyebrow">Loomline</p>
-          <h1>Room canvas</h1>
+          <h1 id="room-title">Room</h1>
+          <a id="room-link" class="room-link" href="/"></a>
         </div>
-        <p id="connection-status" class="connection-status" role="status">
-          Disconnected
-        </p>
+        <div class="topbar-meta">
+          <p id="self-badge" class="self-badge" hidden></p>
+          <p id="connection-status" class="connection-status" role="status">
+            Disconnected
+          </p>
+        </div>
       </header>
+
+      <section class="presence-panel" aria-label="People in this room">
+        <h2 class="presence-heading">Present</h2>
+        <ul id="presence-list" class="presence-list"></ul>
+      </section>
 
       <div
         class="toolbar"
@@ -45,10 +84,20 @@
           <span id="tool-width-value" class="width-value">4px</span>
         </label>
         <button type="button" id="tool-clear">Clear</button>
-        <button type="button" id="tool-undo" disabled title="Server undo comes later">
+        <button
+          type="button"
+          id="tool-undo"
+          disabled
+          title="Server undo comes later"
+        >
           Undo
         </button>
-        <button type="button" id="tool-redo" disabled title="Server redo comes later">
+        <button
+          type="button"
+          id="tool-redo"
+          disabled
+          title="Server redo comes later"
+        >
           Redo
         </button>
       </div>
@@ -66,11 +115,11 @@
             width="1"
             height="1"
             tabindex="0"
-            aria-label="Drawing canvas. Use brush or eraser to draw."
+            aria-label="Drawing canvas. Local only; not synced yet."
           ></canvas>
         </div>
         <p id="empty-state" class="empty-state">
-          Draw with brush or eraser. Local only — not synced yet.
+          Draw locally. Strokes are not synced to others yet.
         </p>
       </section>
     </div>

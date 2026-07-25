@@ -38,8 +38,9 @@ interface ActiveStroke extends Stroke {
 }
 
 /**
- * Local pointer drawing. Finished strokes wait on the live layer until
- * operation:committed arrives (awaitingCommit), then leave the live overlay.
+ * Local pointer drawing. Brush waits on the live layer until committed.
+ * Eraser punches through on the committed view while provisional (active /
+ * awaiting-commit), then the store owns the hole after acknowledge.
  */
 export class LocalDrawingController {
   private readonly surface: LayeredCanvasSurface;
@@ -76,6 +77,41 @@ export class LocalDrawingController {
     this.network = network;
   }
 
+  getTool(): DrawingTool {
+    return this.tool;
+  }
+
+  getWidth(): number {
+    return this.width;
+  }
+
+  /** Brush-only live overlay (eraser paints on the committed pass). */
+  paintLiveBrush(
+    ctx: CanvasRenderingContext2D,
+    _size?: CanvasBackingSize,
+  ): void {
+    for (const stroke of this.awaitingCommit) {
+      if (stroke.tool === "brush") {
+        paintStroke(ctx, stroke, "preview");
+      }
+    }
+    if (this.active?.tool === "brush") {
+      paintStroke(ctx, this.active, "preview");
+    }
+  }
+
+  /** Provisional eraser holes over committed ink (destination-out). */
+  paintProvisionalErasers(ctx: CanvasRenderingContext2D): void {
+    for (const stroke of this.awaitingCommit) {
+      if (stroke.tool === "eraser") {
+        paintStroke(ctx, stroke, "final");
+      }
+    }
+    if (this.active?.tool === "eraser") {
+      paintStroke(ctx, this.active, "final");
+    }
+  }
+
   getPainters(): {
     paintCommitted: (
       ctx: CanvasRenderingContext2D,
@@ -87,15 +123,11 @@ export class LocalDrawingController {
     ) => void;
   } {
     return {
-      // Committed pixels come only from CommittedOperationStore.
-      paintCommitted: () => {},
-      paintLive: (ctx) => {
-        for (const stroke of this.awaitingCommit) {
-          paintStroke(ctx, stroke, "preview");
-        }
-        if (this.active) {
-          paintStroke(ctx, this.active, "preview");
-        }
+      paintCommitted: (ctx) => {
+        this.paintProvisionalErasers(ctx);
+      },
+      paintLive: (ctx, size) => {
+        this.paintLiveBrush(ctx, size);
       },
     };
   }
@@ -114,12 +146,13 @@ export class LocalDrawingController {
 
   /** Drop a locally ended stroke once the server has committed it. */
   acknowledgeCommitted(strokeId: string): boolean {
+    const removed = this.awaitingCommit.find((s) => s.strokeId === strokeId);
     const before = this.awaitingCommit.length;
     this.awaitingCommit = this.awaitingCommit.filter(
       (stroke) => stroke.strokeId !== strokeId,
     );
     if (this.awaitingCommit.length !== before) {
-      this.surface.markDirty("live");
+      this.markStrokeLayersDirty(removed?.tool ?? "brush");
       this.notify();
       return true;
     }
@@ -131,7 +164,7 @@ export class LocalDrawingController {
     this.active = null;
     this.drawing = false;
     this.activePointerId = null;
-    this.surface.markDirty("live");
+    this.surface.markAllDirty();
     this.notify();
   }
 
@@ -145,6 +178,14 @@ export class LocalDrawingController {
 
   hasInk(): boolean {
     return this.awaitingCommit.length > 0 || this.active !== null;
+  }
+
+  private markStrokeLayersDirty(tool: DrawingTool): void {
+    if (tool === "eraser") {
+      this.surface.markDirty("committed");
+    } else {
+      this.surface.markDirty("live");
+    }
   }
 
   private readonly onPointerDown = (event: PointerEvent): void => {
@@ -173,7 +214,7 @@ export class LocalDrawingController {
       width: this.width,
       points: [point],
     };
-    this.surface.markDirty("live");
+    this.markStrokeLayersDirty(this.tool);
     this.notify();
     this.network?.onStrokeStart({
       strokeId,
@@ -204,7 +245,7 @@ export class LocalDrawingController {
     }
 
     this.active.points = nextPoints as Point[];
-    this.surface.markDirty("live");
+    this.markStrokeLayersDirty(this.active.tool);
     this.network?.onStrokePoints(this.active.strokeId, [point]);
   };
 
@@ -241,10 +282,11 @@ export class LocalDrawingController {
       // If start never reached the server, drop live ink with the stroke end.
     }
 
+    const tool = active?.tool ?? this.tool;
     this.active = null;
     this.drawing = false;
     this.activePointerId = null;
-    this.surface.markDirty("live");
+    this.markStrokeLayersDirty(tool);
     this.notify();
   }
 

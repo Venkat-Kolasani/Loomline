@@ -62,13 +62,18 @@ Verified in `test/rooms.test.ts`.
 ### Rendering layers (current)
 
 1. **committed-canvas** — deterministic replay of **visible**
-   `CommittedOperation`s ordered by server `sequence`. Dirty on sync_state /
-   operation:committed / history:changed.
-2. **live-canvas** — local active + awaiting-commit strokes, remote in-progress.
+   `CommittedOperation`s ordered by server `sequence`, plus **provisional
+   eraser** strokes (local active/awaiting + remote in-progress) painted with
+   `destination-out` so erase punches through while dragging. Dirty on
+   sync_state / operation:committed / history:changed / eraser live updates.
+2. **live-canvas** — brush-only: local active + awaiting-commit brushes, remote
+   in-progress brushes. Eraser never draws the gray pencil preview here.
 3. **cursor-layer** (DOM) — remote cursors.
 
-Local finished strokes stay on the live layer until `operation:committed`
-acknowledges them, then move into the committed store (no double paint).
+Local finished strokes stay provisional until `operation:committed`
+acknowledges them (brush on live; eraser on committed view), then the store
+owns the ink/hole (no double paint). Eraser width shares the brush width
+slider; the live canvas cursor shows a circle sized to that width.
 
 ### Storage
 

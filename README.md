@@ -29,7 +29,9 @@ JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
 - Synthetic load script: `npm run load` (5×100 strokes) + `/api/room-metrics`
 - Remote cursors (ephemeral)
 - rAF-batched outgoing points; immediate local drawing
-- Two stacked canvas layers with brush/eraser/colour/width/clear
+- Two stacked canvas layers with brush/eraser/colour/width/clear (eraser uses
+  `destination-out` punch-through on the committed view while dragging; width
+  shares the slider and shows as an eraser-sized cursor)
 - Dirty-layer paint API (no permanent render loop)
 - Scripts: `dev`, `dev:client`, `typecheck`, `test`, `load`, `build`, `deploy`
 - Vitest: isolation, protocol, live strokes, history, reconnect/expiry,

@@ -141,10 +141,13 @@ const surface = new LayeredCanvasSurface({
   liveCanvas,
   paintCommitted: (ctx) => {
     committedOps.paint(ctx);
+    // Provisional eraser punch-through while still in-flight (local + remote).
+    remoteStrokes.paintProvisionalErasers(ctx);
+    drawing.paintProvisionalErasers(ctx);
   },
   paintLive: (ctx, size) => {
     remoteStrokes.paintLive(ctx);
-    drawing.getPainters().paintLive(ctx, size);
+    drawing.paintLiveBrush(ctx, size);
   },
 });
 
@@ -183,10 +186,26 @@ function setActiveTool(tool: DrawingTool): void {
   eraserButton.classList.toggle("is-active", tool === "eraser");
   colorInput.disabled = tool === "eraser";
   colorInput.setAttribute("aria-disabled", tool === "eraser" ? "true" : "false");
+  updateDrawingCursor();
 }
 
 function syncWidthLabel(): void {
   widthValue.textContent = `${widthInput.value}px`;
+}
+
+/** Crosshair for brush; circle sized to stroke width for eraser. */
+function updateDrawingCursor(): void {
+  if (drawing.getTool() !== "eraser") {
+    liveCanvas.style.cursor = "crosshair";
+    return;
+  }
+  const diameter = Math.max(4, Math.min(32, drawing.getWidth()));
+  const pad = 2;
+  const size = diameter + pad * 2;
+  const radius = diameter / 2;
+  const center = size / 2;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${center}" cy="${center}" r="${radius}" fill="rgba(148,163,184,0.2)" stroke="#475569" stroke-width="1.25"/></svg>`;
+  liveCanvas.style.cursor = `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${center} ${center}, crosshair`;
 }
 
 function parseRoomPath(pathname: string): string | null {
@@ -256,6 +275,9 @@ function renderPresence(participants: Participant[]): void {
         const result = remoteStrokes.clearParticipant(stroke.participantId);
         if (result.liveDirty) {
           surface.markDirty("live");
+        }
+        if (result.committedDirty) {
+          surface.markDirty("committed");
         }
       }
     }
@@ -397,7 +419,7 @@ function enterRoom(roomId: string): void {
       remoteStrokes.clearAll();
       remoteCursors.clear();
       drawing.abandonUncommitted();
-      surface.markDirty("live");
+      surface.markAllDirty();
       updateEmptyState();
     },
     onWelcome: (participant) => {
@@ -424,6 +446,9 @@ function enterRoom(roomId: string): void {
       const dirty = remoteStrokes.applyLive(message);
       if (dirty.liveDirty) {
         surface.markDirty("live");
+      }
+      if (dirty.committedDirty) {
+        surface.markDirty("committed");
       }
       updateEmptyState();
     },
@@ -461,6 +486,16 @@ function enterRoom(roomId: string): void {
       // New commits clear the server redo branch.
       setHistoryButtons(committedOps.getOperations().length > 0, false);
       drawing.acknowledgeCommitted(operation.strokeId);
+      const remoteDirty = remoteStrokes.removeStroke(
+        operation.participantId,
+        operation.strokeId,
+      );
+      if (remoteDirty.liveDirty) {
+        surface.markDirty("live");
+      }
+      if (remoteDirty.committedDirty) {
+        surface.markDirty("committed");
+      }
       updateEmptyState();
     },
     onHistoryChanged: (sequenceHead, operations, _roomId, canUndo, canRedo) => {
@@ -547,6 +582,7 @@ colorInput.addEventListener("input", () => {
 widthInput.addEventListener("input", () => {
   drawing.setWidth(Number(widthInput.value));
   syncWidthLabel();
+  updateDrawingCursor();
 });
 
 clearButton.addEventListener("click", () => {

@@ -11,15 +11,15 @@ export interface RemoteLiveStroke extends Stroke {
 }
 
 /**
- * Ephemeral remote in-progress strokes for the live overlay only.
- * Finished remotes leave the live layer; durable ink arrives via operation:committed.
+ * Ephemeral remote in-progress strokes.
+ * Brush paints on the live overlay; eraser punches on the committed view.
  */
 export class RemoteStrokeStore {
   private readonly active = new Map<string, RemoteLiveStroke>();
 
   applyLive(
     message: Extract<ServerMessage, { type: "stroke:live" }>,
-  ): { liveDirty: boolean } {
+  ): { liveDirty: boolean; committedDirty: boolean } {
     const key = remoteKey(message.participantId, message.strokeId);
 
     if (message.phase === "start") {
@@ -28,43 +28,70 @@ export class RemoteStrokeStore {
         message.color === undefined ||
         message.width === undefined
       ) {
-        return { liveDirty: false };
+        return { liveDirty: false, committedDirty: false };
       }
+      const tool = message.tool as DrawingTool;
       this.active.set(key, {
         strokeId: message.strokeId,
         participantId: message.participantId,
-        tool: message.tool as DrawingTool,
+        tool,
         color: message.color,
         width: message.width,
         points: [...message.points],
       });
-      return { liveDirty: true };
+      return dirtyForTool(tool);
     }
 
     const existing = this.active.get(key);
     if (!existing) {
-      return { liveDirty: false };
+      return { liveDirty: false, committedDirty: false };
     }
 
     if (message.phase === "points") {
       existing.points = [...existing.points, ...message.points];
-      return { liveDirty: true };
+      return dirtyForTool(existing.tool);
     }
 
-    // phase === "end" — drop from live; committed op follows from the server.
+    // phase === "end" — brush leaves live; eraser stays provisional until
+    // operation:committed (avoids a one-frame hole flash of restored ink).
+    if (existing.tool === "eraser") {
+      return { liveDirty: false, committedDirty: false };
+    }
     this.active.delete(key);
-    return { liveDirty: true };
+    return dirtyForTool("brush");
   }
 
-  clearParticipant(participantId: string): { liveDirty: boolean } {
+  /** Drop a remote live/provisional stroke after the server commits it. */
+  removeStroke(
+    participantId: string,
+    strokeId: string,
+  ): { liveDirty: boolean; committedDirty: boolean } {
+    const key = remoteKey(participantId, strokeId);
+    const existing = this.active.get(key);
+    if (!existing) {
+      return { liveDirty: false, committedDirty: false };
+    }
+    this.active.delete(key);
+    return dirtyForTool(existing.tool);
+  }
+
+  clearParticipant(participantId: string): {
+    liveDirty: boolean;
+    committedDirty: boolean;
+  } {
     let liveDirty = false;
+    let committedDirty = false;
     for (const [key, stroke] of [...this.active.entries()]) {
       if (stroke.participantId === participantId) {
         this.active.delete(key);
-        liveDirty = true;
+        if (stroke.tool === "eraser") {
+          committedDirty = true;
+        } else {
+          liveDirty = true;
+        }
       }
     }
-    return { liveDirty };
+    return { liveDirty, committedDirty };
   }
 
   clearAll(): void {
@@ -75,11 +102,33 @@ export class RemoteStrokeStore {
     return [...this.active.values()];
   }
 
+  /** Brush-only live overlay. */
   paintLive(ctx: CanvasRenderingContext2D): void {
     for (const stroke of this.active.values()) {
-      paintStroke(ctx, stroke, "preview");
+      if (stroke.tool === "brush") {
+        paintStroke(ctx, stroke, "preview");
+      }
     }
   }
+
+  /** Remote in-progress erasers punch through committed ink. */
+  paintProvisionalErasers(ctx: CanvasRenderingContext2D): void {
+    for (const stroke of this.active.values()) {
+      if (stroke.tool === "eraser") {
+        paintStroke(ctx, stroke, "final");
+      }
+    }
+  }
+}
+
+function dirtyForTool(tool: DrawingTool): {
+  liveDirty: boolean;
+  committedDirty: boolean;
+} {
+  if (tool === "eraser") {
+    return { liveDirty: false, committedDirty: true };
+  }
+  return { liveDirty: true, committedDirty: false };
 }
 
 export function remoteKey(participantId: string, strokeId: string): string {

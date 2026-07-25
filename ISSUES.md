@@ -419,6 +419,36 @@ an intentional flood budget users should not hit in honest drawing.
 **Verification**
 `npm run typecheck && npm run test && npm run build`.
 
+## I10 — Eraser preview looked like a soft gray pencil
+
+**When:** Manual tool check before submission polish (2026-07-26)
+
+**What the issue was**
+Dragging the eraser painted a translucent gray stroke on the live layer instead
+of punching through committed ink. Only after `operation:committed` did holes
+appear. Width slider worked but felt unused because the preview ignored
+destination-out.
+
+**Root cause**
+`paintStroke(..., "preview")` used `source-over` + gray for eraser. Local and
+remote live painters always called preview mode, so mid-drag never hit
+`destination-out` (reserved for `"final"` on the committed store).
+
+**What we fixed**
+Eraser always paints with `destination-out`. Provisional erasers (active,
+awaiting-commit, remote live) paint on the **committed** pass; live overlay is
+brush-only. Eraser cursor is an SVG circle sized to the shared width slider.
+
+**Why this way**
+Keeps server-owned eraser ops (undo/sequence) while making drag feel like a
+real eraser. Rejected a local-only pixel wipe that skipped commits — would break
+collaborative history.
+
+**Verification**
+`test/stroke-paint.test.ts`, `test/remote-strokes.test.ts`;
+`npm run typecheck && npm run test && npm run build`; manual: brush ink → eraser
+drag punches through at multiple widths.
+
 Copy this block when logging a future issue:
 
 ```markdown

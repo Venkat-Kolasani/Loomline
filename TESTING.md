@@ -3,6 +3,21 @@
 Evidence log for Loomline. Record **exact commands and outcomes**. Do not claim
 untested behavior.
 
+## Latest gate (2026-07-26 — punch-through eraser)
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck ok; 73 tests passed (incl. stroke-paint + remote-strokes);
+  client build ok
+```
+
+Manual: brush ink → eraser drag punches through while dragging (destination-out
+on committed view); width slider changes hole size + cursor circle; colour
+disabled for eraser. Browser proof on `http://127.0.0.1:8787/r/32a2cf79`:
+committed opaque **2246 → 1944** after eraser tap; mid-stroke samples show
+`a=0` hole with ink on both sides; live layer **0** gray/opaque pixels;
+eraser cursor is SVG data-URL sized to width.
+
 ## Results — diagnostics + load baseline (2026-07-25)
 
 Environment:

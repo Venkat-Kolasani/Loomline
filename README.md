@@ -2,9 +2,10 @@
 
 Real-time collaborative drawing canvas for the Flam Frontend R&D assignment.
 
-**Live URL:** _not deployed yet_  
-**Status:** measured diagnostics + load baseline + hardened boundaries +
-reconnect + undo/redo + durable ops
+**Live URL:** <https://loomline.kolasanivenkat2.workers.dev>
+**Repository:** <https://github.com/Venkat-Kolasani/Loomline> (private by
+author choice; access must be granted to reviewers)
+**Status:** deployed and production-smoke-tested on 26 July 2026
 
 This repository intentionally uses **Cloudflare Workers + Durable Objects** (edge
 JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
@@ -37,13 +38,11 @@ JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
 - Vitest: isolation, protocol, live strokes, history, reconnect/expiry,
   input boundaries / rate limits / zero-user cleanup, observability
 
-## What is planned (not implemented)
-
-- Deployed demo URL
-
 ## Quick start
 
 ```bash
+git clone https://github.com/Venkat-Kolasani/Loomline.git
+cd Loomline
 npm ci
 npm run typecheck
 npm run test
@@ -52,8 +51,12 @@ npm run dev
 ```
 
 Then open `http://127.0.0.1:8787/`, create a room, and open the same room URL in
-a second browser profile. Draw in one tab — the peer should see the stroke
+a second browser profile. Draw in one client — the peer should see the stroke
 **while it is still in progress**.
+
+This setup was re-run from a clean clone on 26 July 2026: `npm ci`, typecheck,
+77 tests, and the production build all passed. Cloudflare authentication is
+needed only for `npm run deploy`; no credentials or tokens are stored here.
 
 | Script | Purpose |
 | --- | --- |
@@ -68,21 +71,43 @@ a second browser profile. Draw in one tab — the peer should see the stroke
 
 ## Multi-user testing
 
-1. Run `npm run dev` and open `http://127.0.0.1:8787/`.
-2. Click **Create room** and copy the room link.
-3. Open the same link in a second browser/profile — both presence lists should
-   show two participants.
-4. Draw slowly in client A — client B must show the stroke **before** A lifts
+Use the live URL above, or run `npm run dev` and use
+`http://127.0.0.1:8787/`.
+
+1. Click **Create room** and copy the room link.
+2. Open the same link in a second browser/profile — both presence lists should
+   show two distinct participants.
+3. Draw slowly in client A — client B must show the stroke **before** A lifts
    the pointer (live overlay).
-5. After A ends the stroke, both clients keep it via `operation:committed`.
-6. Open a third client on the same room — it receives `sync_state` with the same
-   committed strokes.
-7. Open a **different** room id — presence and strokes must not cross rooms.
+4. After A ends the stroke, both clients keep it via `operation:committed`.
+5. In client B click **Undo** — both clients must remove the latest completed
+   stroke and enable Redo.
+6. In client A click **Redo** — both clients must restore the same stroke.
+7. Refresh either client — it gets a new participant id and restores the same
+   committed canvas from `sync_state`.
+8. Open a **different** room id in a third client — presence and strokes must
+   not cross rooms.
+
+Production evidence (26 July 2026):
+
+- Browser clients `Artist-0590` and `Artist-289d` both showed presence `2`.
+- Before pointer-up, the peer live layer had 8,353 opaque pixels while its
+  committed layer had `0`; the peer screenshot showed the remote cursor/stroke.
+- Independent WebSocket clients in `prod2601` received the same commit sequence,
+  converged to 0 visible ops after global undo and 1 after redo.
+- `isol2601` stayed at one participant with no live/committed crossover.
+- A reconnect received `sync_state` head `1` with the committed stroke.
+
+Full commands and constraints are in [TESTING.md](./TESTING.md).
 
 ## Supported browsers
 
-_Not claimed yet._ Target: current Chrome, Firefox, and Safari once drawing sync
-and mobile passes are verified.
+- **Verified:** Chromium-based Cursor browser on macOS 26.2, local and deployed.
+- **Input path verified:** mouse and synthetic PointerEvent touch emulation.
+- **Not yet claimed:** physical iOS/Android device testing, narrow-viewport
+  usability, Firefox, or Safari. The implementation uses standard Canvas 2D,
+  Pointer Events, DOM, and native WebSocket APIs, but those browsers/devices
+  remain unchecked until manually exercised.
 
 ## Known limitations
 
@@ -91,7 +116,6 @@ and mobile passes are verified.
 - Live in-progress strokes are not undoable (only completed ops)
 - Reconnect assigns a new participant id (no sticky identity yet)
 - Reconnect uses a full visible `sync_state` snapshot (not a delta by last-seq)
-- Production deploy not run yet
 - Very long strokes are stored as one JSON blob per completed op (no checkpoint
   compaction yet — see DECISIONS D7)
 - Per-participant rate limit is in-memory (resets if the DO is evicted mid-abuse;
@@ -99,15 +123,16 @@ and mobile passes are verified.
 - Client chunks outgoing `stroke:points` at `MAX_POINTS_PER_MESSAGE` (64)
 - Room operation-log size under heavy load is **not** load-tested; there is no
   arbitrary reset. Future: checkpoint + retention after a measured threshold.
-
-## Time spent
-
-Tracked per commit; update at submission freeze.
+- Browser evidence in this delivery pass is Chromium-based; Firefox, Safari,
+  narrow mobile layout, and a physical touch device remain unverified.
+- The GitHub repository is private by author choice; reviewer access is required.
 
 ## AI use
 
-AI assisted scaffolding and canvas-shell work. Every retained line is intended to
-be explainable by the author. Details: [AI_USAGE.md](./AI_USAGE.md).
+AI assisted implementation, tests, debugging, deployment workflow, and
+documentation drafts. The author manually reviewed retained changes and owns
+the architecture, failure modes, and verification evidence. Details:
+[AI_USAGE.md](./AI_USAGE.md).
 
 ## Assignment Compliance Checklist
 
@@ -142,20 +167,21 @@ Leave unchecked until implemented **and** verified with evidence.
 
 ### Submission / demo
 
-- [ ] Public GitHub repository with meaningful commits
-- [ ] Deployed demo URL works in a fresh browser session
-- [ ] README setup works with documented scripts
-- [ ] Multi-user test instructions verified
+- [ ] Public GitHub repository with meaningful commits (meaningful history
+  exists, but repository remains private by author choice)
+- [x] Deployed demo URL works in a fresh browser session
+- [x] README setup works with documented scripts
+- [x] Multi-user test instructions verified
 - [ ] Demo recording shows two-client draw, reconnect, and global undo
 - [ ] Mobile / touch drawing verified
-- [ ] ARCHITECTURE.md / PROTOCOL.md / DECISIONS.md / ISSUES.md / TESTING.md kept truthful
+- [x] ARCHITECTURE.md / PROTOCOL.md / DECISIONS.md / ISSUES.md / TESTING.md kept truthful
 
 ### Documentation completeness
 
 - [x] Architecture diagrams and room lifecycle documented as implemented
 - [x] Protocol schemas match shipped messages
 - [x] Honest Workers vs Node.js trade-off documented
-- [ ] Automated and manual test evidence recorded with dates/results
+- [x] Automated and manual test evidence recorded with dates/results
 
 ## Related docs
 

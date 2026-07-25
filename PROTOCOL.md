@@ -9,6 +9,8 @@ are implemented.
 
 - Browser native `WebSocket` to the same origin Worker
 - Path: `/ws?room=<roomId>`
+- Production origin: `https://loomline.kolasanivenkat2.workers.dev`
+  (`wss://loomline.kolasanivenkat2.workers.dev/ws?room=<roomId>`)
 - Worker validates `roomId`, then forwards the upgrade to
   `env.ROOM.get(env.ROOM.idFromName(roomId))`
 
@@ -50,6 +52,8 @@ size and per-participant rate limits are enforced in `RoomDurableObject`
 
 1. Only `stroke:end` may produce a durable operation (and only if the stroke was
    live on the server with at least one point).
+   An optional final point is filtered/appended before commit so pointer-up
+   geometry is not lost.
 2. The room Durable Object assigns the next strictly increasing `sequence`,
    stores **one SQLite row** for the whole stroke, and broadcasts
    `operation:committed` to every socket in the room (including the author).
@@ -102,6 +106,9 @@ size and per-participant rate limits are enforced in `RoomDurableObject`
 
 Clients must batch `stroke:points` at most once per `requestAnimationFrame`.
 Local pixels still update immediately on each accepted pointer sample.
+Each flush is chunked to at most 64 points. Cursor messages are suppressed while
+a stroke is active so the normal drawing path leaves rate-limit headroom for
+point batches and `stroke:end`.
 
 Clients must not send `stroke:points` / `stroke:end` for a `strokeId` unless
 `stroke:start` was successfully sent while joined (`LiveStrokeTransport`).
@@ -196,8 +203,10 @@ restores via full visible `sync_state`.
 | `displayName` | trimmed, max 24 chars |
 | Client messages / participant / 1s | ≤ `120` (`MAX_MESSAGES_PER_WINDOW`) |
 
-`120` frames/s is sized for normal rAF drawing: one `stroke:points` batch plus
-one `cursor` per ~60 Hz frame, with headroom for `start` / `end` / history.
+`120` frames/s is sized for normal rAF drawing: at most one
+`stroke:points` batch per display frame, plus `start` / `end` / history
+headroom. Cursor updates are sent only while not drawing; they do not compete
+with active stroke batches.
 Once a socket has a participant id, **every** incoming frame (text or binary)
 counts toward that budget **before** the binary reject, size checks, JSON parse,
 or type dispatch — including binary floods, malformed, oversized, unknown-type,

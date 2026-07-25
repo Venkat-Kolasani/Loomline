@@ -155,3 +155,44 @@ Product name is **Loomline** (repository and Worker name match).
 - Owns measured vs claimed FPS/RTT language and load-script limitations
 - Ran local load + two-client demo; recorded numbers in TESTING.md
 
+## Eraser punch-through and commit retention
+
+### Assisted by AI
+
+- Diagnosed the gray preview and provisional-versus-committed eraser mismatch
+- Split brush/live and provisional eraser/committed painters
+- Added width-sized eraser cursor feedback, point-batch chunking, final-tip
+  delivery, provisional retention tests, and issue documentation
+
+### Manually reviewed / owned by the author
+
+- Explains why erasers remain server operations even though the provisional hole
+  is painted locally with `destination-out`
+- Understands the rate-limit interaction that shortened committed paths and why
+  cursor sends pause while drawing
+- Reviewed destination-out layering, server sequence ownership, and regression
+  evidence before retaining the changes
+
+## Deployment and submission documentation
+
+### Assisted by AI
+
+- Wrangler dry-run/deployment command execution
+- Clean-clone verification, production protocol smoke script, browser evidence
+  collection, and final documentation drafts
+
+### Manually reviewed / owned by the author
+
+- Approved Cloudflare OAuth locally; no credentials were added to source control
+- Chose to keep the GitHub repository private and accepts that reviewers require
+  explicit access
+- Owns every evidence boundary: Chromium was tested; Firefox, Safari, a physical
+  mobile device, and a demo recording are not claimed
+
+## Retained-code understanding statement
+
+The author is responsible for every retained line and can explain its purpose,
+inputs/outputs, failure modes, and verification. AI output was treated as a
+draft or debugging aid, not as proof; commands, tests, browser observations, and
+deployed protocol results are recorded separately in [TESTING.md](./TESTING.md).
+

@@ -3,6 +3,101 @@
 Evidence log for Loomline. Record **exact commands and outcomes**. Do not claim
 untested behavior.
 
+## Submission gate and deployed smoke (2026-07-26)
+
+### Clean clone
+
+Fresh clone: `/tmp/loomline-submission-clean` from `origin/main` at `fd13de0`.
+
+```text
+npm ci
+→ added 85 packages; 0 vulnerabilities
+
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files 19 passed (19)
+→ Tests 77 passed (77)
+→ Vite production build exit 0
+```
+
+The same gate also passed in the working repository. The sandboxed run printed
+a non-fatal Wrangler log-file `EPERM` for
+`~/Library/Preferences/.wrangler/logs`; Vitest still completed 77/77 and exited
+0. No application check was skipped.
+
+### Cloudflare deployment
+
+```text
+npx wrangler deploy --dry-run
+→ ROOM Durable Object + ASSETS bindings resolved; exit 0
+
+npm run deploy
+→ uploaded Worker + 4 static assets
+→ https://loomline.kolasanivenkat2.workers.dev
+→ Version a1fc2216-2c09-4bf7-b6b9-d9cf4f431c76
+```
+
+No application secrets are required. Wrangler OAuth was completed locally; no
+credential, token, `.env`, or `.dev.vars` file was committed.
+
+```text
+GET /
+→ HTTP 200 text/html
+
+GET /api/health
+→ HTTP 200
+→ {"ok":true,"service":"loomline","phase":"observability"}
+```
+
+### Fresh deployed browser proof
+
+Environment: Cursor embedded Chromium browser on macOS 26.2; production HTTPS /
+WSS origin; room `10410d02`.
+
+1. Two fresh clients connected as `Artist-0590` and `Artist-289d`; both presence
+   lists showed `2`.
+2. Client A started a synthetic PointerEvent stroke and remained pointer-down.
+3. Before end/commit, client B measured **8,353 opaque live-layer pixels** and
+   **0 committed-layer pixels**; a screenshot captured the green remote stroke,
+   remote cursor label, two participants, and Connected state.
+4. This proves browser rendering of peer ink before completion. Synthetic input
+   is used because browser automation cannot hold a physical pointer; the normal
+   mouse path uses the same PointerEvent handlers.
+
+### Deployed protocol convergence proof
+
+Independent WebSocket clients used production room `prod2601`; a third client
+joined `isol2601`.
+
+```text
+same-room participant ids:
+  72585c18-ccc7-42bf-b6ed-6ca5bf82932f
+  d2142c81-883d-45a5-b176-179d9a6b1a81
+presence: [2, 2]
+isolated-room presence: 1
+mid-stroke before end: start points 1; points batch 2
+isolated live/commit crossover: false
+commit sequence observed by A/B: [1, 1]
+global undo visible ops A/B: [0, 0]
+global redo visible ops A/B: [1, 1]
+reconnect sync_state: sequenceHead 1; visible ops 1;
+  strokeId "deploy-proof-stroke"
+```
+
+This proves the deployed Durable Object contract for two-client live fan-out,
+room isolation, shared history, and reconnect replay. It complements—not
+replaces—the visual browser proof above.
+
+### Evidence boundaries / blockers
+
+- Verified browser: Chromium-based Cursor browser only.
+- Touch handler path was exercised with synthetic PointerEvents in an earlier
+  slice; physical iOS/Android and narrow-layout usability are not verified.
+- Firefox and Safari are not verified.
+- Demo recording is not produced in this slice.
+- GitHub history is meaningful, but the repository remains private by author
+  choice; reviewers need access.
+
 ## Latest gate (2026-07-26 — eraser hole must not shrink)
 
 ```text
@@ -262,12 +357,16 @@ npm run typecheck && npm run test && npm run build
 ### Touch / mobile
 
 - [x] Touch drawing path exercised via PointerEvent emulation (earlier slice)
-- [ ] Controls usable on narrow viewport (spot-check later)
+- [ ] Controls usable on narrow viewport / physical mobile device
 
 ### Deployed smoke
 
-- [ ] Fresh session on live URL loads
-- [ ] Two clients against deployed origin
+- [x] Fresh session on live URL loads
+- [x] Two clients against deployed origin
+- [x] Mid-stroke peer ink before pointer-up
+- [x] Separate room isolation
+- [x] Global undo/redo convergence
+- [x] Reconnect snapshot recovery
 
 ## Results — live stroke streaming (2026-07-25)
 

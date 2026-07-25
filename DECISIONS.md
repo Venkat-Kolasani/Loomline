@@ -36,10 +36,13 @@ Socket.io was also rejected to keep the protocol explicit and interviewable.
 
 ### Verification
 
-- Scaffold: Worker serves assets + health; DO class/binding/migration present
-  (`npm run test`, `npm run dev`). See [TESTING.md](./TESTING.md).
-- Later slices must prove room isolation, sequencing, hibernation reload, and
-  reconnect without claiming Node compatibility.
+- Production Worker serves assets + health at
+  <https://loomline.kolasanivenkat2.workers.dev>; the `ROOM` binding and v1
+  SQLite migration deployed successfully.
+- Automated tests prove room isolation, sequencing, history, boundary recovery,
+  and hibernation-safe expiry. The deployed smoke proves two-client live fan-out,
+  isolation, global undo/redo, and reconnect snapshot recovery. See
+  [TESTING.md](./TESTING.md).
 
 ## D2 — Scaffold now; Canvas/WebSocket later
 
@@ -232,8 +235,9 @@ unmeasured operation-log wipe.
 - Process every accepted history request under DO serialization — **no debounce**.
 - On last participant leave: clear live map, expiry rows, rate counters, and
   `deleteAlarm`. Retain committed SQLite ops.
-- Document room growth honestly: **no measured hard cap yet**; future checkpoint /
-  retention after load baseline (not an arbitrary reset in this slice).
+- Document room growth honestly: the measured local baseline is 500 operations,
+  not a hard cap or production capacity claim. Future checkpoint / retention
+  follows replay-size measurements, not an arbitrary reset.
 
 ### Rejected alternative
 
@@ -280,3 +284,42 @@ Rejected: permanent UI noise for reviewers; unmeasured SLA claims are dishonest.
 
 `test/observability.test.ts` (ping/pong + room-metrics). Manual panel screenshot
 + `npm run load` results in [TESTING.md](./TESTING.md).
+
+## D9 — One-origin Cloudflare deployment without repository credentials
+
+### Problem / invariant
+
+The submission needs a reliable public demo while preserving the same-origin
+WebSocket path and Durable Object routing tested locally. Cloudflare account
+credentials must never enter source control.
+
+### Selected design
+
+Deploy one Worker named `loomline` with:
+
+- Vite output in `dist/client` served through the `ASSETS` binding;
+- `/ws` and `/api/*` handled by the Worker;
+- one `ROOM` Durable Object binding with the v1 SQLite class migration;
+- `workers_dev = true`, producing
+  <https://loomline.kolasanivenkat2.workers.dev>.
+
+Wrangler OAuth state remains in the developer's local Cloudflare configuration.
+No API token, account id, `.dev.vars`, or `.env` value is required by the app or
+committed to the repository.
+
+### Rejected alternative
+
+Split the static client onto a second host and point it at a separately deployed
+WebSocket origin. Rejected because it adds CORS/origin configuration and another
+failure boundary without helping the room consistency model. A temporary
+preview deployment was also rejected because the submission needs a stable URL.
+
+### Verification
+
+- `wrangler deploy --dry-run` resolved `ROOM` and `ASSETS`.
+- Production deployment version
+  `a1fc2216-2c09-4bf7-b6b9-d9cf4f431c76` completed successfully.
+- `/` and `/api/health` returned HTTP 200.
+- Fresh production clients proved mid-stroke fan-out, isolated rooms, matching
+  global undo/redo state, and reconnect `sync_state`. Exact evidence is in
+  [TESTING.md](./TESTING.md).

@@ -8,6 +8,10 @@ Loomline is a room-scoped collaborative drawing app. Clients render locally with
 the Canvas 2D API. Presence, live strokes, and durable ordered operations go
 through a Cloudflare Worker that routes each room id to one Durable Object.
 
+Production origin: <https://loomline.kolasanivenkat2.workers.dev>. Static assets,
+HTTP health/metrics, and `wss` use this one origin. Deployment `a1fc2216-2c09-4bf7-b6b9-d9cf4f431c76`
+was smoke-tested on 26 July 2026.
+
 ```mermaid
 flowchart LR
   L["Landing /r create"] --> C1["Client A /r/id"]
@@ -143,6 +147,20 @@ sequenceDiagram
   platform hibernation itself; it proves Loomline clears the state that would
   block hibernation.
 
+### Room lifecycle
+
+1. `/r/<roomId>` loads the SPA; `/ws?room=<roomId>` validates the id and routes
+   through `idFromName(roomId)`.
+2. `join` assigns participant attachment metadata and returns `welcome`,
+   `sync_state`, then room `presence`.
+3. Live points fan out from in-memory state; only minimal expiry metadata is
+   durable until a stroke ends.
+4. `stroke:end` inserts one sequenced SQLite operation and broadcasts the same
+   commit to every joined socket.
+5. Close/error removes presence and abandons that participant's live strokes.
+6. When the final socket leaves, live maps, expiry rows, limiter entries, and
+   alarms are cleared; committed operations and history remain for later joins.
+
 ## Global tombstone undo/redo (implemented)
 
 History is **server-owned and global**. The `operations` table is append-only.
@@ -182,3 +200,27 @@ sequenceDiagram
 
 This is **not** a Node.js server. The Worker runs on Cloudflare's edge JavaScript
 runtime. Rationale: [DECISIONS.md](./DECISIONS.md).
+
+## Deployment and scaling path
+
+```mermaid
+flowchart LR
+  U["Browser / mobile browser"] -->|"HTTPS + WSS"| W["loomline Worker + assets"]
+  W -->|"idFromName(room A)"| A["Room DO A + SQLite"]
+  W -->|"idFromName(room B)"| B["Room DO B + SQLite"]
+```
+
+- **Across rooms:** room ids map to independent Durable Objects, so unrelated
+  rooms can be placed and scheduled independently by Cloudflare.
+- **Within one room:** one Durable Object is intentionally the serialization
+  point for sequence and global undo/redo. This gives correctness but is also
+  the honest single-room throughput ceiling; the project has not measured a
+  1,000-participant room and does not claim it.
+- **Growth path:** measure replay time and operation bytes first, then add
+  immutable checkpoints plus retention/compaction metadata. Keep recent
+  operations in the authoritative room DO. Do not shard one room unless the
+  protocol also gains an explicit ordering coordinator; naive sharding would
+  weaken deterministic layering and global history.
+- **Current evidence:** local synthetic commit/fan-out reached 500/500 completed
+  strokes (5 clients × 100) in 3.257 s. That is not a production capacity SLA,
+  browser rendering benchmark, or cross-region measurement.

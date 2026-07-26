@@ -58,6 +58,25 @@ const ISOLATION_MARK_KEY = "isolationMark";
 export const LIVE_STROKE_STALL_MS = 30_000;
 
 /**
+ * Wall-clock minimum between `live_stroke_expiry` upserts (and alarm resets)
+ * for an active stroke. Start always writes once; subsequent `stroke:points`
+ * batches only refresh when this interval has elapsed. Stall detection remains
+ * bounded: worst case is LIVE_STROKE_STALL_MS + this interval.
+ */
+export const EXPIRY_TOUCH_INTERVAL_MS = 4_000;
+
+/** Test-only override so integration tests can assert throttle without waiting 4s. */
+let testExpiryTouchIntervalMs: number | null = null;
+
+export function setTestExpiryTouchIntervalMs(ms: number | null): void {
+  testExpiryTouchIntervalMs = ms;
+}
+
+function expiryTouchIntervalMs(): number {
+  return testExpiryTouchIntervalMs ?? EXPIRY_TOUCH_INTERVAL_MS;
+}
+
+/**
  * One Durable Object instance per room id (via idFromName).
  * Live strokes are ephemeral; stroke:end persists one ordered operation.
  * Undo/redo uses tombstones; the operation log is never mutated.
@@ -72,6 +91,11 @@ export class RoomDurableObject extends DurableObject<Env> {
   private readonly liveStrokes = new Map<string, LiveStrokeState>();
   /** Ephemeral per-participant frame counters; fine to reset on eviction. */
   private readonly messageRates = new Map<string, RateLimitState>();
+  /**
+   * Wake-scoped count of real `live_stroke_expiry` upserts (start + throttled
+   * points). Exposed on `/test/durable-head` for before/after write audits.
+   */
+  private expiryTouchCount = 0;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -155,6 +179,33 @@ export class RoomDurableObject extends DurableObject<Env> {
         pendingExpiryCount: countLiveStrokeExpiry(this.ctx.storage.sql),
         alarmScheduled: alarmAt !== null,
         rateLimitEntries: this.messageRates.size,
+        expiryTouchCount: this.expiryTouchCount,
+      });
+    }
+
+    if (
+      url.pathname === "/test/expiry-touch-interval" &&
+      request.method === "POST"
+    ) {
+      try {
+        const body = (await request.json()) as { ms?: number | null };
+        if (body.ms === null) {
+          setTestExpiryTouchIntervalMs(null);
+          return Response.json({ ms: EXPIRY_TOUCH_INTERVAL_MS });
+        }
+        if (
+          typeof body.ms === "number" &&
+          Number.isFinite(body.ms) &&
+          body.ms >= 0
+        ) {
+          setTestExpiryTouchIntervalMs(body.ms);
+          return Response.json({ ms: body.ms });
+        }
+      } catch {
+        // Fall through to 400.
+      }
+      return new Response("Expected JSON { ms: number >= 0 | null }", {
+        status: 400,
       });
     }
 
@@ -481,6 +532,7 @@ export class RoomDurableObject extends DurableObject<Env> {
       return;
     }
 
+    const startedAt = Date.now();
     this.liveStrokes.set(key, {
       participantId: attachment.participantId,
       strokeId: message.strokeId,
@@ -488,14 +540,15 @@ export class RoomDurableObject extends DurableObject<Env> {
       color: message.color,
       width: message.width,
       points: [message.point],
-      lastActiveAt: Date.now(),
+      lastActiveAt: startedAt,
+      lastExpiryTouch: startedAt,
       roomId,
     });
     this.touchLiveStrokeExpiry(
       attachment.participantId,
       message.strokeId,
       roomId,
-      Date.now(),
+      startedAt,
     );
     void this.scheduleLiveStrokeAlarm();
 
@@ -525,14 +578,20 @@ export class RoomDurableObject extends DurableObject<Env> {
     }
 
     live.points.push(...message.points);
-    live.lastActiveAt = Date.now();
-    this.touchLiveStrokeExpiry(
-      attachment.participantId,
-      message.strokeId,
-      roomId,
-      live.lastActiveAt,
-    );
-    void this.scheduleLiveStrokeAlarm();
+    const now = Date.now();
+    live.lastActiveAt = now;
+    // Time-based throttle: refresh durable expiry/alarm only every
+    // EXPIRY_TOUCH_INTERVAL_MS (not once per rAF points batch).
+    if (now - live.lastExpiryTouch >= expiryTouchIntervalMs()) {
+      this.touchLiveStrokeExpiry(
+        attachment.participantId,
+        message.strokeId,
+        roomId,
+        now,
+      );
+      live.lastExpiryTouch = now;
+      void this.scheduleLiveStrokeAlarm();
+    }
 
     this.broadcastStrokeLive(ws, {
       roomId,
@@ -770,6 +829,7 @@ export class RoomDurableObject extends DurableObject<Env> {
     roomId: string,
     lastActiveAt: number,
   ): void {
+    this.expiryTouchCount += 1;
     upsertLiveStrokeExpiry(this.ctx.storage.sql, {
       participantId,
       strokeId,
@@ -943,6 +1003,8 @@ interface LiveStrokeState {
   width: number;
   points: StrokePoint[];
   lastActiveAt: number;
+  /** Wall-clock of last `live_stroke_expiry` upsert for this stroke. */
+  lastExpiryTouch: number;
   roomId: string;
 }
 

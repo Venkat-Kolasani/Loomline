@@ -185,8 +185,8 @@ These are real constraints of the current code — not a backlog wishlist:
    live state that would block hibernation and that expiry metadata survives
    eviction; they cannot prove Cloudflare platform hibernation itself.
 9. **Expiry writes while drawing.** `live_stroke_expiry` is upserted on
-   start/points (correctness-first; can be ~1 small SQLite write per rAF batch
-   per active drawer).
+   `stroke:start` and then at most once every `EXPIRY_TOUCH_INTERVAL_MS` (4 s)
+   while points stream — not once per rAF batch (D26).
 10. **Browser matrix incomplete.** Firefox/Safari not claimed as primary.
 11. **Private repository.** Reviewer access must be granted.
 12. **Deploy is manual (or optional Actions).** Git push alone does not publish.

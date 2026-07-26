@@ -112,9 +112,9 @@ hibernation; idle strokes expire after 30 s via alarm using durable
 without changing sequence head). In-memory-only stall expiry (hibernation wipe
 would leave peer overlays stuck).
 
-**Trade-off kept.** Upserting expiry on every accepted `stroke:points` batch can
-mean roughly one small SQLite write per frame per active drawer. Correctness
-first; coalesce only after measured pressure.
+**Trade-off (historical).** Upserting expiry on every accepted `stroke:points`
+batch meant roughly one small SQLite write per frame per active drawer.
+**Superseded by D26** (time-based expiry-touch throttle).
 
 **Verified.** `test/reconnect.test.ts`, `test/reconnect-backoff.test.ts`,
 `test/live-expiry-hibernate.test.ts` (`evictDurableObject` +
@@ -476,6 +476,37 @@ field (still easy to graze). Forcing the shell for every width ≤1180px (punish
 narrow desktop windows with a mouse).
 
 **Verified.** MatchMedia checks under iPad metrics; see I20 / TESTING.
+
+## D26 — Time-based throttle for live-stroke expiry upserts
+
+**Problem.** Hibernation-safe stall expiry (D6) needs durable
+`live_stroke_expiry` metadata and alarms. Direct log instrumentation during a
+storage audit showed the room DO called `touchLiveStrokeExpiry` (SQLite upsert)
+and re-armed the alarm on **every** accepted `stroke:points` batch — roughly
+one write per rAF (~20–60/s while drawing) even though points themselves stay
+in the in-memory `liveStrokes` map and only `stroke:end` inserts an
+`operations` row. Cursor traffic remained broadcast-only (zero storage).
+
+**Selected.** Keep `lastExpiryTouch` on each in-memory live stroke. `stroke:start`
+always upserts once and sets the timestamp. On `stroke:points`, call
+`touchLiveStrokeExpiry` and `scheduleLiveStrokeAlarm` only when
+`now - lastExpiryTouch >= EXPIRY_TOUCH_INTERVAL_MS` (4 s). Stall detection stays
+bounded: worst-case expire window is `LIVE_STROKE_STALL_MS` + one interval.
+Client defense-in-depth already caps outbound points at ≤1 batch per rAF
+(`StrokePointBatcher`); the server guard protects even if a client floods
+batches.
+
+**Rejected.** Leaving per-batch upserts (measured excess writes). Dropping
+expiry metadata entirely (hibernation would leave peer overlays stuck — D6).
+Batch-count throttling (N batches) instead of wall-clock (uneven under sparse
+pointer motion). Tightening client rAF alone (helps traffic but does not bound
+server writes under a chatty client).
+
+**Verified.** `test/expiry-touch-throttle.test.ts`: 24 rapid `stroke:points`
+batches within a 5 s interval → `expiryTouchCount` stays **1** (start only;
+pre-fix would be **25**). After a short test interval (40 ms) elapses, the
+next batch increments the count to **2**. Existing hibernation expiry tests
+still pass.
 
 ## D24 — Rectangle as one sequenced op, not live frames
 

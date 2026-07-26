@@ -266,6 +266,8 @@ sequenceDiagram
   visibility independently of sequence head.
 - After wake, live points map starts empty; constructor re-arms the stall alarm
   from remaining `live_stroke_expiry` rows (`LIVE_STROKE_STALL_MS = 30_000`).
+  Active drawers refresh that metadata at most every
+  `EXPIRY_TOUCH_INTERVAL_MS` (4 s), not once per points batch (D26).
 - Zero participants ⇒ no pending stall alarm and no retained live-stroke state
   (`test/boundaries.test.ts`). Vitest cannot prove platform hibernation itself.
 
@@ -297,7 +299,7 @@ These are deliberate trade-offs present in the code — measured where noted:
 | One SQLite row per completed op | Persist geometry without per-point rows | `worker/operations.ts` |
 | Full visible `sync_state` on join | Correct with tombstones; simpler than delta | D6 |
 | Metrics rAF only while dock open | Avoid permanent measurement loop | `DiagnosticsPanel` |
-| Expiry upsert on points (correctness-first) | Hibernation-safe stall cleanup | D6 trade-off; not yet coalesced |
+| Expiry upsert throttled to 4 s wall-clock | Hibernation-safe stall cleanup without per-rAF SQLite | D26; was per-batch under D6 |
 
 ### Measured load baseline (localhost, 25 July 2026)
 

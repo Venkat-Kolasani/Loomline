@@ -3,6 +3,32 @@
 Evidence log for Loomline. Record **exact commands and outcomes**. Do not claim
 untested behavior.
 
+## Expiry-touch throttle (2026-07-26)
+
+D26. `live_stroke_expiry` upserts are wall-clock throttled (`EXPIRY_TOUCH_INTERVAL_MS`
+= 4 s) instead of once per `stroke:points` batch. Client still ≤1 points batch
+per rAF (unchanged).
+
+### Automated
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files 28 passed (28)
+→ Tests 118 passed (118)
+→ Vite production build exit 0
+```
+
+Focused proof in `test/expiry-touch-throttle.test.ts`:
+
+| Scenario | `expiryTouchCount` |
+|---|---|
+| `stroke:start` + 24 rapid `stroke:points` within 5 s window | **1** (pre-fix would be **25**) |
+| Next batch after 40 ms test interval elapses | **2** |
+
+Debug `AGENT_DEBUG` instrumentation from the storage audit was stripped from
+`worker/room.ts` in the same slice.
+
 ## iPad finger-draw text selection (2026-07-26)
 
 I20 / D25. Invite URL and empty-state text no longer steal finger strokes;

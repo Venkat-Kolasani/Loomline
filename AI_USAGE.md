@@ -386,3 +386,19 @@ The author is responsible for every retained line and can explain its purpose,
 inputs/outputs, failure modes, and verification. AI output was treated as a
 draft or debugging aid, not as proof; commands, tests, browser observations, and
 deployed protocol results are recorded separately in [TESTING.md](./TESTING.md).
+
+## Expiry-touch throttle (`perf(realtime): throttle live stroke expiry upserts`)
+
+### Assisted by AI
+
+- `lastExpiryTouch` guard in `stroke:points`, stripping temporary storage-audit
+  instrumentation, D26 / README / ARCHITECTURE wording, and
+  `test/expiry-touch-throttle.test.ts`
+
+### Manually reviewed / owned by the author
+
+- Owns why hibernation still needs durable expiry metadata (D6) and why a
+  wall-clock interval (not batch-count) bounds writes while keeping stall
+  detection within `LIVE_STROKE_STALL_MS + EXPIRY_TOUCH_INTERVAL_MS`
+- Owns the measured before/after `expiryTouchCount` evidence (24 rapid batches
+  → 1 touch vs former 25)

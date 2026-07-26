@@ -128,13 +128,14 @@ pointer or rendering contract changes in this CSS-only slice.
 
 ## Diagnostics (`?debug=1`) and load baseline (implemented)
 
-Developer-only overlay (not product chrome):
+Developer-only collapsed **Metrics** disclosure anchored to the canvas corner
+(not product chrome). Closed by default; expand to read live values:
 
 | Metric | Source |
 | --- | --- |
-| rAF FPS | `requestAnimationFrame` deltas while the panel is active (display cadence, not Canvas paint cost) |
-| WS RTT | `ping` / `pong` echo of `clientTime` |
-| Inbound / outbound msg/s | Client counters reset each second |
+| Display rAF rate | `requestAnimationFrame` deltas **only while the dock is open** (display cadence, not Canvas paint cost) |
+| WebSocket RTT | `ping` / `pong` echo of `clientTime` |
+| Inbound / outbound messages/s | Client counters reset each second |
 | Participants | Latest `presence` length |
 | Sequence head | `sync_state` / commits / `history:changed` |
 
@@ -143,8 +144,8 @@ clients × 100 completed strokes). Server snapshot via
 `GET /api/room-metrics?room=` (sequenceHead, operationCount, live counts).
 **No Worker CPU%** is available from the runtime; do not invent it.
 
-Measured results live in [TESTING.md](./TESTING.md). Do not treat idle FPS or
-localhost RTT as a cross-network SLA.
+Measured results live in [TESTING.md](./TESTING.md). Do not treat idle display
+rAF rate or localhost RTT as a cross-network SLA.
 
 ## Reconnect / hibernation (implemented)
 

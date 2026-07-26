@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { isDebugEnabled } from "../client/src/debug/diagnostics";
+import {
+  isDebugEnabled,
+  METRIC_LABELS,
+} from "../client/src/debug/diagnostics";
 import { env, exports } from "cloudflare:workers";
 import { PROTOCOL_VERSION, type ServerMessage } from "../shared/protocol";
 
@@ -7,6 +10,19 @@ describe("debug query helpers", () => {
   it("detects ?debug=1", () => {
     expect(isDebugEnabled("?debug=1")).toBe(true);
     expect(isDebugEnabled("?foo=1")).toBe(false);
+  });
+});
+
+describe("metrics dock labels", () => {
+  it("names display cadence honestly instead of canvas FPS", () => {
+    expect(METRIC_LABELS.displayRafRate).toBe("Display rAF rate");
+    expect(METRIC_LABELS.wsRtt).toBe("WebSocket RTT");
+    expect(METRIC_LABELS.inboundRate).toBe("Inbound messages/s");
+    expect(METRIC_LABELS.outboundRate).toBe("Outbound messages/s");
+    expect(METRIC_LABELS.participants).toBe("Participants");
+    expect(METRIC_LABELS.sequenceHead).toBe("Sequence head");
+    expect(Object.values(METRIC_LABELS).join(" ")).not.toMatch(/canvas fps/i);
+    expect(Object.values(METRIC_LABELS).join(" ")).not.toMatch(/\bfps\b/i);
   });
 });
 

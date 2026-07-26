@@ -34,7 +34,9 @@ JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
   metadata is durable so hibernation cannot leave peer overlays stuck)
 - Typed rejection of malformed / oversized / rate-limited client frames
 - Empty rooms clear live state + alarms (hibernation-eligible; ops retained)
-- Developer diagnostics panel (`?debug=1`): FPS, WS RTT, msg/s, presence, seq
+- Developer metrics dock (`?debug=1`): collapsed canvas-corner **Metrics**
+  disclosure with Display rAF rate, WebSocket RTT, message rates, participants,
+  and sequence head (not a Canvas FPS claim)
 - Synthetic load script: `npm run load` (5×100 strokes) + `/api/room-metrics`
 - Remote collaborator labels: idle cursor positions plus live stroke-endpoint
   labels, with edge-aware placement (ephemeral)

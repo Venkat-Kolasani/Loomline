@@ -278,6 +278,20 @@ Product name is **Loomline** (repository and Worker name match).
 - Owns the clear confirmation as product safety around a room-global durable op
 - Owns keyboard shortcut scoping so typing a name never triggers undo/tool swaps
 
+## Collapsed metrics dock (`feat(observability): collapse developer metrics dock`)
+
+### Assisted by AI
+
+- `<details>` metrics dock markup/CSS, Display rAF sampler gating, label
+  constants, observability test update, and documentation drafts
+
+### Manually reviewed / owned by the author
+
+- Explains why Display rAF rate is not Canvas FPS and must not be marketed as
+  an SLA
+- Owns pausing the rAF sampler while the dock is collapsed
+- Owns keeping metrics behind `?debug=1` only
+
 ## Retained-code understanding statement
 
 The author is responsible for every retained line and can explain its purpose,

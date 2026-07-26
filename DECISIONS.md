@@ -268,22 +268,26 @@ fixed RTT budget without a stated workload violates the evidence rule.
 
 ### Selected design
 
-- Optional diagnostics panel when `?debug=1` is present: FPS from rAF deltas,
-  RTT from `ping`/`pong`, msg/s counters, presence count, sequence head.
+- Optional collapsed **Metrics** dock when `?debug=1` is present: Display rAF
+  rate from rAF deltas (only while expanded), WebSocket RTT from `ping`/`pong`,
+  inbound/outbound messages/s, presence count, sequence head.
 - Reproducible `scripts/synthetic-load.mjs`: 5 clients × 100 strokes; record
   wall clock, commit rate, `/api/room-metrics` head — never invent CPU%.
 - Document browser/machine/network and limitations next to the numbers.
+- Never label display cadence as “Canvas FPS.”
 
 ### Rejected alternative
 
 **Always-on HUD and marketing “60 FPS / &lt;50 ms” badges.**
 
 Rejected: permanent UI noise for reviewers; unmeasured SLA claims are dishonest.
+A always-expanded corner panel was also rejected for the polish pass — the dock
+stays collapsed until a developer opens it.
 
 ### Verification
 
-`test/observability.test.ts` (ping/pong + room-metrics). Manual panel screenshot
-+ `npm run load` results in [TESTING.md](./TESTING.md).
+`test/observability.test.ts` (label honesty + ping/pong + room-metrics). Manual
+panel use + `npm run load` results in [TESTING.md](./TESTING.md).
 
 ## D9 — One-origin Cloudflare deployment without repository credentials
 
@@ -518,3 +522,29 @@ ignored while focus is in an editable control.
 
 `test/tool-settings.test.ts` covers independent widths and clamping; the full
 gate is recorded in [TESTING.md](./TESTING.md).
+
+## D16 — Collapsed metrics dock with honest Display rAF naming
+
+### Problem / invariant
+
+Developer metrics must remain available for interviews without dominating the
+canvas or implying an unmeasured “Canvas FPS” SLA.
+
+### Selected design
+
+Keep `?debug=1` only. Mount a canvas-corner `<details>` labelled **Metrics**,
+collapsed by default. Expanded labels are Display rAF rate, WebSocket RTT,
+inbound/outbound messages/s, participants, and sequence head. The rAF sampler
+runs only while the disclosure is open so a closed dock does not keep a
+permanent measurement loop.
+
+### Rejected alternatives
+
+- **Always-expanded fixed HUD:** steals attention from the drawing surface.
+- **Calling the metric “FPS” / “Canvas FPS”:** conflates display refresh cadence
+  with Canvas paint cost and invites false performance claims.
+
+### Verification
+
+`test/observability.test.ts` asserts label honesty; full gate in
+[TESTING.md](./TESTING.md).

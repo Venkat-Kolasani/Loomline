@@ -584,31 +584,53 @@ h1 {
   border: 1px solid rgba(0, 0, 0, 0.12);
 }
 
-/* Developer-only (`?debug=1`) — not part of the product chrome. */
+/* Developer-only (`?debug=1`) — collapsed canvas-corner dock, not product chrome. */
 .debug-panel {
-  position: fixed;
-  right: 0.75rem;
-  bottom: 0.75rem;
-  z-index: 40;
-  width: min(16rem, calc(100vw - 1.5rem));
-  padding: 0.65rem 0.75rem;
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  z-index: 5;
+  width: auto;
+  max-width: min(16rem, calc(100% - 1rem));
+  margin: 0;
+  padding: 0;
   background: rgba(18, 22, 28, 0.92);
   color: #e8ecef;
   border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.35rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.72rem;
   line-height: 1.35;
+  box-shadow: 0 0.35rem 0.9rem rgba(15, 23, 42, 0.18);
 }
 
-.debug-heading {
-  margin: 0 0 0.4rem;
-  font-size: 0.78rem;
+.debug-summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.74rem;
   font-weight: 600;
   letter-spacing: 0.02em;
 }
 
+.debug-summary::-webkit-details-marker {
+  display: none;
+}
+
+.debug-panel[open] {
+  width: min(16rem, calc(100% - 1rem));
+  padding-bottom: 0.55rem;
+}
+
+.debug-panel[open] .debug-summary {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 0.35rem;
+}
+
 .debug-metrics {
   margin: 0;
+  padding: 0 0.65rem;
   display: grid;
   gap: 0.2rem;
 }
@@ -630,7 +652,7 @@ h1 {
 }
 
 .debug-note {
-  margin: 0.45rem 0 0;
+  margin: 0.45rem 0.65rem 0;
   color: rgba(232, 236, 239, 0.55);
   font-size: 0.65rem;
 }

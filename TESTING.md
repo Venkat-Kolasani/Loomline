@@ -3,6 +3,32 @@
 Evidence log for Loomline. Record **exact commands and outcomes**. Do not claim
 untested behavior.
 
+## Collapsed metrics dock gate (2026-07-26)
+
+### Automated
+
+```text
+Focused: npm run test -- test/observability.test.ts
+→ Test Files 1 passed (1)
+→ Tests 4 passed (4)
+
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files 24 passed (24)
+→ Tests 99 passed (99)
+→ Vite production build exit 0
+```
+
+Label contract: Display rAF rate, WebSocket RTT, inbound/outbound messages/s,
+participants, sequence head — no “FPS” / “Canvas FPS” wording in metric labels.
+Dock defaults collapsed (`<details>` summary “Metrics”). Production CSS/JS
+includes the canvas-corner `.debug-panel` disclosure styles and honest labels.
+
+### Evidence boundary
+
+Interactive expand/collapse and live RTT sampling remain for manual
+`?debug=1` use; embedded localhost browser proof is not claimed in this slice.
+
 ## Tool ergonomics gate (2026-07-26)
 
 ### Automated
@@ -377,7 +403,7 @@ Room `obs10b02` @ `http://127.0.0.1:8787/r/obs10b02?debug=1`
 
 | Metric | Observed |
 | --- | --- |
-| rAF FPS (display cadence, idle/light) | **120.0** (ProMotion-class display; not Canvas paint cost or a claimed 60 FPS budget) |
+| Display rAF rate (display cadence, idle/light; expanded Metrics dock) | **120.0 Hz** historically observed on ProMotion-class display — not Canvas paint cost or a claimed 60 FPS budget |
 | WS RTT (`ping`/`pong`) | **1.2 ms** idle → **3.1 ms** after light drawing (localhost) |
 | Participants | 1 idle; **3** when browser + Demo-A/B WS clients shared the room |
 | Sequence head | **2** after two committed strokes |

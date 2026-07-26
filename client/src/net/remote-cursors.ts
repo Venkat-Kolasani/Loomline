@@ -1,8 +1,15 @@
 /**
  * DOM overlays for remote cursors (ephemeral; not painted into canvas buffers).
+ * Positions arrive normalized (see `canvas/normalized-coords.ts`) and are
+ * resolved to CSS pixels against the overlay box that is current at paint time,
+ * so peer cursors and labels reflow with the canvas on resize / rotation.
  */
 
 import type { StrokePoint } from "../../../shared/protocol";
+import {
+  toCssPixelPoint,
+  type NormalizedPoint,
+} from "../canvas/normalized-coords";
 
 const LABEL_SAFE_WIDTH = 144;
 const LABEL_SAFE_HEIGHT = 42;
@@ -43,6 +50,8 @@ export class RemoteCursorLayer {
   private readonly cursors = new Map<string, HTMLElement>();
   private readonly names = new Map<string, string>();
   private readonly colors = new Map<string, string>();
+  /** Last known normalized position per participant, for resize reflow. */
+  private readonly positions = new Map<string, NormalizedPoint>();
 
   constructor(root: HTMLElement) {
     this.root = root;
@@ -61,6 +70,7 @@ export class RemoteCursorLayer {
     }
   }
 
+  /** `x` / `y` are normalized fractions of the overlay box, not pixels. */
   setPosition(
     participantId: string,
     x: number,
@@ -69,6 +79,26 @@ export class RemoteCursorLayer {
     isDrawing = false,
   ): void {
     if (selfId && participantId === selfId) {
+      return;
+    }
+    this.positions.set(participantId, { x, y });
+    this.place(participantId, isDrawing);
+  }
+
+  /**
+   * Re-place every cursor against the current overlay box. Cursor traffic is
+   * event-driven, so without this an idle peer's dot would keep stale pixels
+   * after a resize until they moved again.
+   */
+  refresh(): void {
+    for (const participantId of this.cursors.keys()) {
+      this.place(participantId, undefined);
+    }
+  }
+
+  private place(participantId: string, isDrawing: boolean | undefined): void {
+    const normalized = this.positions.get(participantId);
+    if (!normalized) {
       return;
     }
     let el = this.cursors.get(participantId);
@@ -87,14 +117,22 @@ export class RemoteCursorLayer {
     }
     const color = this.colors.get(participantId) ?? "#334155";
     const name = this.names.get(participantId) ?? "Peer";
+    const containerWidth = this.root.clientWidth;
+    const containerHeight = this.root.clientHeight;
+    const pixel = toCssPixelPoint(normalized, {
+      cssWidth: containerWidth,
+      cssHeight: containerHeight,
+    });
     el.style.setProperty("--cursor-color", color);
-    el.style.transform = `translate(${x}px, ${y}px)`;
-    el.classList.toggle("is-drawing", isDrawing);
+    el.style.transform = `translate(${pixel.x}px, ${pixel.y}px)`;
+    if (isDrawing !== undefined) {
+      el.classList.toggle("is-drawing", isDrawing);
+    }
     const placement = getCursorEdgePlacement(
-      x,
-      y,
-      this.root.clientWidth,
-      this.root.clientHeight,
+      pixel.x,
+      pixel.y,
+      containerWidth,
+      containerHeight,
     );
     el.classList.toggle("is-near-right", placement.nearRight);
     el.classList.toggle("is-near-bottom", placement.nearBottom);
@@ -116,6 +154,7 @@ export class RemoteCursorLayer {
     }
     this.names.delete(participantId);
     this.colors.delete(participantId);
+    this.positions.delete(participantId);
   }
 
   clear(): void {
@@ -124,5 +163,6 @@ export class RemoteCursorLayer {
     }
     this.names.clear();
     this.colors.clear();
+    this.positions.clear();
   }
 }

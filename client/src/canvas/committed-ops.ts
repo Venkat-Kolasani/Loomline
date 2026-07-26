@@ -1,4 +1,5 @@
 import type { CommittedOperation } from "../../../shared/protocol";
+import type { CanvasSpace } from "./normalized-coords";
 import { paintStroke, type Stroke } from "./stroke";
 
 /**
@@ -78,7 +79,8 @@ export class CommittedOperationStore {
     return false;
   }
 
-  paint(ctx: CanvasRenderingContext2D): void {
+  /** Deterministic replay against the canvas box that is current right now. */
+  paint(ctx: CanvasRenderingContext2D, space: CanvasSpace): void {
     for (const op of this.getOperations()) {
       if (op.kind === "clear") {
         ctx.save();
@@ -93,7 +95,7 @@ export class CommittedOperationStore {
         width: op.width,
         points: op.points,
       };
-      paintStroke(ctx, stroke, "final");
+      paintStroke(ctx, stroke, space, "final");
     }
   }
 }

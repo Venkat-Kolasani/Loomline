@@ -1,6 +1,10 @@
 import type { StrokePoint } from "../../../shared/protocol";
-import type { CanvasBackingSize } from "./sizing";
 import { clientToCssPoint } from "./sizing";
+import {
+  toNormalizedPoint,
+  type CanvasSpace,
+  type NormalizedPoint,
+} from "./normalized-coords";
 import { appendFilteredPoint, type Point } from "./points";
 import {
   paintStroke,
@@ -87,48 +91,45 @@ export class LocalDrawingController {
   }
 
   /** Brush-only live overlay (eraser paints on the committed pass). */
-  paintLiveBrush(
-    ctx: CanvasRenderingContext2D,
-    _size?: CanvasBackingSize,
-  ): void {
+  paintLiveBrush(ctx: CanvasRenderingContext2D, space: CanvasSpace): void {
     for (const stroke of this.awaitingCommit) {
       if (stroke.tool === "brush") {
-        paintStroke(ctx, stroke, "preview");
+        paintStroke(ctx, stroke, space, "preview");
       }
     }
     if (this.active?.tool === "brush") {
-      paintStroke(ctx, this.active, "preview");
+      paintStroke(ctx, this.active, space, "preview");
     }
   }
 
   /** Provisional eraser holes over committed ink (destination-out). */
-  paintProvisionalErasers(ctx: CanvasRenderingContext2D): void {
+  paintProvisionalErasers(
+    ctx: CanvasRenderingContext2D,
+    space: CanvasSpace,
+  ): void {
     for (const stroke of this.awaitingCommit) {
       if (stroke.tool === "eraser") {
-        paintStroke(ctx, stroke, "final");
+        paintStroke(ctx, stroke, space, "final");
       }
     }
     if (this.active?.tool === "eraser") {
-      paintStroke(ctx, this.active, "final");
+      paintStroke(ctx, this.active, space, "final");
     }
   }
 
   getPainters(): {
     paintCommitted: (
       ctx: CanvasRenderingContext2D,
-      _size: CanvasBackingSize,
+      space: CanvasSpace,
     ) => void;
-    paintLive: (
-      ctx: CanvasRenderingContext2D,
-      _size: CanvasBackingSize,
-    ) => void;
+    paintLive: (ctx: CanvasRenderingContext2D, space: CanvasSpace) => void;
   } {
     return {
-      paintCommitted: (ctx) => {
-        this.paintProvisionalErasers(ctx);
+      paintCommitted: (ctx, space) => {
+        this.paintProvisionalErasers(ctx, space);
       },
-      paintLive: (ctx, size) => {
-        this.paintLiveBrush(ctx, size);
+      paintLive: (ctx, space) => {
+        this.paintLiveBrush(ctx, space);
       },
     };
   }
@@ -236,7 +237,7 @@ export class LocalDrawingController {
     this.drawing = true;
     this.activePointerId = event.pointerId;
 
-    const point = this.toCanvasPoint(event);
+    const { point } = this.samplePointer(event);
     const strokeId = crypto.randomUUID();
     this.active = {
       strokeId,
@@ -258,7 +259,7 @@ export class LocalDrawingController {
   };
 
   private readonly onPointerMove = (event: PointerEvent): void => {
-    const point = this.toCanvasPoint(event);
+    const { point, space } = this.samplePointer(event);
     // Skip cursor while drawing so live stroke batches stay the only
     // in-flight pointer traffic (bandwidth / peer overlay clarity).
     if (!this.drawing) {
@@ -274,6 +275,7 @@ export class LocalDrawingController {
       this.active.points,
       point,
       this.minPointDistance,
+      space,
     );
     if (nextPoints.length === this.active.points.length) {
       return;
@@ -312,11 +314,12 @@ export class LocalDrawingController {
     if (active && active.points.length > 0) {
       let endPoint: StrokePoint | undefined;
       if (endEvent) {
-        const tip = this.toCanvasPoint(endEvent);
+        const { point: tip, space } = this.samplePointer(endEvent);
         const nextPoints = appendFilteredPoint(
           active.points,
           tip,
           this.minPointDistance,
+          space,
         );
         if (nextPoints.length !== active.points.length) {
           active.points = nextPoints as Point[];
@@ -339,9 +342,27 @@ export class LocalDrawingController {
     this.notify();
   }
 
-  private toCanvasPoint(event: PointerEvent): { x: number; y: number } {
+  /**
+   * One `getBoundingClientRect` per pointer event yields both the normalized
+   * point and the canvas box it was normalized against, so the CSS-pixel
+   * distance filter stays consistent with the sample.
+   */
+  private samplePointer(event: PointerEvent): {
+    point: NormalizedPoint;
+    space: CanvasSpace;
+  } {
     const rect = this.liveCanvas.getBoundingClientRect();
-    return clientToCssPoint(event.clientX, event.clientY, rect.left, rect.top);
+    const cssPoint = clientToCssPoint(
+      event.clientX,
+      event.clientY,
+      rect.left,
+      rect.top,
+    );
+    const space: CanvasSpace = {
+      cssWidth: rect.width,
+      cssHeight: rect.height,
+    };
+    return { point: toNormalizedPoint(cssPoint, space), space };
   }
 
   private notify(): void {

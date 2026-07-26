@@ -319,6 +319,26 @@ Product name is **Loomline** (repository and Worker name match).
 - Owns author-confirmed physical phone two-user acceptance for slice 7
 - Still owns honest metric naming (Display rAF rate ≠ Canvas FPS)
 
+## Normalized coordinates (`refactor(canvas): normalize stroke coordinates`)
+
+### Assisted by AI
+
+- `client/src/canvas/normalized-coords.ts` conversion helpers, threading a
+  `CanvasSpace` argument through the paint path, storing normalized remote
+  cursor positions, the `matchMedia` DPR-change listener, and the new
+  `normalized-coords` / resize specs
+
+### Manually reviewed / owned by the author
+
+- Owns why the space is per-axis fractions (all ink stays visible) and the
+  accepted cost that a circle becomes an ellipse when the aspect ratio changes
+- Owns keeping stroke `width` and the 1.5 px input filter in CSS pixels, and can
+  explain why the filter multiplies normalized gaps by the current box
+- Owns the `PROTOCOL_VERSION` `2 → 3` bump: the bytes are unchanged, the meaning
+  is not, so mixed-version clients must fail loudly instead of painting garbage
+- Owns the measured resize evidence in TESTING.md and the known typecheck gap
+  recorded as I19 rather than silently fixed inside this slice
+
 ## Retained-code understanding statement
 
 The author is responsible for every retained line and can explain its purpose,

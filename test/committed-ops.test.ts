@@ -83,7 +83,7 @@ describe("CommittedOperationStore", () => {
       strokeStyle: "#000000",
     } as unknown as CanvasRenderingContext2D;
 
-    store.paint(ctx);
+    store.paint(ctx, { cssWidth: 800, cssHeight: 600 });
 
     expect(events).toEqual(["stroke", "clear", "stroke"]);
     expect(store.getOperations().map(label)).toEqual([

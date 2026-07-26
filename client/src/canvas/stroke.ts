@@ -1,4 +1,5 @@
 import type { Point } from "./points";
+import { toCssPixelPoint, type CanvasSpace } from "./normalized-coords";
 
 export type DrawingTool = "brush" | "eraser";
 
@@ -6,17 +7,22 @@ export interface Stroke {
   tool: DrawingTool;
   color: string;
   width: number;
+  /** Normalized points; resolved against `space` at paint time. */
   points: Point[];
 }
 
 /**
  * Paint a stroke in CSS pixel space (context must already be DPR-scaled).
+ * `space` is the canvas box as it is *now*, not the box that was active when
+ * the points were captured — that is what makes replay resize-correct.
+ * Stroke width stays in CSS pixels so ink keeps its physical weight.
  * Eraser always uses destination-out (punch-through). Brush uses colour.
  * `mode` is retained for call-site clarity; eraser ignores preview styling.
  */
 export function paintStroke(
   ctx: CanvasRenderingContext2D,
   stroke: Stroke,
+  space: CanvasSpace,
   _mode: "final" | "preview" = "final",
 ): void {
   if (stroke.points.length === 0) {
@@ -36,7 +42,7 @@ export function paintStroke(
     ctx.strokeStyle = stroke.color;
   }
 
-  const first = stroke.points[0]!;
+  const first = toCssPixelPoint(stroke.points[0]!, space);
   ctx.beginPath();
   ctx.moveTo(first.x, first.y);
 
@@ -45,7 +51,7 @@ export function paintStroke(
     ctx.lineTo(first.x + 0.01, first.y);
   } else {
     for (let i = 1; i < stroke.points.length; i += 1) {
-      const point = stroke.points[i]!;
+      const point = toCssPixelPoint(stroke.points[i]!, space);
       ctx.lineTo(point.x, point.y);
     }
   }
@@ -57,8 +63,9 @@ export function paintStroke(
 export function paintStrokes(
   ctx: CanvasRenderingContext2D,
   strokes: readonly Stroke[],
+  space: CanvasSpace,
 ): void {
   for (const stroke of strokes) {
-    paintStroke(ctx, stroke, "final");
+    paintStroke(ctx, stroke, space, "final");
   }
 }

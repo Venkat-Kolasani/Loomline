@@ -367,6 +367,76 @@ pixels. Claiming unsupported automatic pixel merges.
 **Verified.** Overlap cases in `test/history.test.ts`; architecture explanation
 in [ARCHITECTURE.md](./ARCHITECTURE.md).
 
+## D22 — Normalized (0–1) stroke coordinates, not raw canvas pixels
+
+**Problem.** Points were captured and persisted as CSS pixels of whatever
+canvas box happened to exist when the pointer moved. The operation log is
+durable and is replayed later against whatever box exists *then*, so pixels
+were only correct by coincidence. Concretely, what breaks with pixel points:
+
+- Resize a 1118×704 window down to a 404×509 phone layout without reloading and
+  every committed stroke keeps its old pixel values: ink drawn near the right
+  edge is now painted far outside the canvas and simply disappears.
+- Rotating a phone (portrait ↔ landscape) shifts the whole drawing instead of
+  reflowing it.
+- Two participants with different window sizes never agree on where a stroke
+  is. A stroke at `x: 900` is mid-canvas for the author and off-screen for a
+  peer on a laptop, so the "same" room shows different pictures — which also
+  makes invariant 4 (deterministic replay) untrue in practice.
+- A rejoin on a differently sized window replays the room's history in the
+  wrong place, so reconnect and snapshot restore look broken.
+
+**Selected.** One coordinate space for everything durable or transmitted:
+`x` is a fraction of canvas width and `y` a fraction of canvas height. Pixels
+exist at exactly two boundaries — `LocalDrawingController.samplePointer`
+divides the pointer sample by the canvas box, and `paintStroke` multiplies by
+the box supplied to the current paint pass. The same rule covers remote cursor
+positions (`RemoteCursorLayer` stores the normalized point and re-places it
+against the current overlay box) and any future shape start/end point, because
+they travel as the same `StrokePoint`. Stroke **width** stays in CSS pixels so
+ink keeps its physical weight, and the input distance filter keeps its 1.5 CSS
+px threshold by measuring normalized gaps against the current box.
+
+`PROTOCOL_VERSION` moves `2 → 3`. The bytes on the wire are unchanged, but
+their meaning is not, and a cached version 2 client would interpret pixel
+values as fractions. Version negotiation is the existing mechanism for exactly
+that, and it fails loudly (`protocol_mismatch`) instead of silently painting
+garbage. Committed operations stored by older builds keep pixel values; those
+demo rooms are abandoned rather than migrated.
+
+DPR is handled by regenerating, never stretching: `applyBackingSize` reassigns
+`canvas.width/height` at the new `cssSize × dpr` (which clears the bitmap) and
+the layer is then repainted from the normalized log. A `matchMedia`
+`(resolution: Ndppx)` listener covers DPR changes that `ResizeObserver` does
+not report, such as browser zoom or moving the window to another display.
+
+**Rejected.**
+
+- *Keep pixels, rescale the log on resize.* Every resize would rewrite stored
+  operations, accumulating rounding error, and it cannot fix peers whose
+  canvases differ from the author's at capture time.
+- *Keep pixels, freeze the canvas at a fixed logical size and letterbox.* Simple
+  and it preserves aspect ratio, but it wastes screen on phones and contradicts
+  D13's canvas-first responsive grid.
+- *Store pixels plus the authoring canvas size and scale at replay.* Works, but
+  it makes every point carry provenance and leaves two spaces alive in the
+  codebase — the mistake is then one forgotten multiply away.
+- *Uniform scale (one factor for both axes) instead of per-axis fractions.*
+  Keeps stroke shapes undistorted, but leaves ink outside a re-shaped canvas.
+  Per-axis reflow was chosen so a drawing always stays fully visible; the
+  accepted cost is that a circle becomes an ellipse when the aspect ratio
+  changes.
+
+**Verified.** `test/normalized-coords.test.ts`, `test/points.test.ts`,
+`test/stroke-paint.test.ts` (same stroke resolved at 800×400 and 400×800);
+`npm run typecheck && npm run test && npm run build`. Browser proof on
+`wrangler dev`: three strokes committed at 1118×704 CSS / DPR 2 measured an ink
+bounding box of `left 0.098, right 0.902, top 0.097, bottom 0.852`; emulating a
+404×509 CSS / DPR 3 portrait phone **without reloading** re-measured
+`0.095 / 0.904 / 0.096 / 0.853`. A touch stroke drawn at 5–95% width in
+portrait re-measured at `left 0.048, right 0.951` after returning to landscape.
+See [TESTING.md](./TESTING.md).
+
 ## Deferred
 
 These remain intentionally unimplemented:

@@ -197,14 +197,16 @@ artistNameInput.value = "";
 const surface = new LayeredCanvasSurface({
   committedCanvas,
   liveCanvas,
-  paintCommitted: (ctx) => {
-    committedOps.paint(ctx);
+  // `size` is the canvas box for this paint pass; normalized points resolve
+  // against it, so a resized canvas replays the same log at new dimensions.
+  paintCommitted: (ctx, size) => {
+    committedOps.paint(ctx, size);
     // Provisional eraser punch-through while still in-flight (local + remote).
-    remoteStrokes.paintProvisionalErasers(ctx);
-    drawing.paintProvisionalErasers(ctx);
+    remoteStrokes.paintProvisionalErasers(ctx, size);
+    drawing.paintProvisionalErasers(ctx, size);
   },
   paintLive: (ctx, size) => {
-    remoteStrokes.paintLive(ctx);
+    remoteStrokes.paintLive(ctx, size);
     drawing.paintLiveBrush(ctx, size);
   },
 });
@@ -231,6 +233,27 @@ function setHistoryButtons(canUndo: boolean, canRedo: boolean): void {
 function resizeSurface(): void {
   const rect = stage.getBoundingClientRect();
   surface.resizeToContainer(rect.width, rect.height);
+  // DOM cursors are not part of a canvas repaint, so reflow them explicitly.
+  remoteCursors.refresh();
+}
+
+/**
+ * `ResizeObserver` does not fire when only the device pixel ratio changes
+ * (browser zoom, dragging the window to a different-density display). Watch
+ * the resolution media query so the backing bitmap is regenerated at the new
+ * DPR instead of being scaled up from a stale buffer.
+ */
+function watchDevicePixelRatio(): void {
+  const query = window.matchMedia(
+    `(resolution: ${window.devicePixelRatio}dppx)`,
+  );
+  const onChange = (): void => {
+    if (!roomView.hidden) {
+      resizeSurface();
+    }
+    watchDevicePixelRatio();
+  };
+  query.addEventListener("change", onChange, { once: true });
 }
 
 function setActiveTool(tool: DrawingTool): void {
@@ -911,6 +934,8 @@ new ResizeObserver(() => {
     resizeSurface();
   }
 }).observe(stage);
+
+watchDevicePixelRatio();
 
 window.addEventListener("popstate", () => {
   routeFromLocation();

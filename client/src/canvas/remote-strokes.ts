@@ -1,4 +1,5 @@
 import type { ServerMessage } from "../../../shared/protocol";
+import type { CanvasSpace } from "./normalized-coords";
 import {
   paintStroke,
   type DrawingTool,
@@ -137,19 +138,22 @@ export class RemoteStrokeStore {
   }
 
   /** Brush-only live overlay. */
-  paintLive(ctx: CanvasRenderingContext2D): void {
+  paintLive(ctx: CanvasRenderingContext2D, space: CanvasSpace): void {
     for (const stroke of this.active.values()) {
       if (stroke.tool === "brush") {
-        paintStroke(ctx, stroke, "preview");
+        paintStroke(ctx, stroke, space, "preview");
       }
     }
   }
 
   /** Remote in-progress erasers punch through committed ink. */
-  paintProvisionalErasers(ctx: CanvasRenderingContext2D): void {
+  paintProvisionalErasers(
+    ctx: CanvasRenderingContext2D,
+    space: CanvasSpace,
+  ): void {
     for (const stroke of this.active.values()) {
       if (stroke.tool === "eraser") {
-        paintStroke(ctx, stroke, "final");
+        paintStroke(ctx, stroke, space, "final");
       }
     }
   }

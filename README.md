@@ -26,6 +26,9 @@ WebSocket API. See [DECISIONS.md](./DECISIONS.md).
 - Keyboard: `B` / `E`; ⌘/Ctrl+Z and ⌘/Ctrl+Shift+Z (or Y) for global undo/redo
   when focus is not in an editable control
 - Two canvas layers + DOM collaborator labels (idle cursors + live stroke tips)
+- Normalized (0–1) coordinates: strokes and cursors are fractions of the canvas
+  box, so committed ink reflows on window resize / rotation without a reload and
+  peers on different screen sizes see the same drawing (DECISIONS D22)
 - Worker routes `/ws?room=` to one Durable Object per room via `idFromName`
 - Presence list with chosen name + deterministic participant colours
 - Live stroke fan-out; durable stroke/clear ops with strictly increasing sequence
@@ -39,7 +42,8 @@ WebSocket API. See [DECISIONS.md](./DECISIONS.md).
   participants, sequence head) — not a Canvas FPS claim
 - Synthetic load: `npm run load` (5×100 strokes) + `GET /api/room-metrics?room=`
 - Vitest coverage across isolation, protocol, live strokes, history, reconnect,
-  boundaries, observability, and UI helpers (102 tests as of this docs pass)
+  boundaries, observability, coordinate space, and UI helpers (113 tests as of
+  this docs pass)
 
 ## Setup (clean clone)
 
@@ -70,7 +74,7 @@ documentation pass: **25** test files, **102** tests.
 | --- | --- |
 | `npm run dev` | Build client, then local Worker (`wrangler dev`) |
 | `npm run dev:client` | Vite-only HMR (no Worker / `/api/health`) |
-| `npm run typecheck` | TypeScript for app + tests |
+| `npm run typecheck` | TypeScript for app (specs are skipped — ISSUES I19) |
 | `npm run test` | Vitest with Cloudflare Workers pool |
 | `npm run load` | Synthetic 5×100 stroke load against local `wrangler dev` |
 | `npm run build` | Production client → `dist/client` |
@@ -180,6 +184,15 @@ These are real constraints of the current code — not a backlog wishlist:
 15. **Localhost RTT / synthetic commit rate** are not WAN or multi-region claims.
 16. **Demo recording** for the assignment submission is still unchecked in the
     compliance list below.
+17. **Resize reflow is per axis.** A re-shaped canvas keeps all ink visible by
+    stretching it, so a circle drawn on a wide window becomes an ellipse in a
+    narrow one. Chosen over letterboxing (DECISIONS D22).
+18. **Pre-version-3 rooms replay wrong.** Operations persisted before the
+    normalized-coordinate change hold raw pixels and are not migrated; those
+    demo rooms are abandoned rather than converted.
+19. **Tests are not typechecked.** `test/tsconfig.json` inherits the root
+    `exclude: ["test"]`, so `npm run typecheck` skips every spec. Specs are
+    still executed by Vitest. Tracked as ISSUES I19.
 
 ## AI use
 
@@ -213,6 +226,8 @@ Leave unchecked until implemented **and** verified with evidence.
 - [x] Efficient Canvas path rendering and dirty-layer redraws
 - [x] Pointer batching (at most one network batch per animation frame)
 - [x] Layered committed vs live overlay model
+- [x] Resolution-independent geometry: normalized coordinates replay correctly
+      after a live resize / rotation (measured, TESTING 2026-07-26)
 - [x] Versioned, validated WebSocket protocol
 - [x] Server-authoritative operation ordering
 - [x] Global undo/redo without mutating the durable operation log incorrectly

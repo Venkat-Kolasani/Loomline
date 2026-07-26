@@ -74,6 +74,8 @@ function createRecordingContext(): CanvasRenderingContext2D & {
   };
 }
 
+const space = { cssWidth: 100, cssHeight: 100 };
+
 describe("paintStroke eraser", () => {
   it("uses destination-out for eraser in final and preview modes", () => {
     for (const mode of ["final", "preview"] as const) {
@@ -86,9 +88,10 @@ describe("paintStroke eraser", () => {
           width: 12,
           points: [
             { x: 0, y: 0 },
-            { x: 10, y: 0 },
+            { x: 0.1, y: 0 },
           ],
         },
+        space,
         mode,
       );
       expect(ctx.strokeSnapshots).toHaveLength(1);
@@ -107,8 +110,9 @@ describe("paintStroke eraser", () => {
         tool: "brush",
         color: "#0f6a5a",
         width: 4,
-        points: [{ x: 1, y: 1 }],
+        points: [{ x: 0.01, y: 0.01 }],
       },
+      space,
       "preview",
     );
     expect(ctx.strokeSnapshots[0]!.globalCompositeOperation).toBe("source-over");
@@ -124,13 +128,57 @@ describe("paintStroke eraser", () => {
         tool: "eraser",
         color: "#000",
         width: 8,
-        points: [{ x: 5, y: 5 }],
+        points: [{ x: 0.05, y: 0.05 }],
       },
+      space,
       "preview",
     );
     expect(ctx.lineTo).toHaveBeenCalledWith(5.01, 5);
     expect(ctx.strokeSnapshots[0]!.globalCompositeOperation).toBe(
       "destination-out",
     );
+  });
+});
+
+describe("paintStroke coordinate space", () => {
+  const stroke = {
+    tool: "brush" as const,
+    color: "#0f6a5a",
+    width: 4,
+    points: [
+      { x: 0.25, y: 0.5 },
+      { x: 0.75, y: 0.5 },
+    ],
+  };
+
+  it("resolves normalized points against the canvas box given at paint time", () => {
+    const ctx = createRecordingContext();
+    paintStroke(ctx, stroke, { cssWidth: 800, cssHeight: 400 }, "final");
+
+    expect(ctx.moveTo).toHaveBeenCalledWith(200, 200);
+    expect(ctx.lineTo).toHaveBeenCalledWith(600, 200);
+  });
+
+  it("reflows the same stroke when the canvas is resized or rotated", () => {
+    const landscape = createRecordingContext();
+    paintStroke(landscape, stroke, { cssWidth: 800, cssHeight: 400 }, "final");
+
+    const portrait = createRecordingContext();
+    paintStroke(portrait, stroke, { cssWidth: 400, cssHeight: 800 }, "final");
+
+    // Same fractions of the box, so the ink keeps its relative placement.
+    expect(portrait.moveTo).toHaveBeenCalledWith(100, 400);
+    expect(portrait.lineTo).toHaveBeenCalledWith(300, 400);
+    // Width stays in CSS pixels: ink weight does not shrink with the canvas.
+    expect(portrait.strokeSnapshots[0]!.lineWidth).toBe(
+      landscape.strokeSnapshots[0]!.lineWidth,
+    );
+  });
+
+  it("keeps a zero-sized canvas finite instead of painting NaN", () => {
+    const ctx = createRecordingContext();
+    paintStroke(ctx, stroke, { cssWidth: 0, cssHeight: 0 }, "final");
+
+    expect(ctx.moveTo).toHaveBeenCalledWith(0.25, 0.5);
   });
 });

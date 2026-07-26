@@ -9,7 +9,7 @@
  * reconnect snapshot, and room isolation. Prints PASS/FAIL per check.
  */
 
-const PROTOCOL_VERSION = 2;
+const PROTOCOL_VERSION = 3;
 const BASE_URL = (process.env.LOOMLINE_URL ?? "http://127.0.0.1:8787").replace(
   /\/$/,
   "",
@@ -187,7 +187,7 @@ async function main() {
         tool: "brush",
         color: "#0f6a5a",
         width: 4,
-        point: { x: 10, y: 10 },
+        point: { x: 0.1, y: 0.1 },
       }),
     );
     await liveStart;
@@ -198,8 +198,8 @@ async function main() {
         roomId: id,
         strokeId: "live-1",
         points: [
-          { x: 40, y: 50 },
-          { x: 80, y: 90 },
+          { x: 0.4, y: 0.5 },
+          { x: 0.8, y: 0.9 },
         ],
       }),
     );
@@ -252,12 +252,12 @@ async function main() {
       "B sees A",
     );
     sendStroke(a.socket, id, "overlap-a", "#1d4ed8", [
-      { x: 20, y: 20 },
-      { x: 60, y: 60 },
+      { x: 0.2, y: 0.2 },
+      { x: 0.6, y: 0.6 },
     ]);
     sendStroke(b.socket, id, "overlap-b", "#be123c", [
-      { x: 30, y: 80 },
-      { x: 90, y: 30 },
+      { x: 0.3, y: 0.8 },
+      { x: 0.9, y: 0.3 },
     ]);
     const [ownA, ownB, peerA, peerB] = await Promise.all([
       aCommit,

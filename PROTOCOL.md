@@ -1,6 +1,7 @@
 # Protocol
 
-**Protocol version:** `2`
+**Protocol version:** `3` (`2` → `3`: coordinates are normalized, see
+[Coordinate space](#coordinate-space))
 **Status:** presence, live strokes, durable stroke/clear ops, global undo/redo, reconnect
 recovery, input-boundary hardening, and **developer diagnostics / load baseline**
 are implemented.
@@ -19,8 +20,27 @@ All JSON messages include:
 | Field | Type | Notes |
 | --- | --- | --- |
 | `type` | string | Message discriminant |
-| `protocolVersion` | number | Must be `2` |
+| `protocolVersion` | number | Must be `3` |
 | `roomId` | string | Must match the socket room |
+
+## Coordinate space
+
+Every `x` / `y` in this protocol — stroke points, the optional `stroke:end`
+point, and `cursor` — is **normalized**: `x` is a fraction of the sender's
+canvas width and `y` a fraction of its height, so `{ "x": 0.5, "y": 0.5 }` is
+the centre of any canvas at any size or orientation. Receivers multiply by the
+canvas box that is current when they paint, which is what lets a persisted
+operation log replay correctly after a resize, a rotation, or a rejoin from a
+differently sized window.
+
+Values slightly outside `0`–`1` are legal (pointer capture reports samples past
+the canvas edge) and are validated only as finite numbers. `width` is **not**
+normalized: it stays in CSS pixels so ink keeps a consistent physical weight.
+
+Version `2` used the sender's raw CSS pixels. The version bump exists so a
+stale client cannot mix the two spaces in one room; it is rejected with
+`protocol_mismatch`. Operations persisted by version `2` builds still hold
+pixel values and are not migrated.
 
 Invalid client messages return a typed `error` and do not crash the room.
 Shape validation lives in `shared/protocol.ts` (`parseClientMessage`). Frame
@@ -129,7 +149,7 @@ Clients must not send `stroke:points` / `stroke:end` for a `strokeId` unless
 ```json
 {
   "type": "sync_state",
-  "protocolVersion": 2,
+  "protocolVersion": 3,
   "roomId": "abcd1234",
   "sequenceHead": 2,
   "operations": [
@@ -142,7 +162,7 @@ Clients must not send `stroke:points` / `stroke:end` for a `strokeId` unless
       "tool": "brush",
       "color": "#0f6a5a",
       "width": 4,
-      "points": [{ "x": 10, "y": 10 }, { "x": 20, "y": 25 }],
+      "points": [{ "x": 0.1, "y": 0.1 }, { "x": 0.2, "y": 0.25 }],
       "createdAt": 1720000000000
     }
   ],
@@ -156,7 +176,7 @@ Clients must not send `stroke:points` / `stroke:end` for a `strokeId` unless
 ```json
 {
   "type": "history:changed",
-  "protocolVersion": 2,
+  "protocolVersion": 3,
   "roomId": "abcd1234",
   "sequenceHead": 2,
   "operations": [
@@ -169,7 +189,7 @@ Clients must not send `stroke:points` / `stroke:end` for a `strokeId` unless
       "tool": "brush",
       "color": "#0f6a5a",
       "width": 4,
-      "points": [{ "x": 10, "y": 10 }],
+      "points": [{ "x": 0.1, "y": 0.1 }],
       "createdAt": 1720000000000
     }
   ],
@@ -183,7 +203,7 @@ Clients must not send `stroke:points` / `stroke:end` for a `strokeId` unless
 ```json
 {
   "type": "operation:committed",
-  "protocolVersion": 2,
+  "protocolVersion": 3,
   "roomId": "abcd1234",
   "operation": {
     "sequence": 3,
@@ -194,7 +214,7 @@ Clients must not send `stroke:points` / `stroke:end` for a `strokeId` unless
     "tool": "eraser",
     "color": "#334155",
     "width": 12,
-    "points": [{ "x": 40, "y": 40 }, { "x": 60, "y": 60 }],
+    "points": [{ "x": 0.4, "y": 0.4 }, { "x": 0.6, "y": 0.6 }],
     "createdAt": 1720000000500
   }
 }
@@ -205,7 +225,7 @@ Clients must not send `stroke:points` / `stroke:end` for a `strokeId` unless
 ```json
 {
   "type": "canvas:clear",
-  "protocolVersion": 2,
+  "protocolVersion": 3,
   "roomId": "abcd1234"
 }
 ```
@@ -213,7 +233,7 @@ Clients must not send `stroke:points` / `stroke:end` for a `strokeId` unless
 ```json
 {
   "type": "operation:committed",
-  "protocolVersion": 2,
+  "protocolVersion": 3,
   "roomId": "abcd1234",
   "operation": {
     "kind": "clear",

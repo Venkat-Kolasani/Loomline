@@ -487,6 +487,92 @@ a long stroke — hole must not shrink after the stroke commits.
 
 ---
 
+## I18 — Committed strokes were pinned to the canvas size that drew them
+
+**When:** 26 July 2026, coordinate-space slice.
+
+**What the issue was**
+
+Points were stored and transmitted as CSS pixels of the canvas box that existed
+at capture time, while the operation log is durable and gets replayed against
+whatever box exists later. Resizing the window without reloading left ink
+sitting at its old pixel coordinates: strokes near the right or bottom edge of
+a wide window were painted outside a narrower canvas and vanished. The same
+bug meant two peers with different window sizes never saw the same picture, and
+a rejoin on a resized window replayed history in the wrong place.
+
+**Root cause**
+
+There was only one coordinate space in the system — the author's pixels — and
+`paintStroke` consumed those numbers directly. Nothing converted between the
+canvas that captured a point and the canvas that painted it.
+
+**What we fixed**
+
+`client/src/canvas/normalized-coords.ts` defines a fraction-of-the-box space.
+Pointer samples are divided by the canvas box in
+`LocalDrawingController.samplePointer`; painting multiplies by the box passed to
+the current paint pass (`paintStroke(ctx, stroke, space)`), and remote cursors
+store the normalized point and re-place on resize. `PROTOCOL_VERSION` moved
+`2 → 3` so a cached pixel-space client cannot mix spaces in a room.
+
+**Why this way**
+
+Rescaling the stored log on every resize accumulates rounding error and still
+cannot fix peers whose canvases differed at capture time; freezing a logical
+canvas and letterboxing wastes phone screen and contradicts D13. Normalizing at
+the two boundaries leaves exactly one durable space. Full trade-off: D22.
+
+**Verification**
+
+`test/normalized-coords.test.ts`, `test/points.test.ts`,
+`test/stroke-paint.test.ts`; `npm run typecheck && npm run test && npm run
+build`; browser on local `wrangler dev` — ink bounding box measured at
+`0.098/0.902/0.097/0.852` on a 1118×704 CSS canvas (DPR 2) re-measured at
+`0.095/0.904/0.096/0.853` after emulating a 404×509 CSS portrait phone
+(DPR 3) with no reload.
+
+---
+
+## I19 — `npm run typecheck` never actually typechecked the tests
+
+**When:** 26 July 2026, discovered while migrating call sites for I18.
+
+**What the issue was**
+
+`npm run typecheck` runs `tsc -p test/tsconfig.json` and reported success even
+though several specs called `paintStroke` with the old argument order. Stale
+test call sites could only be caught by running Vitest.
+
+**Root cause**
+
+`test/tsconfig.json` extends the root config, and `extends` inherits `exclude`.
+The root config excludes `test`, and those relative paths resolve against the
+root config, so every spec was excluded from its own project.
+`tsc -p test/tsconfig.json --listFiles | grep -c /test/` returns `0`.
+
+**What we fixed**
+
+Nothing yet — deliberately. Resetting `"exclude": []` immediately surfaces ~40
+pre-existing type errors in unrelated specs (`cloudflare:test` module types,
+union narrowing on `CommittedOperation`). Fixing those belongs in its own slice
+rather than inside a coordinate-space change, so this is recorded as a known
+gap: **test files are currently checked by Vitest at runtime, not by `tsc`.**
+
+**Why this way**
+
+Bundling an unrelated ~10-file test cleanup into this commit would make the
+diff unreviewable, and the alternative — landing `"exclude": []` with a red
+typecheck — violates the "never commit a known failure" rule outright.
+
+**Verification**
+
+`npx tsc --noEmit -p test/tsconfig.json --listFiles | grep -c "/test/"` → `0`
+(gap confirmed). Coordinate migration was instead verified by the 113 passing
+Vitest specs plus the browser proof above.
+
+---
+
 ## I17 — Metrics pings could drop stroke:end (ghost local ink)
 
 **When:** 26 July 2026 systematic multi-client acceptance / browser proof.

@@ -3,6 +3,56 @@
 Evidence log for Loomline. Record **exact commands and outcomes**. Do not claim
 untested behavior.
 
+## Normalized coordinates (2026-07-26)
+
+Stroke, cursor, and durable operation coordinates became fractions of the canvas
+box (D22 / I18). Protocol version `2 → 3`.
+
+### Automated
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files 26 passed (26)
+→ Tests 113 passed (113)
+→ Vite production build exit 0 (dist/client/assets/index-*.js 35.28 kB)
+```
+
+New / changed specs: `test/normalized-coords.test.ts` (conversion, round-trip,
+no clamping, zero-extent guard), `test/points.test.ts` (CSS-pixel threshold over
+normalized gaps), `test/stroke-paint.test.ts` (one stroke resolved at 800×400
+and again at 400×800), `test/committed-ops.test.ts` (replay takes a box).
+
+### Browser resize proof (local `wrangler dev`, Chromium, no reload)
+
+Room `2fb30ac7`. Three strokes committed, then the viewport was changed with
+CDP `Emulation.setDeviceMetricsOverride` — no page reload, no rejoin. Ink
+bounding box measured from `committed-canvas` pixel alpha, expressed as
+fractions of the buffer:
+
+| Step | Canvas CSS | Buffer / DPR | left | right | top | bottom |
+| --- | --- | --- | --- | --- | --- | --- |
+| Landscape (drawn here) | 1118×704 | 2236×1408 / 2 | 0.098 | 0.902 | 0.097 | 0.852 |
+| Portrait phone emulation | 404×509 | 1212×1528 / 3 | 0.095 | 0.904 | 0.096 | 0.853 |
+| Back to landscape | 1118×704 | 2236×1408 / 2 | 0.048 | 0.951 | 0.097 | 0.952 |
+
+Rows 1→2: the same committed log reflowed to a flipped aspect ratio and a
+different DPR; the ≤0.003 drift is the 4 px round cap being a larger fraction of
+the smaller canvas. Row 3 includes one extra stroke drawn **with touch pointer
+events while in portrait** at 5–95% width / 95% height; after returning to
+landscape it measures `left 0.048, right 0.951, bottom 0.952`, so input captured
+in one box replays correctly in another.
+
+The buffer went 2236×1408 → 1212×1528 → 2236×1408, i.e. the bitmap was
+regenerated at `cssSize × dpr` each time rather than stretched.
+
+### Evidence boundary
+
+Emulated portrait phone (DPR 3) via CDP, not a physical rotation on hardware
+this session. Peer-to-peer agreement across two differently sized windows is
+argued from the shared coordinate space and the single-client proof above; it
+was not separately re-measured with two live browsers in this slice.
+
 ## Abuse-only rate limit (2026-07-26)
 
 Valid join / stroke / cursor / history / `ping` frames no longer consume the

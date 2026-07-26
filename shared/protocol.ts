@@ -15,6 +15,13 @@ export const MAX_STROKE_WIDTH = 32;
 
 export type DrawingTool = "brush" | "eraser";
 
+/**
+ * Normalized canvas coordinate: `x` is a fraction of the canvas width and `y`
+ * a fraction of its height (`0`–`1` inside the box). Points are resolution and
+ * aspect independent so a persisted operation replays correctly on any canvas
+ * size. Values slightly outside `0`–`1` are legal (pointer capture past an
+ * edge) and are validated only as finite numbers.
+ */
 export interface StrokePoint {
   x: number;
   y: number;

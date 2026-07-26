@@ -85,7 +85,8 @@ What this is **not**:
 
 Transport: native browser `WebSocket` to same origin.  
 Path: `/ws?room=<roomId>`.  
-Every JSON message includes `type`, `protocolVersion` (`2`), and `roomId`.
+Every JSON message includes `type`, `protocolVersion` (`3`), and `roomId`.
+All coordinates are normalized (see [Coordinate space](#coordinate-space)).
 
 | Message | Direction | Meaning |
 | --- | --- | --- |
@@ -132,6 +133,30 @@ Typed `error` codes include: `invalid_json`, `payload_too_large`,
 | `GET /api/health` | `{ ok, service: "loomline", phase: "observability" }` |
 | `GET /api/room-metrics?room=` | DO head snapshot for load scripts |
 | Static assets via `ASSETS` | Landing + SPA `/r/:roomId` |
+
+## Coordinate space
+
+Points are pixels only at the two edges of the system. Everything in between —
+stroke geometry, durable operations, `stroke:live` fan-out, `cursor` frames —
+holds fractions of the canvas box (`client/src/canvas/normalized-coords.ts`).
+
+| Stage | Space | Where |
+| --- | --- | --- |
+| Pointer event | CSS px relative to the canvas box | `LocalDrawingController.samplePointer` |
+| Stroke / op / wire | normalized `0–1` | `Stroke.points`, `StrokePoint` |
+| Paint | CSS px of the box current at paint time | `paintStroke(ctx, stroke, space)` |
+| Remote cursor DOM | CSS px of the overlay box current now | `RemoteCursorLayer` |
+
+Consequences: replay follows the canvas across resize and rotation, peers with
+different window sizes see the same drawing, and reflow is **per axis** — a
+re-shaped canvas keeps all ink visible and stretches it, rather than preserving
+aspect ratio and pushing ink out of view. Stroke `width` stays in CSS pixels.
+
+Resizing regenerates the bitmap; it never scales one. `applyBackingSize`
+reassigns `canvas.width/height` to `cssSize × dpr` (which clears the buffer) and
+both layers repaint from the normalized log. `ResizeObserver` covers box
+changes; a `matchMedia('(resolution: Ndppx)')` listener covers DPR-only changes
+such as browser zoom or a move to a different-density display.
 
 ## Client rendering layers
 
@@ -284,7 +309,8 @@ Localhost Metrics RTT (≈1–3 ms) is not a multi-region SLA. Details:
 Desktop keeps header / presence / tools / stage. At `≤640px`, CSS uses a
 safe-area-aware `100dvh` grid: header → compact presence → canvas → horizontally
 scrollable tool row. Canvas DPR sizing still comes from `ResizeObserver`; pointer
-math is unchanged. Physical phone two-user proof recorded 26 July 2026.
+math normalizes against the canvas box, so committed ink reflows with the layout
+instead of shifting. Physical phone two-user proof recorded 26 July 2026.
 
 ## Scaling path (honest)
 

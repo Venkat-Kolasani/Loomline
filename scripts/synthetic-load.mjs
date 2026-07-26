@@ -9,7 +9,7 @@
  * counts, and GET /api/room-metrics when available. Does not invent CPU %.
  */
 
-const PROTOCOL_VERSION = 2;
+const PROTOCOL_VERSION = 3;
 const CLIENTS = 5;
 const STROKES_PER_CLIENT = 100;
 const BASE_URL = (process.env.LOOMLINE_URL ?? "http://127.0.0.1:8787").replace(
@@ -129,8 +129,9 @@ async function runClient(roomId, clientIndex, stats) {
   for (let s = 0; s < STROKES_PER_CLIENT; s += 1) {
     const strokeId = `${ownPrefix}s${s}`;
     const color = `#${((clientIndex * 40 + s) % 200 + 20).toString(16).padStart(2, "0")}6a5a`;
-    const x0 = 10 + clientIndex * 20 + (s % 50);
-    const y0 = 10 + s;
+    // Normalized coordinates (fractions of a canvas box), kept inside 0–1.
+    const x0 = (0.01 + clientIndex * 0.02 + (s % 50) * 0.001) % 1;
+    const y0 = (0.01 + s * 0.001) % 1;
     send({
       type: "stroke:start",
       protocolVersion: PROTOCOL_VERSION,
@@ -147,8 +148,8 @@ async function runClient(roomId, clientIndex, stats) {
       roomId,
       strokeId,
       points: [
-        { x: x0 + 2, y: y0 + 2 },
-        { x: x0 + 4, y: y0 + 1 },
+        { x: x0 + 0.002, y: y0 + 0.002 },
+        { x: x0 + 0.004, y: y0 + 0.001 },
       ],
     });
     send({

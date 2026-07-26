@@ -1,14 +1,11 @@
 /** Quick brush colours for the toolbar; custom picker remains available. */
 
 export const COLOR_PRESETS = [
+  "#111827",
   "#0f6a5a",
   "#1d4ed8",
-  "#b45309",
   "#be123c",
-  "#334155",
-  "#7c3aed",
-  "#0f766e",
-  "#111827",
+  "#b45309",
 ] as const;
 
 export type ColorPreset = (typeof COLOR_PRESETS)[number];

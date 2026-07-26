@@ -6,9 +6,16 @@ import {
 } from "../client/src/canvas/color-presets";
 
 describe("color presets", () => {
-  it("exposes eight quick swatches including the default brush colour", () => {
-    expect(COLOR_PRESETS).toHaveLength(8);
-    expect(COLOR_PRESETS[0]).toBe("#0f6a5a");
+  it("exposes five quick swatches including the default brush colour", () => {
+    expect(COLOR_PRESETS).toHaveLength(5);
+    expect(COLOR_PRESETS).toContain("#0f6a5a");
+    expect(COLOR_PRESETS).toEqual([
+      "#111827",
+      "#0f6a5a",
+      "#1d4ed8",
+      "#be123c",
+      "#b45309",
+    ]);
   });
 
   it("normalizes and recognizes preset hex colours", () => {

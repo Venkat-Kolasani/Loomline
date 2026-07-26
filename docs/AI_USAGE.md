@@ -387,6 +387,18 @@ inputs/outputs, failure modes, and verification. AI output was treated as a
 draft or debugging aid, not as proof; commands, tests, browser observations, and
 deployed protocol results are recorded separately in [TESTING.md](./TESTING.md).
 
+## Documentation folder (`docs(docs): consolidate markdown under docs/`)
+
+### Assisted by AI
+
+- Moving product markdown into `docs/`, rewriting root README with Mermaid
+  overview, and updating path references in AGENTS / blueprint / testing
+
+### Manually reviewed / owned by the author
+
+- Owns keeping the root README reviewer-clean (compliance + setup + diagrams)
+  while interview depth stays in `docs/`
+
 ## Expiry-touch throttle (`perf(realtime): throttle live stroke expiry upserts`)
 
 ### Assisted by AI

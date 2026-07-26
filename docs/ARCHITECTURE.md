@@ -6,10 +6,11 @@ travel over a same-origin WebSocket to a Cloudflare Worker that routes each
 room id to **one** Durable Object.
 
 Production origin: <https://loomline.kolasanivenkat2.workers.dev>  
-Static assets, `/api/*`, and `wss` share that origin.
+Static assets, `/api/*`, and `wss` share that origin. Reviewer entry:
+[../README.md](../README.md).
 
-This is **not** a Node.js server. The Worker runs on Cloudflare's edge JavaScript
-runtime. Rationale: [DECISIONS.md](./DECISIONS.md) D1.
+Backend runtime: Cloudflare Workers (edge JavaScript) + Durable Objects — not a
+long-lived Node process. Rationale: [DECISIONS.md](./DECISIONS.md) D1.
 
 ## System diagram
 

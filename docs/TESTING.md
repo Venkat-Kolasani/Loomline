@@ -1,7 +1,14 @@
 # Testing
 
 Evidence log for Loomline. Record **exact commands and outcomes**. Do not claim
-untested behavior.
+untested behavior. Sibling docs live in this `docs/` folder; the public README
+is at [../README.md](../README.md).
+
+## Documentation layout (2026-07-26)
+
+Product markdown (architecture, protocol, decisions, testing, issues, AI usage,
+blueprint, assignment) moved under `docs/`. Root `README.md` is the reviewer
+entry with Mermaid overview diagrams; deep detail stays here.
 
 ## Expiry-touch throttle (2026-07-26)
 

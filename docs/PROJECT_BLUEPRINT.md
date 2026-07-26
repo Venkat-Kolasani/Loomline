@@ -26,9 +26,9 @@ ordered remote operations, global undo/redo, reconnect recovery, and persistence
 
 The assignment says `Node.js + WebSockets`; Workers are an intentional edge
 JavaScript-runtime choice rather than a Node process. We will state that plainly
-in `ARCHITECTURE.md`, explain the trade-off, and use only web-standard TypeScript
-and native WebSockets. The real-time requirements are the priority and this
-choice is defensible only because we can explain it precisely.
+in `docs/ARCHITECTURE.md`, explain the trade-off, and use only web-standard
+TypeScript and native WebSockets. The real-time requirements are the priority and
+this choice is defensible only because we can explain it precisely.
 
 ## Product scope
 
@@ -89,7 +89,7 @@ pointer event.
 ### Protocol and consistency contract
 
 All messages have a `type`, `protocolVersion`, `roomId`, and payload validated
-at the boundary. The full protocol will live in `PROTOCOL.md`.
+at the boundary. The full protocol lives in `docs/PROTOCOL.md`.
 
 | Message | Direction | Meaning |
 | --- | --- | --- |
@@ -170,17 +170,24 @@ The 29th is buffer and submission time, not feature-development time.
 
 ## Required documents
 
-- `README.md` - live URL, quick start, feature list, multi-user test steps,
-  mobile/browser support, limitations, time spent, and honest AI-use note.
-- `ARCHITECTURE.md` - diagram, client layers, Durable Object rationale,
+Product docs live under `docs/`. The public entry point is root `README.md`.
+
+- `README.md` (repo root) - live URL, quick start, feature list, multi-user
+  test steps, Mermaid overview, mobile/browser support, limitations, time
+  spent, and a short AI-use note. Keep interview-sensitive depth in `docs/`.
+- `docs/ARCHITECTURE.md` - diagram, client layers, Durable Object rationale,
   room lifecycle, persistence/reconnect, scaling plan, and trade-offs.
-- `PROTOCOL.md` - message schemas, sequence/idempotency contract, invalid-message
-  behavior, and examples.
-- `DECISIONS.md` - global undo semantics, overlap/conflict policy, Cloudflare
-  choice versus Node server, and deferred scale architecture.
-- `TESTING.md` - exact automated/manual/deployed commands and actual evidence.
-- `AI_USAGE.md` - concise, honest list of where AI assisted and the manual
-  verification/understanding performed. No code is retained unless we can explain it.
+- `docs/PROTOCOL.md` - message schemas, sequence/idempotency contract,
+  invalid-message behavior, and examples.
+- `docs/DECISIONS.md` - global undo semantics, overlap/conflict policy,
+  Cloudflare choice versus Node server, and deferred scale architecture.
+- `docs/TESTING.md` - exact automated/manual/deployed commands and actual
+  evidence.
+- `docs/AI_USAGE.md` - concise, honest list of where AI assisted and the manual
+  verification/understanding performed. No code is retained unless we can
+  explain it.
+- `docs/ISSUES.md` - interview-facing issue log.
+- `docs/README.md` - index of this folder.
 
 ## Interview readiness rule
 

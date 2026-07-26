@@ -316,16 +316,22 @@ Localhost Metrics RTT (≈1–3 ms) is not a multi-region SLA. Details:
 
 ## Responsive shell
 
-Desktop (`>640px` wide and taller than 500px) keeps a stacked shell: compact
-topbar → invite + presence chrome → toolbar → stage.
+Mouse / large displays keep a stacked shell: compact topbar → invite + presence
+chrome → toolbar → stage.
 
-On phone widths (`≤640px`) **or** short landscape viewports (`max-height: 500px`
-and `max-width: 960px`), the room uses a canvas-dominant `100dvh` grid:
+On phone widths (`≤640px`), short landscape (`max-height: 500px` and
+`max-width: 960px`), **or** finger-first tablets (`hover: none` and
+`pointer: coarse` up to `1180px`, e.g. iPad), the room uses a canvas-dominant
+`100dvh` grid:
 
 1. Compact topbar with a **Room** toggle (invite + presence start collapsed).
 2. Stage fills the remaining height.
 3. Slim semi-transparent toolbar is `position: absolute` over the bottom of the
    stage so it does not steal vertical space from drawing.
+
+Drawing surfaces set `user-select: none` / `-webkit-touch-callout: none`, and
+pointer-down on the canvas blurs focused form controls so Safari cannot
+select-all the invite URL mid-stroke (I20 / D25).
 
 `ResizeObserver` on the stage, `window.resize`, `orientationchange`,
 `visualViewport.resize`, and a `matchMedia('(resolution: Ndppx)')` listener all

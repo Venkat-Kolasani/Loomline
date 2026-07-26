@@ -104,6 +104,24 @@ const roomLink = requireElement(
   "#room-link",
   (node): node is HTMLInputElement => node instanceof HTMLInputElement,
 );
+/** Only the copy/share fallback may focus+select the invite URL field. */
+let allowRoomLinkFocus = false;
+
+function focusRoomLinkForManualCopy(): void {
+  allowRoomLinkFocus = true;
+  roomLink.focus();
+  roomLink.select();
+}
+
+roomLink.addEventListener("focus", () => {
+  if (allowRoomLinkFocus) {
+    allowRoomLinkFocus = false;
+    return;
+  }
+  // Accidental tap on iPad: refuse focus so Safari cannot select-all the URL.
+  roomLink.blur();
+});
+
 const shareRoomButton = requireElement(
   "#share-room",
   (node): node is HTMLButtonElement => node instanceof HTMLButtonElement,
@@ -286,7 +304,7 @@ function watchDevicePixelRatio(): void {
 }
 
 const MOBILE_SHELL_QUERY =
-  "(max-width: 640px), (max-height: 500px) and (max-width: 960px)";
+  "(max-width: 640px), (max-height: 500px) and (max-width: 960px), (hover: none) and (pointer: coarse) and (max-width: 1180px)";
 
 function isMobileShell(): boolean {
   return window.matchMedia(MOBILE_SHELL_QUERY).matches;
@@ -874,8 +892,7 @@ shareRoomButton.addEventListener("click", async () => {
     shareStatus.textContent = "Sharing cancelled.";
     return;
   }
-  roomLink.focus();
-  roomLink.select();
+  focusRoomLinkForManualCopy();
   shareStatus.textContent = "Select the invite link above to copy it.";
 });
 
@@ -885,8 +902,7 @@ copyRoomLinkButton.addEventListener("click", async () => {
     shareStatus.textContent = "Invite link copied.";
     return;
   }
-  roomLink.focus();
-  roomLink.select();
+  focusRoomLinkForManualCopy();
   shareStatus.textContent = "Select the invite link above to copy it.";
 });
 

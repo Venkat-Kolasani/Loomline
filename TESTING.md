@@ -3,6 +3,29 @@
 Evidence log for Loomline. Record **exact commands and outcomes**. Do not claim
 untested behavior.
 
+## iPad finger-draw text selection (2026-07-26)
+
+I20 / D25. Invite URL and empty-state text no longer steal finger strokes;
+finger-first tablets ≤1180px use the Room sheet shell.
+
+### Automated
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files 27 passed (27)
+→ Tests 116 passed (116)
+→ Vite production build exit 0
+```
+
+### Manual
+
+1. iPad (or DevTools iPad + coarse pointer): open a room — invite is behind
+   **Room**, not above the canvas.
+2. Finger-draw on the canvas: no select-all on a text field; empty-state copy
+   does not highlight.
+3. Copy invite still works via the copy icon / Share link.
+
 ## Rectangle shape tool (2026-07-26)
 
 `PROTOCOL_VERSION` 4. `shape:rect` commits one durable `kind: "rect"` op with

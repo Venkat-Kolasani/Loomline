@@ -461,6 +461,22 @@ fall back to the desktop stack).
 tap; landscape 844×390 stays on the mobile shell with stage ~80%; ink bounding
 fractions held across the rotate (see TESTING 26 July 2026).
 
+## D25 — Finger-first tablets use the mobile room shell
+
+**Problem.** iPads matched the desktop chrome (width >640px), so the invite URL
+field stayed visible and Safari select-all stole finger draws (I20).
+
+**Selected.** Extend the mobile media query / `MOBILE_SHELL_QUERY` with
+`(hover: none) and (pointer: coarse) and (max-width: 1180px)` so typical iPads
+get the Room sheet + floating toolbar. Keep desktop stacked chrome for mouse
+and large displays.
+
+**Rejected.** Leaving iPad on desktop chrome and only CSS-hardening the invite
+field (still easy to graze). Forcing the shell for every width ≤1180px (punishes
+narrow desktop windows with a mouse).
+
+**Verified.** MatchMedia checks under iPad metrics; see I20 / TESTING.
+
 ## D24 — Rectangle as one sequenced op, not live frames
 
 **Problem.** A shape tool must collaborate and undo/redo like strokes without

@@ -367,6 +367,19 @@ Product name is **Loomline** (repository and Worker name match).
   undo machinery without a second history system (`PROTOCOL_VERSION` 4)
 - Owns two-tab draw/undo verification recorded in TESTING.md
 
+## iPad draw selection fix (`fix(ui): stop iPad draw selecting invite text`)
+
+### Assisted by AI
+
+- Selection/callout CSS, invite focus gate, canvas blur-on-draw, tablet shell
+  media query, I20 / D25 docs
+
+### Manually reviewed / owned by the author
+
+- Owns why iPad hit desktop chrome and why invite select-all / empty-state
+  selection broke finger drawing
+- Owns keeping copy/share fallback focus while blocking accidental focus
+
 ## Retained-code understanding statement
 
 The author is responsible for every retained line and can explain its purpose,

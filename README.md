@@ -31,11 +31,11 @@ WebSocket API. See [DECISIONS.md](./DECISIONS.md).
 - Normalized (0–1) coordinates: strokes and cursors are fractions of the canvas
   box, so committed ink reflows on window resize / rotation without a reload and
   peers on different screen sizes see the same drawing (DECISIONS D22)
-- Mobile-first room shell (≤640px wide, or short landscape ≤500px tall):
-  `100dvh` stage, invite+presence collapsed behind a **Room** sheet (closed by
-  default), slim semi-transparent floating toolbar over the canvas. Desktop
-  keeps stacked chrome. Resize / `orientationchange` / visualViewport regenerate
-  the DPR backing bitmap and replay the normalized log
+- Mobile-first room shell (phones, short landscape, or finger-first tablets
+  ≤1180px): `100dvh` stage, invite+presence collapsed behind a **Room** sheet
+  (closed by default), slim semi-transparent floating toolbar over the canvas.
+  Desktop / mouse keeps stacked chrome. Resize / `orientationchange` /
+  visualViewport regenerate the DPR backing bitmap and replay the normalized log
 - Worker routes `/ws?room=` to one Durable Object per room via `idFromName`
 - Presence list with chosen name + deterministic participant colours
 - Live stroke fan-out; durable stroke/rect/clear ops with strictly increasing sequence
@@ -207,9 +207,11 @@ These are real constraints of the current code — not a backlog wishlist:
     viewports the tool bar sits over the bottom of the stage so the canvas can
     stay ~80%+ of `100dvh`. Strokes near the bottom edge remain in the log and
     reflow correctly; they may be briefly obscured while the bar is visible.
-20. **Mobile shell uses width *or* short-height.** Phones in landscape often
-    exceed 640px width, so the shell also activates when height ≤500px and
-    width ≤960px. Larger tablets in landscape use the desktop stacked layout.
+20. **Mobile shell uses width, short-height, or coarse pointer.** Phones in
+    landscape often exceed 640px width, so the shell also activates when height
+    ≤500px and width ≤960px, or on finger-first tablets (`hover: none` +
+    `pointer: coarse`) up to 1180px (iPad). Larger mouse-driven desktops keep
+    the stacked layout.
 
 ## AI use
 

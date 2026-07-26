@@ -282,6 +282,9 @@ export class LocalDrawingController {
     }
 
     event.preventDefault();
+    // Drop focus from invite URL / width slider so iPad Safari cannot
+    // select-all a text field while the finger starts a stroke.
+    blurActiveFormControl(this.liveCanvas);
     try {
       this.liveCanvas.setPointerCapture(event.pointerId);
     } catch {
@@ -485,5 +488,21 @@ export class LocalDrawingController {
 
   private notify(): void {
     this.onStrokesChanged?.(this.hasInk());
+  }
+}
+
+function blurActiveFormControl(except: HTMLElement): void {
+  const active = document.activeElement;
+  if (!(active instanceof HTMLElement) || active === except) {
+    return;
+  }
+  const tag = active.tagName;
+  if (
+    tag === "INPUT" ||
+    tag === "TEXTAREA" ||
+    tag === "SELECT" ||
+    active.isContentEditable
+  ) {
+    active.blur();
   }
 }

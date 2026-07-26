@@ -618,6 +618,39 @@ pointer-up.
 
 ---
 
+## I20 — iPad finger draw selected the invite URL / empty-state text
+
+**When:** 26 July 2026, user report on physical iPad.
+
+**What the issue was**
+Starting a stroke with a finger selected a text box (often select-all on the
+invite URL) or highlighted the centered empty-state copy, so drawing felt
+broken.
+
+**Root cause**
+iPad widths (>640px) used the desktop stacked chrome, so the readonly invite
+`<input>` sat above the canvas and Safari selects-all on tap/focus. Long-press
+draw also selected overlay text because empty-state lacked `user-select: none`
+(pointer-events: none alone does not block Safari selection).
+
+**What we fixed**
+Stage/canvas/empty-state/toolbar/invite field refuse user-select and touch
+callouts; invite input is `tabindex="-1"` and ignores accidental focus except
+the copy/share fallback; pointerdown on the canvas blurs active form controls;
+mobile shell also matches finger-first tablets (`hover: none` + `pointer: coarse`
+up to 1180px) so invite stays behind Room.
+
+**Why this way**
+Keeping a real input for clipboard fallback is simpler than a second control;
+blurring on draw start covers width slider focus without hiding controls.
+
+**Verification**
+`npm run typecheck && npm run test && npm run build`; DevTools iPad metrics +
+`(hover: none) and (pointer: coarse)` confirms Room sheet shell; re-test finger
+draw on device after deploy.
+
+---
+
 Copy this block when logging a future issue:
 
 ```markdown

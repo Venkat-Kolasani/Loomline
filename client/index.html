@@ -59,7 +59,22 @@
         <div class="brand-block">
           <p class="eyebrow">Loomline</p>
           <h1 id="room-title">Room</h1>
-          <a id="room-link" class="room-link" href="/"></a>
+          <section class="room-invite" aria-labelledby="room-invite-label">
+            <p id="room-invite-label" class="room-invite-label">
+              Invite collaborators
+            </p>
+            <div class="room-invite-controls">
+              <input
+                id="room-link"
+                class="room-link"
+                type="text"
+                readonly
+                aria-label="Room invite link"
+              />
+              <button type="button" id="share-room">Share link</button>
+            </div>
+            <p id="share-status" class="share-status" role="status" aria-live="polite"></p>
+          </section>
         </div>
         <div class="topbar-meta">
           <p id="self-badge" class="self-badge" hidden></p>

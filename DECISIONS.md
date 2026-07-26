@@ -394,3 +394,33 @@ assigns a fresh participant id and deterministic colour on every join.
 and unavailable storage. `test/rooms.test.ts` proves the Worker trims/caps a
 supplied name and falls back for blank input. Local browser proof is recorded in
 [TESTING.md](./TESTING.md).
+
+## D12 — Progressive invite sharing with an explicit manual fallback
+
+### Problem / invariant
+
+A raw URL in the room header is easy to miss and awkward on mobile. Inviting
+must always resolve to the canonical `/r/<roomId>` path without leaking local
+debug query state or changing room membership/history.
+
+### Selected design
+
+The header uses a **Share link** control. It calls the native device share sheet
+when present; otherwise it writes the canonical URL to the clipboard. If both
+APIs are unavailable or denied, the readonly input receives selection and the
+UI explains how to copy it manually. A user-cancelled native share leaves the
+clipboard untouched.
+
+### Rejected alternatives
+
+- **Raw anchor only:** works, but is less discoverable and provides no feedback.
+- **External sharing SDK:** unnecessary dependency and account surface for one
+  URL.
+- **Always copy after a cancelled share:** surprising side effect that overwrites
+  a user's clipboard after they explicitly backed out.
+
+### Verification
+
+`test/invite.test.ts` covers canonical URL creation, native share, clipboard
+fallback, cancellation, and manual fallback. Current automated/local-server
+evidence is recorded in [TESTING.md](./TESTING.md).

@@ -55,7 +55,7 @@ Verified in `test/rooms.test.ts`.
 
 | Piece | Role |
 | --- | --- |
-| Landing / room client | Browser-local artist name, presence, cursors, live + committed sync |
+| Landing / room client | Browser-local artist name, canonical invite sharing, presence, cursors, live + committed sync |
 | Canvas layers | `committed-canvas` = server ops; `live-canvas` = in-progress |
 | Point batching | ≤ one `stroke:points` per animation frame |
 | `RoomDurableObject` | Live fan-out + SQLite ops + tombstones + stall alarm + `sync_state` |
@@ -159,6 +159,8 @@ sequenceDiagram
    artist name; a first-time browser sees the landing name gate before any
    WebSocket joins. `/ws?room=<roomId>` validates the id and routes through
    `idFromName(roomId)`.
+   The room header derives its invite URL from the canonical room path only;
+   device sharing/clipboard are client conveniences and never alter room state.
 2. `join` carries that optional name; the server trims/caps it, assigns fresh
    participant attachment metadata and returns `welcome`,
    `sync_state`, then room `presence`.

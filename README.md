@@ -16,6 +16,8 @@ JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
 - Landing page: create/join shareable `/r/<roomId>` links
 - Browser-local artist name: readable random fallback or user nickname (1–24
   trimmed characters); returning users rejoin with that name without an account
+- Room invite control: native device share sheet when available, clipboard
+  fallback otherwise, plus a selectable URL when browser APIs are unavailable
 - Worker routes `/ws?room=` to one Durable Object per room via `idFromName`
 - Presence: join/leave list with the chosen name and deterministic participant
   colours
@@ -81,7 +83,10 @@ needed only for `npm run deploy`; no credentials or tokens are stored here.
 Use the live URL above, or run `npm run dev` and use
 `http://127.0.0.1:8787/`.
 
-1. Choose a name, then click **Create room** and copy the room link.
+1. Choose a name, then click **Create room** and use **Share link**. On a
+   supported device it opens the native share sheet; otherwise it copies the
+   canonical room URL. If browser permission/API support prevents copying, the
+   readonly URL remains selectable for manual copy.
 2. Open the same link in a second browser/profile. On a first visit, choose a
    name before joining; both presence lists should show the supplied names.
 3. Draw slowly in client A — client B must show the stroke **before** A lifts

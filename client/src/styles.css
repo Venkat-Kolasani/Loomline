@@ -60,6 +60,65 @@ body {
   min-width: 0;
 }
 
+.room-invite {
+  display: grid;
+  gap: 0.25rem;
+  margin-top: 0.55rem;
+  max-width: min(32rem, 100%);
+}
+
+.room-invite-label {
+  margin: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.room-invite-controls {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.room-link {
+  min-width: 0;
+  flex: 1;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  background: rgba(255, 255, 255, 0.68);
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.room-invite-controls button {
+  appearance: none;
+  flex: none;
+  min-height: 2.25rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.35rem;
+  background: rgba(15, 106, 90, 0.1);
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+.room-invite-controls input:focus-visible,
+.room-invite-controls button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.share-status {
+  min-height: 1.1rem;
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
 .eyebrow {
   margin: 0 0 0.2rem;
   font-size: 0.8rem;
@@ -386,14 +445,6 @@ h1 {
   justify-items: end;
 }
 
-.room-link {
-  display: inline-block;
-  margin-top: 0.35rem;
-  font-size: 0.85rem;
-  color: var(--accent);
-  word-break: break-all;
-}
-
 .self-badge {
   margin: 0;
   padding: 0.25rem 0.55rem;
@@ -509,6 +560,10 @@ h1 {
   }
 
   .artist-name-controls {
+    align-items: stretch;
+  }
+
+  .room-invite-controls {
     align-items: stretch;
   }
 }

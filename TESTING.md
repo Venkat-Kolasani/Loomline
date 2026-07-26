@@ -3,6 +3,36 @@
 Evidence log for Loomline. Record **exact commands and outcomes**. Do not claim
 untested behavior.
 
+## Invite sharing gate (2026-07-26)
+
+### Automated
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files 22 passed (22)
+→ Tests 94 passed (94)
+→ Vite production build exit 0
+```
+
+`test/invite.test.ts` proves canonical `/r/<roomId>` URL generation, successful
+native sharing, clipboard fallback, share cancellation without a clipboard
+write, and manual-copy fallback. Focused identity/room/invite gate passed 3
+files / 15 tests.
+
+### Local server smoke
+
+After rebuilding, `curl --fail --silent http://127.0.0.1:8787/r/name1111 |
+rg -o 'Share link|room-invite|room-link' | sort -u` returned all three expected
+invite controls.
+
+### Evidence boundary
+
+The browser automation surface explicitly rejected new localhost navigation in
+this session, so no fresh visual/share-sheet interaction is claimed. Native
+share, clipboard permission behavior, and the manual fallback need a fresh
+browser/deployed acceptance pass; the module behavior is unit-tested.
+
 ## Artist identity gate (2026-07-26)
 
 ### Automated

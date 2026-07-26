@@ -222,6 +222,21 @@ Product name is **Loomline** (repository and Worker name match).
   name is resent, while the room still assigns a new anonymous participant id
 - Verified name gate, welcome label, presence label, and reload path locally
 
+## Invite sharing (`feat(rooms): add shareable invite controls`)
+
+### Assisted by AI
+
+- Native share/clipboard fallback helper, accessible invite control, unit tests,
+  and documentation drafts
+
+### Manually reviewed / owned by the author
+
+- Explains why canonical invite URLs omit local debug state and do not modify
+  Durable Object room state
+- Owns the cancellation rule: aborting the system share sheet must not write to
+  the clipboard
+- Reviewed the manual-copy fallback for permission-denied or unsupported browsers
+
 ## Retained-code understanding statement
 
 The author is responsible for every retained line and can explain its purpose,

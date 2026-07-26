@@ -10,6 +10,7 @@ import {
   saveArtistName,
   type NameStorage,
 } from "./identity/artist-name";
+import { createInviteUrl, shareInvite } from "./rooms/invite";
 import {
   DiagnosticsPanel,
   isDebugEnabled,
@@ -96,7 +97,15 @@ const roomTitle = requireElement(
 );
 const roomLink = requireElement(
   "#room-link",
-  (node): node is HTMLAnchorElement => node instanceof HTMLAnchorElement,
+  (node): node is HTMLInputElement => node instanceof HTMLInputElement,
+);
+const shareRoomButton = requireElement(
+  "#share-room",
+  (node): node is HTMLButtonElement => node instanceof HTMLButtonElement,
+);
+const shareStatus = requireElement(
+  "#share-status",
+  (node): node is HTMLElement => node instanceof HTMLElement,
 );
 const presenceList = requireElement(
   "#presence-list",
@@ -400,9 +409,8 @@ function enterRoom(roomId: string, displayName: string): void {
   roomView.hidden = false;
   document.title = `Loomline · ${roomId}`;
   roomTitle.textContent = `Room ${roomId}`;
-  const shareUrl = `${location.origin}/r/${roomId}`;
-  roomLink.href = shareUrl;
-  roomLink.textContent = shareUrl;
+  roomLink.value = createInviteUrl(location.origin, roomId);
+  shareStatus.textContent = "";
   connectionStatus.textContent = "Connecting…";
   selfBadge.hidden = true;
   setHistoryButtons(false, false);
@@ -648,6 +656,25 @@ newArtistNameButton.addEventListener("click", () => {
   landingError.hidden = true;
   artistNameInput.focus();
   artistNameInput.select();
+});
+
+shareRoomButton.addEventListener("click", async () => {
+  const result = await shareInvite(window.navigator, roomLink.value);
+  if (result === "shared") {
+    shareStatus.textContent = "Invite opened.";
+    return;
+  }
+  if (result === "copied") {
+    shareStatus.textContent = "Invite link copied.";
+    return;
+  }
+  if (result === "cancelled") {
+    shareStatus.textContent = "Sharing cancelled.";
+    return;
+  }
+  roomLink.focus();
+  roomLink.select();
+  shareStatus.textContent = "Select the invite link above to copy it.";
 });
 
 brushButton.addEventListener("click", () => {

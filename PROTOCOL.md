@@ -240,20 +240,15 @@ restores via full visible `sync_state`.
 | `width` | integer 1–32 |
 | `color` | `#RRGGBB` |
 | `displayName` | optional; server trims/caps at 24 characters and falls back when blank |
-| Client messages / participant / 1s | ≤ `120` (`MAX_MESSAGES_PER_WINDOW`) |
+| Client abuse frames / participant / 1s | ≤ `120` (`MAX_MESSAGES_PER_WINDOW`) — binary / oversized / malformed / parse failures only |
 
-`120` frames/s is sized for normal rAF drawing: at most one
-`stroke:points` batch per display frame, plus `start` / `end` / clear / history
-headroom. Cursor updates are sent only while not drawing; they do not compete
-with active stroke batches.
-Once a socket has a participant id, drawing and control frames count toward that
-budget (binary floods, malformed JSON, oversized frames, unknown types, cursor,
-strokes, history, repeated `join`). **Valid `ping` frames are exempt** so RTT
-probes cannot drop `stroke:points` / `stroke:end`. Exceeding the budget returns
-`error` `rate_limited`; the room stays alive. History is **not** debounced —
-each accepted `history:undo` / `history:redo` runs to completion under Durable
-Object serialization. Clients send `ping` only while the Metrics dock is
-expanded.
+Valid join / stroke / cursor / history / `ping` frames **do not** consume the
+rate budget and never return `rate_limited`. The budget exists only so a
+hostile flood of garbage frames gets a typed error instead of unbounded work
+before rejection. History is **not** debounced — each accepted `history:undo`
+/ `history:redo` runs to completion under Durable Object serialization.
+Clients still send `ping` only while the Metrics dock is expanded (cheaper RTT
+sampling; not required for rate-limit safety).
 
 ### Typed boundary errors (non-exhaustive)
 
@@ -264,7 +259,7 @@ expanded.
 | `unsupported_type` | Unknown `type` |
 | `protocol_mismatch` | Wrong `protocolVersion` |
 | `invalid_payload` | Bad shape / binary frames / field constraints |
-| `rate_limited` | Per-participant frame budget exceeded (valid `ping` exempt) |
+| `rate_limited` | Abuse-frame budget exceeded (valid protocol traffic exempt) |
 | `not_joined` / `room_mismatch` | Join / room binding failures |
 
 ## HTTP endpoints

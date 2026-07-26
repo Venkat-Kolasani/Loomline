@@ -117,7 +117,7 @@ Every JSON message includes `type`, `protocolVersion` (`2`), and `roomId`.
 | Stroke width | integer 1–32 |
 | Colour | `#RRGGBB` |
 | Display name | optional; trim/cap 24; blank → `Artist-<id prefix>` |
-| Client frames / participant / 1s | ≤ 120 (all post-join frames, before parse) |
+| Abuse frames / participant / 1s | ≤ 120 (binary / oversized / malformed / parse failures only) |
 
 Typed `error` codes include: `invalid_json`, `payload_too_large`,
 `unsupported_type`, `protocol_mismatch`, `invalid_payload`, `rate_limited`,
@@ -256,8 +256,8 @@ These are deliberate trade-offs present in the code — measured where noted:
 | Immediate local paint; network later | Keep pointer-to-pixel under one frame | Invariant 1; local drawing path |
 | Distance filter (`minPointDistance` default **1.5** CSS px) | Drop micro-moves before batching | `client/src/canvas/points.ts` |
 | ≤ one `stroke:points` per `requestAnimationFrame` | Avoid one WS message per pointer event | `StrokePointBatcher`; unit + live tests |
-| Chunk points at **64** / message | Bound frame size under rate limit | `MAX_POINTS_PER_MESSAGE` |
-| Suppress `cursor` while drawing | Leave rate-limit headroom for point batches | Client drawing hooks |
+| Chunk points at **64** / message | Bound frame size | `MAX_POINTS_PER_MESSAGE` |
+| Suppress `cursor` while drawing | Keep live overlay traffic to stroke batches | Client drawing hooks |
 | Dirty-layer paint only (no permanent loop) | Idle rooms do not burn frames | `LayeredCanvasSurface` |
 | One SQLite row per completed op | Persist geometry without per-point rows | `worker/operations.ts` |
 | Full visible `sync_state` on join | Correct with tombstones; simpler than delta | D6 |

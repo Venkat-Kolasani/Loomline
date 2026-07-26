@@ -282,19 +282,9 @@ export class RoomDurableObject extends DurableObject<Env> {
       return;
     }
 
-    // Valid ping is exempt from the drawing budget so RTT probes never drop
-    // stroke:points / stroke:end. Abuse still pays: malformed/oversized/binary
-    // frames are counted above before rejection.
-    if (result.message.type !== "ping" && participantId) {
-      if (!this.consumeRateLimit(participantId)) {
-        this.sendError(
-          ws,
-          "rate_limited",
-          "Too many messages; slow down while keeping the room alive.",
-        );
-        return;
-      }
-    }
+    // Valid protocol messages are never rate-limited. The budget only applies
+    // to abuse frames above (binary / oversized / malformed / parse failures)
+    // so normal drawing, cursor, history, and ping cannot starve stroke:end.
 
     switch (result.message.type) {
       case "join":

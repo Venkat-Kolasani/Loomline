@@ -259,8 +259,8 @@ export class LocalDrawingController {
 
   private readonly onPointerMove = (event: PointerEvent): void => {
     const point = this.toCanvasPoint(event);
-    // Skip cursor while drawing so points+cursor do not saturate the room
-    // rate limit (120/s) and drop trailing stroke:points batches.
+    // Skip cursor while drawing so live stroke batches stay the only
+    // in-flight pointer traffic (bandwidth / peer overlay clarity).
     if (!this.drawing) {
       this.network?.onCursor(point);
     }

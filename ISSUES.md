@@ -514,6 +514,10 @@ moved the stroke into awaiting-commit, so ink looked stuck with no server seq.
 3. On `rate_limited` / `unknown_stroke` / `stroke_expired`, abandon local
    uncommitted ink so ghost brushes do not linger.
 
+**Follow-up (same day):** Valid protocol messages are no longer rate-limited at
+all — only abuse frames consume the 120/s budget — so normal drawing cannot hit
+`rate_limited` even if Metrics is open or pointer traffic is dense.
+
 **Why this way**
 
 Dropping diagnostics traffic during drawing is cheaper than raising the global
@@ -521,9 +525,10 @@ cap. Keeping anti-abuse on garbage frames preserves invariant 10. Clearing
 provisional ink on those errors is better than leaving an un-undoable ghost.
 
 **Verification**
-`test/boundaries.test.ts` “ping flood does not block stroke commit”;
-`npm run typecheck && npm run test && npm run build`; browser: draw with Metrics
-collapsed → peer live ink + Undo enables after pointer-up.
+`test/boundaries.test.ts` “valid burst never rate-limited” + “ping flood does
+not block stroke commit”; `npm run typecheck && npm run test && npm run build`;
+browser: draw with Metrics collapsed → peer live ink + Undo enables after
+pointer-up.
 
 ---
 

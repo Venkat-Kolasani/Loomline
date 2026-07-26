@@ -155,10 +155,11 @@ These are real constraints of the current code — not a backlog wishlist:
    tombstones change visibility independently of sequence head.
 4. **One SQLite JSON blob per completed stroke.** Very long strokes are not
    checkpoint-compacted (see DECISIONS D7).
-5. **In-memory rate limit.** The 120 messages / 1s per-participant limit resets
-   if the Durable Object is evicted mid-abuse. It is anti-spam, not auth. Valid
-   `ping` frames are exempt so Metrics RTT probes cannot drop stroke commits;
-   Metrics pings run only while the dock is expanded.
+5. **In-memory abuse rate limit.** Only binary / oversized / malformed / parse
+   failures count toward 120 frames / 1s per participant. Valid drawing and
+   control messages are never rate-limited. The counter resets if the Durable
+   Object is evicted mid-abuse — anti-spam, not auth. Metrics still pings only
+   while the dock is expanded.
 6. **Client chunks `stroke:points` at 64 points** (`MAX_POINTS_PER_MESSAGE`).
 7. **No measured room-size cap.** Local synthetic load reached 500 committed
    ops; there is no automatic log reset. Future checkpoint/retention needs a

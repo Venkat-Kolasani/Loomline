@@ -93,14 +93,29 @@ describe("room input boundaries", () => {
     socket.close(1000, "done");
   });
 
-  it("returns typed rate_limited after the per-participant frame budget", async () => {
+  it("does not rate-limit a burst of valid protocol frames", async () => {
     const roomId = "bbbb9013";
     await setRoomRateLimitMax(roomId, 5);
     const socket = await openRoomSocket(roomId);
     await joinAndDrain(socket, roomId, "Boundary");
 
-    const err = waitForError(socket, "rate_limited");
-    for (let i = 0; i < 6; i += 1) {
+    let rateLimited = false;
+    const onRateLimited = (event: MessageEvent): void => {
+      if (typeof event.data !== "string") {
+        return;
+      }
+      try {
+        const message = JSON.parse(event.data) as ServerMessage;
+        if (message.type === "error" && message.code === "rate_limited") {
+          rateLimited = true;
+        }
+      } catch {
+        // ignore
+      }
+    };
+    socket.addEventListener("message", onRateLimited);
+
+    for (let i = 0; i < 40; i += 1) {
       socket.send(
         JSON.stringify({
           type: "cursor",
@@ -111,7 +126,46 @@ describe("room input boundaries", () => {
         }),
       );
     }
-    await err;
+
+    const committed = waitForMessage(
+      socket,
+      (message): message is Extract<ServerMessage, { type: "operation:committed" }> =>
+        message.type === "operation:committed" &&
+        message.operation.kind === "stroke" &&
+        message.operation.strokeId === "valid-burst",
+    );
+    socket.send(
+      JSON.stringify({
+        type: "stroke:start",
+        protocolVersion: PROTOCOL_VERSION,
+        roomId,
+        strokeId: "valid-burst",
+        tool: "brush",
+        color: "#0f6a5a",
+        width: 4,
+        point: { x: 1, y: 1 },
+      }),
+    );
+    socket.send(
+      JSON.stringify({
+        type: "stroke:points",
+        protocolVersion: PROTOCOL_VERSION,
+        roomId,
+        strokeId: "valid-burst",
+        points: [{ x: 2, y: 2 }],
+      }),
+    );
+    socket.send(
+      JSON.stringify({
+        type: "stroke:end",
+        protocolVersion: PROTOCOL_VERSION,
+        roomId,
+        strokeId: "valid-burst",
+      }),
+    );
+    await committed;
+    expect(rateLimited).toBe(false);
+    socket.removeEventListener("message", onRateLimited);
     socket.close(1000, "done");
     await setRoomRateLimitMax(roomId, null);
   });
@@ -125,27 +179,6 @@ describe("room input boundaries", () => {
     const err = waitForError(socket, "rate_limited");
     for (let i = 0; i < 6; i += 1) {
       socket.send("{not-json");
-    }
-    await err;
-    socket.close(1000, "done");
-    await setRoomRateLimitMax(roomId, null);
-  });
-
-  it("rate-limits a joined socket flooding repeated join frames", async () => {
-    const roomId = "bbbb9022";
-    await setRoomRateLimitMax(roomId, 5);
-    const socket = await openRoomSocket(roomId);
-    await joinAndDrain(socket, roomId, "Flood-Join");
-
-    const err = waitForError(socket, "rate_limited");
-    const joinFrame = JSON.stringify({
-      type: "join",
-      protocolVersion: PROTOCOL_VERSION,
-      roomId,
-      displayName: "Flood-Join",
-    });
-    for (let i = 0; i < 6; i += 1) {
-      socket.send(joinFrame);
     }
     await err;
     socket.close(1000, "done");
@@ -174,7 +207,7 @@ describe("room input boundaries", () => {
     const socket = await openRoomSocket(roomId);
     await joinAndDrain(socket, roomId, "Ping-Exempt");
 
-    // More pings than the drawing budget; they must not consume it.
+    // Valid pings (and strokes) never consume the abuse-only budget.
     for (let i = 0; i < 12; i += 1) {
       socket.send(
         JSON.stringify({

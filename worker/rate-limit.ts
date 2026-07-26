@@ -1,6 +1,8 @@
 /**
- * Fixed-window per-participant message-frame rate limiter (in-memory).
- * Resets on Durable Object eviction — acceptable; limit is anti-abuse, not auth.
+ * Fixed-window per-participant rate limiter for abuse frames only
+ * (binary / oversized / malformed / parse failures). Valid protocol
+ * messages never call this. Resets on Durable Object eviction — acceptable;
+ * the limit is anti-spam, not auth.
  */
 
 import {

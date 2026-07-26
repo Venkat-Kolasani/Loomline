@@ -3,6 +3,23 @@
 Evidence log for Loomline. Record **exact commands and outcomes**. Do not claim
 untested behavior.
 
+## Abuse-only rate limit (2026-07-26)
+
+Valid join / stroke / cursor / history / `ping` frames no longer consume the
+per-participant budget. `rate_limited` applies only to binary, oversized,
+malformed, and parse-failure floods.
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files 25 passed (25)
+→ Tests 102 passed (102)
+→ Vite production build exit 0
+```
+
+Focused: `test/boundaries.test.ts` — valid-burst never limited; malformed /
+binary floods still limited.
+
 ## Multi-client acceptance + I17 rate-limit fix (2026-07-26)
 
 ### Automated

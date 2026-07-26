@@ -128,18 +128,21 @@ hibernation-eligible. Do not invent an unmeasured operation-log wipe.
 
 **Selected.** Reject oversized text frames (`MAX_CLIENT_MESSAGE_BYTES = 16_384`
 UTF-8 bytes) before parse; shape validation in `parseClientMessage`;
-per-participant `120` messages / `1s` for joined drawing/control traffic
-(binary / malformed / oversized / strokes / cursor / history / repeated join).
-**Valid `ping` is exempt** so RTT probes cannot starve `stroke:end` (I17).
+per-participant `120` abuse frames / `1s` for **invalid** traffic only
+(binary / malformed / oversized / parse failures). **Valid protocol messages
+are never rate-limited** so drawing, cursor, history, and Metrics `ping`
+cannot starve `stroke:end` (extends I17).
 Process every accepted history request under DO serialization (no debounce);
 on last leave, clear live state / expiry / alarms but retain committed ops.
 
 **Rejected.** Debouncing undo/redo (would silently drop intentional actions).
-Wiping the op log when empty or after arbitrary N (surprises rejoins; no
-measured threshold).
+Rate-limiting valid strokes/cursors (demo clients hit false `rate_limited`
+under Metrics pings or dense pointer traffic — I17). Wiping the op log when
+empty or after arbitrary N (surprises rejoins; no measured threshold).
 
 **Verified.** `test/boundaries.test.ts` (malformed JSON, unknown type, UTF-8
-size bypass, rate limit, rapid history, zero-user cleanup).
+size bypass, abuse-only rate limit, valid-burst never limited, rapid history,
+zero-user cleanup).
 
 ## D8 — Measured diagnostics only (honest labels, synthetic load)
 

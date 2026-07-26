@@ -7,6 +7,23 @@ workers_dev = true
 # CLOUDFLARE_ACCOUNT_ID / Zone ID pasted into Actions secrets).
 account_id = "06ff94e3e142ac402ca6504bcecd67db"
 
+# Keep dashboard observability settings in source so `wrangler deploy`
+# does not reset them (matches Cloudflare "Update your Wrangler config").
+[observability]
+enabled = false
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = false
+persist = true
+head_sampling_rate = 1
+
 [assets]
 directory = "./dist/client"
 binding = "ASSETS"

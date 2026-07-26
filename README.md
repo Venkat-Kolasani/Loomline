@@ -14,8 +14,9 @@ JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
 
 - Vite vanilla TypeScript client shell
 - Landing page: create/join shareable `/r/<roomId>` links
-- Browser-local artist name: readable random fallback or user nickname (1–24
-  trimmed characters); returning users rejoin with that name without an account
+- Browser-local artist name: empty by default; type a nickname or use
+  **Random name** (1–24 trimmed characters). Chosen names are saved in
+  `localStorage` after join, but the field is never prefilled.
 - Room invite control: native device share sheet when available, clipboard
   fallback otherwise, plus a selectable URL when browser APIs are unavailable
 - Responsive canvas-first shell: dynamic viewport sizing, safe-area padding,
@@ -41,11 +42,11 @@ JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
 - Remote collaborator labels: idle cursor positions plus live stroke-endpoint
   labels, with edge-aware placement (ephemeral)
 - rAF-batched outgoing points; immediate local drawing
-- Two stacked canvas layers with brush / partial eraser / colour / per-tool
-  width presets (1–32px retained independently), circular eraser cursor, and a
-  confirmed room-wide Clear (durable and undoable). Keyboard: `B` / `E` for
-  tools; ⌘/Ctrl+Z and ⌘/Ctrl+Shift+Z (or Y) for global undo/redo when focus is
-  not in an input.
+- Two stacked canvas layers with brush / eraser / colour / per-tool width
+  (1–32px retained independently), circular eraser cursor, and a confirmed
+  room-wide Clear (durable and undoable). Keyboard: `B` / `E` for tools;
+  ⌘/Ctrl+Z and ⌘/Ctrl+Shift+Z (or Y) for global undo/redo when focus is not in
+  an input.
 - Dirty-layer paint API (no permanent render loop)
 - Scripts: `dev`, `dev:client`, `typecheck`, `test`, `load`, `build`, `deploy`
 - Vitest: isolation, protocol, live strokes, history, reconnect/expiry,
@@ -63,11 +64,10 @@ npm run build
 npm run dev
 ```
 
-Then open `http://127.0.0.1:8787/`, choose a name (or accept **New name**),
+Then open `http://127.0.0.1:8787/`, enter a name (or click **Random name**),
 create a room, and open the same room URL in a second browser profile. A
-first-time visitor is asked for a name before joining; a returning browser uses
-its remembered local name. Draw in one client — the peer should see the stroke
-**while it is still in progress**.
+first-time visitor must supply a name before joining. Draw in one client — the
+peer should see the stroke **while it is still in progress**.
 
 This setup was re-run from a clean clone on 26 July 2026: `npm ci`, typecheck,
 77 tests, and the production build all passed. Cloudflare authentication is

@@ -199,17 +199,6 @@ h1 {
   color: var(--ink);
 }
 
-.width-presets {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-
-.width-presets button {
-  min-width: 2.5rem;
-  padding-inline: 0.55rem;
-}
-
 .clear-controls {
   display: inline-flex;
   align-items: center;
@@ -752,11 +741,6 @@ h1 {
 
   .field input[type="range"] {
     width: 6.25rem;
-  }
-
-  .width-presets button {
-    min-width: 2.75rem;
-    min-height: 2.75rem;
   }
 
   .clear-confirmation {

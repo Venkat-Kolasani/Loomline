@@ -1,7 +1,5 @@
 import type { DrawingTool } from "./stroke";
 
-export const WIDTH_PRESETS = [2, 4, 8, 16] as const;
-
 export interface ToolSettings {
   brushWidth: number;
   eraserWidth: number;

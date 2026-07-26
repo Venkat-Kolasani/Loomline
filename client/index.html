@@ -21,14 +21,15 @@
             id="artist-name"
             name="artistName"
             maxlength="24"
-            autocomplete="nickname"
+            autocomplete="off"
             spellcheck="false"
+            placeholder="Enter your name"
             aria-describedby="artist-name-hint landing-error"
           />
-          <button type="button" id="new-artist-name">New name</button>
+          <button type="button" id="new-artist-name">Random name</button>
         </div>
         <p id="artist-name-hint" class="artist-name-hint">
-          Remembered only in this browser. No account required.
+          Type a nickname or use Random name. No account required.
         </p>
       </section>
       <div class="landing-actions">
@@ -108,9 +109,9 @@
           type="button"
           id="tool-eraser"
           aria-pressed="false"
-          title="Partial eraser (E)"
+          title="Eraser (E)"
         >
-          Partial eraser
+          Eraser
         </button>
         <label class="field">
           <span>Color</span>
@@ -121,12 +122,6 @@
           <input id="tool-width" type="range" min="1" max="32" value="4" />
           <span id="tool-width-value" class="width-value">4px</span>
         </label>
-        <div class="width-presets" role="group" aria-label="Stroke width presets">
-          <button type="button" data-width-preset="2" aria-pressed="false">2</button>
-          <button type="button" data-width-preset="4" aria-pressed="true" class="is-active">4</button>
-          <button type="button" data-width-preset="8" aria-pressed="false">8</button>
-          <button type="button" data-width-preset="16" aria-pressed="false">16</button>
-        </div>
         <div class="clear-controls">
           <button
             type="button"

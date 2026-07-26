@@ -4,7 +4,6 @@ import { LocalDrawingController } from "./canvas/local-drawing";
 import { RemoteStrokeStore } from "./canvas/remote-strokes";
 import type { DrawingTool } from "./canvas/stroke";
 import {
-  WIDTH_PRESETS,
   createToolSettings,
   widthForTool,
   withToolWidth,
@@ -12,7 +11,6 @@ import {
 } from "./canvas/tool-settings";
 import {
   createArtistName,
-  loadArtistName,
   normalizeArtistName,
   saveArtistName,
   type NameStorage,
@@ -158,9 +156,6 @@ const widthLabel = requireElement(
   "#tool-width-label",
   (node): node is HTMLElement => node instanceof HTMLElement,
 );
-const widthPresetButtons = Array.from(
-  document.querySelectorAll<HTMLButtonElement>("[data-width-preset]"),
-);
 const clearConfirmation = requireElement(
   "#clear-confirmation",
   (node): node is HTMLElement => node instanceof HTMLElement,
@@ -190,8 +185,7 @@ let pendingCursor: StrokePoint | null = null;
 let cursorRaf: number | null = null;
 const diagnostics = isDebugEnabled() ? new DiagnosticsPanel() : null;
 const artistNameStorage = getArtistNameStorage();
-const savedArtistName = loadArtistName(artistNameStorage);
-artistNameInput.value = savedArtistName ?? createArtistName();
+artistNameInput.value = "";
 
 const surface = new LayeredCanvasSurface({
   committedCanvas,
@@ -258,19 +252,8 @@ function applyActiveToolWidth(): void {
 function syncWidthControls(): void {
   const tool = drawing.getTool();
   const width = widthForTool(toolSettings, tool);
-  widthLabel.textContent =
-    tool === "eraser" ? "Partial eraser width" : "Brush width";
+  widthLabel.textContent = tool === "eraser" ? "Eraser width" : "Brush width";
   widthValue.textContent = `${width}px`;
-  for (const button of widthPresetButtons) {
-    const preset = Number(button.dataset.widthPreset);
-    const isActive = WIDTH_PRESETS.includes(
-      preset as (typeof WIDTH_PRESETS)[number],
-    )
-      ? preset === width
-      : false;
-    button.classList.toggle("is-active", isActive);
-    button.setAttribute("aria-pressed", isActive ? "true" : "false");
-  }
 }
 
 function setWidthForActiveTool(width: number): void {
@@ -709,12 +692,8 @@ function routeFromLocation(): void {
     showLanding();
     return;
   }
-  const rememberedName = loadArtistName(artistNameStorage);
-  if (rememberedName === null) {
-    showLanding(roomId);
-    return;
-  }
-  enterRoom(roomId, rememberedName);
+  // Always collect the name on the landing form — never autofill or silent-join.
+  showLanding(roomId);
 }
 
 createRoomButton.addEventListener("click", () => {
@@ -785,16 +764,6 @@ colorInput.addEventListener("input", () => {
 widthInput.addEventListener("input", () => {
   setWidthForActiveTool(Number(widthInput.value));
 });
-
-for (const button of widthPresetButtons) {
-  button.addEventListener("click", () => {
-    const preset = Number(button.dataset.widthPreset);
-    if (!Number.isFinite(preset)) {
-      return;
-    }
-    setWidthForActiveTool(preset);
-  });
-}
 
 clearButton.addEventListener("click", () => {
   if (!roomSocket?.isReady()) {

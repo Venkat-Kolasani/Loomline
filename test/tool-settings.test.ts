@@ -6,7 +6,7 @@ import {
 } from "../client/src/canvas/tool-settings";
 
 describe("tool settings", () => {
-  it("keeps brush and partial-eraser widths independently", () => {
+  it("keeps brush and eraser widths independently", () => {
     const initial = createToolSettings(4, 12);
     const updated = withToolWidth(initial, "eraser", 20);
 

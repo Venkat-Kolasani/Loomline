@@ -385,17 +385,20 @@ or a client-controlled participant identity.
 
 ### Selected design
 
-The landing page offers a 1–24-character name with a readable random fallback.
-The normalized value is stored only in browser `localStorage` and passed through
-the existing optional `join.displayName` field. A first-time `/r/<roomId>` visit
-stays on the landing page until the user joins; a returning browser can rejoin
-with its saved name. The Durable Object still trims/caps the wire value and
+The landing page offers an empty 1–24-character name field (`autocomplete="off"`)
+plus a **Random name** button. The field is never prefilled with a generated or
+restored value. After a successful join, the normalized name is stored in
+browser `localStorage` for optional future use, but every visit still requires
+an explicit name entry (or Random name). Deep links to `/r/<roomId>` always show
+the landing form first. The Durable Object still trims/caps the wire value and
 assigns a fresh participant id and deterministic colour on every join.
 
 ### Rejected alternatives
 
 - **Keep opaque generated names only:** requires no UI but makes people and
   cursor labels harder to follow in a collaboration demo.
+- **Prefill a random nickname on load:** looks like browser autofill and makes
+  the name feel unchosen.
 - **Persist a server-side profile or auth account:** exceeds assignment scope
   and does not improve authoritative canvas ordering.
 - **Live rename / client-provided participant id:** adds a new presence protocol
@@ -512,16 +515,19 @@ or inventing a third eraser mode that would complicate global undo.
 ### Selected design
 
 Client-only `ToolSettings` retains brush and eraser widths independently (1–32px,
-same clamp as the renderer). The toolbar shows contextual width label + presets,
-keeps colour disabled for eraser, and uses the existing circular eraser cursor.
-Clear requires an explicit “Clear for everyone?” confirmation because clear is
+same clamp as the renderer). The toolbar shows a contextual width label + range
+slider (no numeric preset chips), keeps colour disabled for eraser, and uses the
+existing circular eraser cursor. The eraser control is labelled **Eraser**. Clear
+requires an explicit “Clear for everyone?” confirmation because clear is
 room-global and durable. Keyboard shortcuts (`B`/`E`, modifier undo/redo) are
 ignored while focus is in an editable control.
 
 ### Rejected alternatives
 
 - **One shared width for brush and eraser:** forces awkward size changes when
-  switching tools and hides the Notability-style partial-eraser affordance.
+  switching tools.
+- **Width preset chip row (2/4/8/16):** cluttered the compact toolbar without
+  improving control over the existing 1–32 range slider.
 - **Whole-stroke eraser / object deletion:** would require targeting completed
   ops and new conflict rules; deferred past submission.
 - **Immediate Clear without confirmation:** too easy to wipe a collaborative

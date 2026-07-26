@@ -15,7 +15,8 @@ import {
   saveArtistName,
   type NameStorage,
 } from "./identity/artist-name";
-import { createInviteUrl, shareInvite } from "./rooms/invite";
+import { createInviteUrl, copyInvite, shareInvite } from "./rooms/invite";
+import { normalizeHexColor } from "./canvas/color-presets";
 import {
   DiagnosticsPanel,
   withDebugQuery,
@@ -107,6 +108,10 @@ const shareRoomButton = requireElement(
   "#share-room",
   (node): node is HTMLButtonElement => node instanceof HTMLButtonElement,
 );
+const copyRoomLinkButton = requireElement(
+  "#copy-room-link",
+  (node): node is HTMLButtonElement => node instanceof HTMLButtonElement,
+);
 const shareStatus = requireElement(
   "#share-status",
   (node): node is HTMLElement => node instanceof HTMLElement,
@@ -130,6 +135,9 @@ const eraserButton = requireElement(
 const colorInput = requireElement(
   "#tool-color",
   (node): node is HTMLInputElement => node instanceof HTMLInputElement,
+);
+const colorSwatchButtons = Array.from(
+  document.querySelectorAll<HTMLButtonElement>("[data-color-preset]"),
 );
 const widthInput = requireElement(
   "#tool-width",
@@ -236,8 +244,28 @@ function setActiveTool(tool: DrawingTool): void {
   eraserButton.classList.toggle("is-active", tool === "eraser");
   colorInput.disabled = tool === "eraser";
   colorInput.setAttribute("aria-disabled", tool === "eraser" ? "true" : "false");
+  for (const swatch of colorSwatchButtons) {
+    swatch.disabled = tool === "eraser";
+  }
   applyActiveToolWidth();
   hideClearConfirmation();
+}
+
+function setBrushColor(color: string): void {
+  const normalized = normalizeHexColor(color) ?? color.toLowerCase();
+  colorInput.value = normalized;
+  drawing.setColor(normalized);
+  syncColorSwatches(normalized);
+}
+
+function syncColorSwatches(activeColor: string): void {
+  const normalized = normalizeHexColor(activeColor) ?? activeColor.toLowerCase();
+  for (const swatch of colorSwatchButtons) {
+    const preset = swatch.dataset.colorPreset?.toLowerCase() ?? "";
+    const isActive = preset === normalized;
+    swatch.classList.toggle("is-active", isActive);
+    swatch.setAttribute("aria-pressed", isActive ? "true" : "false");
+  }
 }
 
 function applyActiveToolWidth(): void {
@@ -478,6 +506,7 @@ function enterRoom(roomId: string, displayName: string): void {
   renderPresence([]);
 
   drawing.setColor(colorInput.value);
+  syncColorSwatches(colorInput.value);
   setActiveTool("brush");
   hideClearConfirmation();
   resizeSurface();
@@ -540,8 +569,7 @@ function enterRoom(roomId: string, displayName: string): void {
       selfBadge.hidden = false;
       selfBadge.textContent = participant.displayName;
       selfBadge.style.setProperty("--self-color", participant.color);
-      colorInput.value = participant.color;
-      drawing.setColor(participant.color);
+      setBrushColor(participant.color);
     },
     onPresence: (participants) => {
       if (roomSocket !== socket) {
@@ -748,6 +776,17 @@ shareRoomButton.addEventListener("click", async () => {
   shareStatus.textContent = "Select the invite link above to copy it.";
 });
 
+copyRoomLinkButton.addEventListener("click", async () => {
+  const result = await copyInvite(window.navigator, roomLink.value);
+  if (result === "copied") {
+    shareStatus.textContent = "Invite link copied.";
+    return;
+  }
+  roomLink.focus();
+  roomLink.select();
+  shareStatus.textContent = "Select the invite link above to copy it.";
+});
+
 brushButton.addEventListener("click", () => {
   setActiveTool("brush");
 });
@@ -757,8 +796,19 @@ eraserButton.addEventListener("click", () => {
 });
 
 colorInput.addEventListener("input", () => {
-  drawing.setColor(colorInput.value);
+  setBrushColor(colorInput.value);
 });
+
+for (const swatch of colorSwatchButtons) {
+  swatch.addEventListener("click", () => {
+    const preset = swatch.dataset.colorPreset;
+    if (!preset) {
+      return;
+    }
+    setActiveTool("brush");
+    setBrushColor(preset);
+  });
+}
 
 widthInput.addEventListener("input", () => {
   setWidthForActiveTool(Number(widthInput.value));

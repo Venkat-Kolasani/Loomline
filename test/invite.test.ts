@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { createInviteUrl, shareInvite } from "../client/src/rooms/invite";
+import {
+  copyInvite,
+  createInviteUrl,
+  shareInvite,
+} from "../client/src/rooms/invite";
 
 describe("room invite sharing", () => {
   it("creates the canonical room URL without carrying local debug state", () => {
@@ -37,6 +41,16 @@ describe("room invite sharing", () => {
     ).resolves.toBe("copied");
   });
 
+  it("copies directly from the invite copy control", async () => {
+    const clipboard = { writeText: vi.fn().mockResolvedValue(undefined) };
+    await expect(
+      copyInvite({ clipboard }, "https://loomline.example/r/abcd1234"),
+    ).resolves.toBe("copied");
+    expect(clipboard.writeText).toHaveBeenCalledWith(
+      "https://loomline.example/r/abcd1234",
+    );
+  });
+
   it("does not overwrite the clipboard when a user cancels sharing", async () => {
     const clipboard = { writeText: vi.fn() };
     await expect(
@@ -54,6 +68,9 @@ describe("room invite sharing", () => {
   it("leaves a manual selection fallback when no API can complete", async () => {
     await expect(
       shareInvite({}, "https://loomline.example/r/abcd1234"),
+    ).resolves.toBe("manual");
+    await expect(
+      copyInvite({}, "https://loomline.example/r/abcd1234"),
     ).resolves.toBe("manual");
   });
 });

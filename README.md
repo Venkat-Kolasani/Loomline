@@ -17,8 +17,10 @@ JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
 - Browser-local artist name: empty by default; type a nickname or use
   **Random name** (1–24 trimmed characters). Chosen names are saved in
   `localStorage` after join, but the field is never prefilled.
-- Room invite control: native device share sheet when available, clipboard
-  fallback otherwise, plus a selectable URL when browser APIs are unavailable
+- Room invite control: copy-link icon next to the URL, native share sheet when
+  available, clipboard fallback otherwise, plus a selectable URL when browser
+  APIs are unavailable
+- Brush colour presets (8 swatches) plus a custom colour picker
 - Responsive canvas-first shell: dynamic viewport sizing, safe-area padding,
   compact presence, and a single horizontally scrollable mobile tool row
 - Worker routes `/ws?room=` to one Durable Object per room via `idFromName`

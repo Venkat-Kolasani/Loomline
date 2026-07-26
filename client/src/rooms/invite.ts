@@ -36,6 +36,14 @@ export async function shareInvite(
     }
   }
 
+  return copyInvite(navigatorLike, url);
+}
+
+/** One-click clipboard write for the invite URL (icon control next to the link). */
+export async function copyInvite(
+  navigatorLike: InviteNavigator,
+  url: string,
+): Promise<"copied" | "manual"> {
   if (navigatorLike.clipboard) {
     try {
       await navigatorLike.clipboard.writeText(url);
@@ -44,7 +52,6 @@ export async function shareInvite(
       // The readonly input remains available for manual selection and copy.
     }
   }
-
   return "manual";
 }
 

@@ -72,6 +72,40 @@
                 readonly
                 aria-label="Room invite link"
               />
+              <button
+                type="button"
+                id="copy-room-link"
+                class="icon-button"
+                aria-label="Copy invite link"
+                title="Copy invite link"
+              >
+                <svg
+                  class="icon"
+                  viewBox="0 0 24 24"
+                  width="18"
+                  height="18"
+                  aria-hidden="true"
+                  focusable="false"
+                >
+                  <rect
+                    x="8"
+                    y="8"
+                    width="12"
+                    height="12"
+                    rx="2"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.75"
+                  />
+                  <path
+                    d="M6 16H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.75"
+                    stroke-linecap="round"
+                  />
+                </svg>
+              </button>
               <button type="button" id="share-room">Share link</button>
             </div>
             <p id="share-status" class="share-status" role="status" aria-live="polite"></p>
@@ -113,10 +147,23 @@
         >
           Eraser
         </button>
-        <label class="field">
-          <span>Color</span>
-          <input id="tool-color" type="color" value="#0f6a5a" />
-        </label>
+        <div class="color-field" role="group" aria-label="Brush color">
+          <span class="color-field-label">Color</span>
+          <div class="color-presets" role="group" aria-label="Color presets">
+            <button type="button" class="color-swatch is-active" data-color-preset="#0f6a5a" aria-label="Teal" aria-pressed="true" style="--swatch:#0f6a5a"></button>
+            <button type="button" class="color-swatch" data-color-preset="#1d4ed8" aria-label="Blue" aria-pressed="false" style="--swatch:#1d4ed8"></button>
+            <button type="button" class="color-swatch" data-color-preset="#b45309" aria-label="Amber" aria-pressed="false" style="--swatch:#b45309"></button>
+            <button type="button" class="color-swatch" data-color-preset="#be123c" aria-label="Rose" aria-pressed="false" style="--swatch:#be123c"></button>
+            <button type="button" class="color-swatch" data-color-preset="#334155" aria-label="Slate" aria-pressed="false" style="--swatch:#334155"></button>
+            <button type="button" class="color-swatch" data-color-preset="#7c3aed" aria-label="Violet" aria-pressed="false" style="--swatch:#7c3aed"></button>
+            <button type="button" class="color-swatch" data-color-preset="#0f766e" aria-label="Cyan" aria-pressed="false" style="--swatch:#0f766e"></button>
+            <button type="button" class="color-swatch" data-color-preset="#111827" aria-label="Ink" aria-pressed="false" style="--swatch:#111827"></button>
+          </div>
+          <label class="field color-custom">
+            <span class="visually-hidden">Custom color</span>
+            <input id="tool-color" type="color" value="#0f6a5a" title="Custom color" />
+          </label>
+        </div>
         <label class="field">
           <span id="tool-width-label">Brush width</span>
           <input id="tool-width" type="range" min="1" max="32" value="4" />

@@ -26,6 +26,12 @@ npm run typecheck && npm run test && npm run build
    does not highlight.
 3. Copy invite still works via the copy icon / Share link.
 
+### Follow-up — mobile + Apple Pencil (same day)
+
+Empty-state uses CSS `::before` (no selectable DOM text). Canvas
+`touchstart`/`touchmove` are non-passive + `preventDefault`; `selectstart`
+blocked on the stage. Deployed so phone/iPad Safari pick up the fix.
+
 ## Rectangle shape tool (2026-07-26)
 
 `PROTOCOL_VERSION` 4. `shape:rect` commits one durable `kind: "rect"` op with

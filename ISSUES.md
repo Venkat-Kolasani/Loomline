@@ -649,6 +649,14 @@ blurring on draw start covers width slider focus without hiding controls.
 `(hover: none) and (pointer: coarse)` confirms Room sheet shell; re-test finger
 draw on device after deploy.
 
+**Follow-up (same day)**
+Mobile + Apple Pencil still selected the centered empty-state *box* because
+Safari starts selection on `touchstart` before `pointerdown`, and DOM text
+remains selectable even with `pointer-events: none`. Empty-state copy moved to
+CSS `::before` (no text node); non-passive `touchstart`/`touchmove` +
+`selectstart` guards clear selection; `#view-room` / stage use
+`touch-action: none`. Deployed with this slice.
+
 ---
 
 Copy this block when logging a future issue:

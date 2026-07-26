@@ -48,6 +48,10 @@ body {
   margin: 0 auto;
   padding: 1rem 1rem 1.25rem;
   gap: 0.75rem;
+  /* Finger / Apple Pencil must not select chrome text while drawing. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .topbar {
@@ -367,6 +371,7 @@ h1 {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
+  touch-action: none;
 }
 
 .canvas-stage {
@@ -497,6 +502,11 @@ h1 {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
+}
+
+/* CSS content is not a DOM text node — Safari cannot select-all it on Pencil/finger. */
+.empty-state::before {
+  content: "Draw to start. Peers see live ink; finished strokes sync as ordered room operations.";
 }
 
 .empty-state[hidden] {

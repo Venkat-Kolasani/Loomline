@@ -99,6 +99,17 @@ export class LocalDrawingController {
     this.liveCanvas.addEventListener("pointerup", this.onPointerUp);
     this.liveCanvas.addEventListener("pointercancel", this.onPointerUp);
     this.liveCanvas.addEventListener("lostpointercapture", this.onLostCapture);
+    // Non-passive touch listeners: iOS Safari starts text selection on
+    // touchstart before pointerdown; preventDefault stops that (finger + Pencil).
+    this.liveCanvas.addEventListener("touchstart", this.onTouchGuard, {
+      passive: false,
+    });
+    this.liveCanvas.addEventListener("touchmove", this.onTouchGuard, {
+      passive: false,
+    });
+    const stage = this.liveCanvas.parentElement;
+    stage?.addEventListener("selectstart", this.onSelectStart);
+    stage?.addEventListener("gesturestart", this.onSelectStart);
   }
 
   setNetworkHooks(network: LocalDrawingNetworkHooks | undefined): void {
@@ -282,6 +293,7 @@ export class LocalDrawingController {
     }
 
     event.preventDefault();
+    clearDomSelection();
     // Drop focus from invite URL / width slider so iPad Safari cannot
     // select-all a text field while the finger starts a stroke.
     blurActiveFormControl(this.liveCanvas);
@@ -343,6 +355,7 @@ export class LocalDrawingController {
     }
 
     event.preventDefault();
+    clearDomSelection();
 
     if (this.activeRect) {
       // Local preview only — no network frames while dragging a rectangle.
@@ -383,6 +396,17 @@ export class LocalDrawingController {
       return;
     }
     this.finishPointer(event.pointerId, event);
+  };
+
+  private readonly onTouchGuard = (event: TouchEvent): void => {
+    // Required so iOS does not treat the stroke as a text-selection gesture.
+    event.preventDefault();
+    clearDomSelection();
+  };
+
+  private readonly onSelectStart = (event: Event): void => {
+    event.preventDefault();
+    clearDomSelection();
   };
 
   private finishPointer(pointerId: number, endEvent?: PointerEvent): void {
@@ -488,6 +512,13 @@ export class LocalDrawingController {
 
   private notify(): void {
     this.onStrokesChanged?.(this.hasInk());
+  }
+}
+
+function clearDomSelection(): void {
+  const selection = window.getSelection?.();
+  if (selection && selection.rangeCount > 0) {
+    selection.removeAllRanges();
   }
 }
 

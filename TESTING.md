@@ -3,6 +3,54 @@
 Evidence log for Loomline. Record **exact commands and outcomes**. Do not claim
 untested behavior.
 
+## Deploy refresh + mobile acceptance gate (2026-07-26)
+
+### Root cause of stale live URL
+
+Cloudflare Workers Builds history for `loomline` is empty — git push never
+auto-deployed. Production was last uploaded 2026-07-25 until a manual:
+
+```text
+npm run deploy
+→ https://loomline.kolasanivenkat2.workers.dev
+→ Current Version ID: 7f696ade-815a-46e2-aef3-52b7d1b506bf
+```
+
+Live HTML/JS after deploy includes artist name, Share link, Partial eraser,
+width presets, Clear confirmation, and Metrics dock labels.
+
+Optional CI: `.github/workflows/deploy-cloudflare.yml` (needs repository secrets
+`CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`; account id for this project is
+available via `npx wrangler whoami`).
+
+### Automated regression (same session)
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files 24 passed (24)
+→ Tests 99 passed (99)
+→ Vite production build exit 0
+```
+
+### Live browser acceptance (Chromium embedded browser)
+
+Room `https://loomline.kolasanivenkat2.workers.dev/r/92cd5054` as **Cedar Lantern**:
+
+| Check | Result |
+| --- | --- |
+| Desktop ~1920×1080 Connected + Share/Partial eraser/presets | Pass (screenshot) |
+| 390×844 mobile grid `topbar / presence / stage / toolbar` | Pass (`stage` before `toolbar`) |
+| Touch PointerEvent draw → committed opaque pixels `6909`, Undo enabled | Pass |
+| Partial eraser + Clear confirmation show/cancel | Pass (`Partial eraser width`, clear confirm visible then cancelled) |
+| Reload reconnect restores committed ink (`opaque` 2402, Undo on) | Pass |
+| Tablet 768×1024 layout usable | Pass (desktop toolbar order; breakpoint is ≤640px) |
+
+### Still unchecked (physical device)
+
+- [ ] Real iOS or Android two-user session on a phone/tablet (required before
+  claiming the mobile compliance checkbox / starting rectangle stretch work)
+
 ## Collapsed metrics dock gate (2026-07-26)
 
 ### Automated
@@ -602,7 +650,9 @@ npm run typecheck && npm run test && npm run build
 ### Touch / mobile
 
 - [x] Touch drawing path exercised via PointerEvent emulation (earlier slice)
-- [ ] Controls usable on narrow viewport / physical mobile device
+- [x] Narrow viewport (390px) canvas-first grid + touch draw/erase/clear UX on
+  deployed URL (embedded Chromium device metrics; 2026-07-26)
+- [ ] Controls usable on physical iOS/Android device (two-user)
 
 ### Deployed smoke
 
@@ -612,6 +662,8 @@ npm run typecheck && npm run test && npm run build
 - [x] Separate room isolation
 - [x] Global undo/redo convergence
 - [x] Reconnect snapshot recovery
+- [x] 2026-07-26 polish redeploy (`7f696ade…`) verified with Partial eraser /
+  Share link / artist name on production
 
 ## Results — live stroke streaming (2026-07-25)
 

@@ -84,6 +84,12 @@ needed only for `npm run deploy`; no credentials or tokens are stored here.
 | `npm run deploy` | Build + `wrangler deploy` (requires Cloudflare auth) |
 | `npm run cf-typegen` | Regenerate `worker-configuration.d.ts` from Wrangler config |
 
+**Important:** pushing to GitHub does **not** update the live Worker by itself.
+Cloudflare Workers Builds is not linked to this repo. After polish commits, run
+`npm run deploy`, or configure the optional GitHub Action secrets
+`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` so
+`.github/workflows/deploy-cloudflare.yml` can publish on `main`.
+
 ## Multi-user testing
 
 Use the live URL above, or run `npm run dev` and use
@@ -124,12 +130,11 @@ Full commands and constraints are in [TESTING.md](./TESTING.md).
 
 ## Supported browsers
 
-- **Verified:** Chromium-based Cursor browser on macOS 26.2, local and deployed.
+- **Verified:** Chromium-based Cursor browser on macOS 26.2, local and deployed;
+  deployed 390px mobile layout + touch PointerEvent draw/erase on
+  <https://loomline.kolasanivenkat2.workers.dev>.
 - **Input path verified:** mouse and synthetic PointerEvent touch emulation.
-- **Not yet claimed:** physical iOS/Android device testing, narrow-viewport
-  usability, Firefox, or Safari. The implementation uses standard Canvas 2D,
-  Pointer Events, DOM, and native WebSocket APIs, but those browsers/devices
-  remain unchecked until manually exercised.
+- **Not yet claimed:** physical iOS/Android two-user session, Firefox, or Safari.
 
 ## Known limitations
 

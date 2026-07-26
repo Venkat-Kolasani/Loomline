@@ -292,6 +292,20 @@ Product name is **Loomline** (repository and Worker name match).
 - Owns pausing the rAF sampler while the dock is collapsed
 - Owns keeping metrics behind `?debug=1` only
 
+## Deploy refresh + mobile acceptance (`test(mobile): record responsive and touch acceptance evidence`)
+
+### Assisted by AI
+
+- Diagnosis of missing Workers Builds git link, Wrangler redeploy, optional
+  GitHub Action workflow draft, live viewport/touch acceptance notes
+
+### Manually reviewed / owned by the author
+
+- Explains why git push alone cannot update `workers.dev` without Builds or
+  Actions secrets
+- Owns keeping the physical-device checklist unchecked until a real phone test
+- Owns the redeploy version id and live acceptance evidence in TESTING.md
+
 ## Retained-code understanding statement
 
 The author is responsible for every retained line and can explain its purpose,

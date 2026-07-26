@@ -311,18 +311,27 @@ Wrangler OAuth state remains in the developer's local Cloudflare configuration.
 No API token, account id, `.dev.vars`, or `.env` value is required by the app or
 committed to the repository.
 
+**Git push does not publish the Worker by itself.** Cloudflare Workers Builds is
+not connected to this repository (build history is empty). Production updates
+require `npm run deploy` (local Wrangler OAuth) or the optional GitHub Action
+`.github/workflows/deploy-cloudflare.yml` after
+`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repository secrets are set.
+
 ### Rejected alternative
 
 Split the static client onto a second host and point it at a separately deployed
 WebSocket origin. Rejected because it adds CORS/origin configuration and another
 failure boundary without helping the room consistency model. A temporary
 preview deployment was also rejected because the submission needs a stable URL.
+Assuming “git auto-deploy” without Workers Builds or Actions was also rejected —
+it silently left production on an older upload.
 
 ### Verification
 
 - `wrangler deploy --dry-run` resolved `ROOM` and `ASSETS`.
-- Production deployment version
-  `a1fc2216-2c09-4bf7-b6b9-d9cf4f431c76` completed successfully.
+- Production redeploy on 26 July 2026 (version
+  `7f696ade-815a-46e2-aef3-52b7d1b506bf`) served current polish HTML/JS
+  (`Partial eraser`, Share link, artist name).
 - `/` and `/api/health` returned HTTP 200.
 - Fresh production clients proved mid-stroke fan-out, isolated rooms, matching
   global undo/redo state, and reconnect `sync_state`. Exact evidence is in

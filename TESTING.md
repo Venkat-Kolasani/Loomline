@@ -3,6 +3,49 @@
 Evidence log for Loomline. Record **exact commands and outcomes**. Do not claim
 untested behavior.
 
+## Multi-client acceptance + I17 rate-limit fix (2026-07-26)
+
+### Automated
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files 25 passed (25)
+→ Tests 103 passed (103)  # includes boundaries “valid ping flood does not block stroke commit”
+→ Vite production build exit 0
+
+npm run acceptance
+→ LOOM_WS=ws://127.0.0.1:8787  → 8/8 PASS
+→ LOOM_WS=wss://loomline.kolasanivenkat2.workers.dev  → 8/8 PASS
+  (join, live fan-out, overlapping seqs, undo/redo, mid-join, reconnect,
+   room isolation, clear+undo)
+```
+
+### Browser + peer live mid-stroke (local)
+
+Room `http://127.0.0.1:8787/r/dc4ddbc5` (Metrics collapsed):
+
+| Check | Result |
+| --- | --- |
+| Browser PointerEvent stroke commits (`stroke:start`/`points`/`end`, Undo on) | Pass |
+| Node peer sees live `start` + batched `points` + `end` then `operation:committed` seq 2 | Pass |
+
+### Mobile 390×844 touch re-proof (local, this session)
+
+Room `http://127.0.0.1:8787/r/cf41a902` as **Mobile Check**, Chromium
+`Emulation.setDeviceMetricsOverride` 390×844 `mobile:true`:
+
+| Check | Result |
+| --- | --- |
+| Connected; layout tops `topbar` → `presence-panel` → `stage-wrap` → `toolbar` | Pass |
+| Touch `pointerType:'touch'` draw → opaque `4614`, Undo enabled | Pass |
+| Eraser selected + touch erase → opaque `2006` (ink reduced), label `Eraser width` | Pass |
+
+### Deploy note
+
+Git push does **not** auto-deploy this Worker. Production still needs a manual
+`npm run deploy` after this fix lands if reviewers must see I17 on the live URL.
+
 ## Slice 7 complete — metrics on demo + mobile acceptance (2026-07-26)
 
 ### Metrics on the live demo

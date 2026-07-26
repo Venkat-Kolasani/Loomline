@@ -698,6 +698,18 @@ function enterRoom(roomId: string, displayName: string): void {
         code === "unsupported_type" ||
         code === "invalid_payload"
       ) {
+        // Drop provisional local ink that will never receive operation:committed
+        // (e.g. stroke:end dropped by rate_limited → ghost awaiting-commit brush).
+        if (
+          code === "unknown_stroke" ||
+          code === "stroke_expired" ||
+          code === "rate_limited"
+        ) {
+          drawing.abandonUncommitted();
+          liveStrokeTransport?.clear();
+          surface.markAllDirty();
+          updateEmptyState();
+        }
         console.debug("Room error", code, message);
         return;
       }

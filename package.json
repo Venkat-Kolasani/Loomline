@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "load": "node scripts/synthetic-load.mjs",
+    "acceptance": "node scripts/acceptance-multi-client.mjs",
     "deploy": "npm run build && wrangler deploy",
     "cf-typegen": "wrangler types"
   },

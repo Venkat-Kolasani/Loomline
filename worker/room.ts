@@ -200,17 +200,13 @@ export class RoomDurableObject extends DurableObject<Env> {
     message: string | ArrayBuffer,
   ): Promise<void> {
     const attachment = ws.deserializeAttachment() as SocketAttachment | null;
+    const participantId = attachment?.participantId;
 
-    // Joined sockets: every frame counts toward the budget before type/size/parse
-    // so binary, malformed, oversized, unknown-type, and repeated-join floods cannot bypass.
-    if (attachment?.participantId) {
+    if (typeof message !== "string") {
+      // Count binary floods toward the budget before rejecting.
       if (
-        !allowParticipantMessage(
-          this.messageRates,
-          attachment.participantId,
-          Date.now(),
-          effectiveMaxMessagesPerWindow(),
-        )
+        participantId &&
+        !this.consumeRateLimit(participantId)
       ) {
         this.sendError(
           ws,
@@ -219,15 +215,23 @@ export class RoomDurableObject extends DurableObject<Env> {
         );
         return;
       }
-    }
-
-    if (typeof message !== "string") {
       this.sendError(ws, "invalid_payload", "Binary frames are not supported.");
       return;
     }
 
     const byteLength = new TextEncoder().encode(message).byteLength;
     if (byteLength > MAX_CLIENT_MESSAGE_BYTES) {
+      if (
+        participantId &&
+        !this.consumeRateLimit(participantId)
+      ) {
+        this.sendError(
+          ws,
+          "rate_limited",
+          "Too many messages; slow down while keeping the room alive.",
+        );
+        return;
+      }
       this.sendError(
         ws,
         "payload_too_large",
@@ -240,12 +244,34 @@ export class RoomDurableObject extends DurableObject<Env> {
     try {
       parsed = JSON.parse(message) as unknown;
     } catch {
+      if (
+        participantId &&
+        !this.consumeRateLimit(participantId)
+      ) {
+        this.sendError(
+          ws,
+          "rate_limited",
+          "Too many messages; slow down while keeping the room alive.",
+        );
+        return;
+      }
       this.sendError(ws, "invalid_json", "Message must be JSON.");
       return;
     }
 
     const result = parseClientMessage(parsed);
     if (!result.ok) {
+      if (
+        participantId &&
+        !this.consumeRateLimit(participantId)
+      ) {
+        this.sendError(
+          ws,
+          "rate_limited",
+          "Too many messages; slow down while keeping the room alive.",
+        );
+        return;
+      }
       this.sendError(ws, result.code, result.message);
       return;
     }
@@ -254,6 +280,20 @@ export class RoomDurableObject extends DurableObject<Env> {
     if (!isValidRoomId(roomId) || result.message.roomId !== roomId) {
       this.sendError(ws, "room_mismatch", "roomId does not match this socket.");
       return;
+    }
+
+    // Valid ping is exempt from the drawing budget so RTT probes never drop
+    // stroke:points / stroke:end. Abuse still pays: malformed/oversized/binary
+    // frames are counted above before rejection.
+    if (result.message.type !== "ping" && participantId) {
+      if (!this.consumeRateLimit(participantId)) {
+        this.sendError(
+          ws,
+          "rate_limited",
+          "Too many messages; slow down while keeping the room alive.",
+        );
+        return;
+      }
     }
 
     switch (result.message.type) {
@@ -271,6 +311,15 @@ export class RoomDurableObject extends DurableObject<Env> {
         this.handleJoinedMessage(ws, attachment, result.message, roomId);
         return;
     }
+  }
+
+  private consumeRateLimit(participantId: string): boolean {
+    return allowParticipantMessage(
+      this.messageRates,
+      participantId,
+      Date.now(),
+      effectiveMaxMessagesPerWindow(),
+    );
   }
 
   async webSocketClose(

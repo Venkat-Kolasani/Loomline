@@ -128,9 +128,11 @@ hibernation-eligible. Do not invent an unmeasured operation-log wipe.
 
 **Selected.** Reject oversized text frames (`MAX_CLIENT_MESSAGE_BYTES = 16_384`
 UTF-8 bytes) before parse; shape validation in `parseClientMessage`;
-per-participant `120` messages / `1s` on every post-join frame; process every
-accepted history request under DO serialization (no debounce); on last leave,
-clear live state / expiry / alarms but retain committed ops.
+per-participant `120` messages / `1s` for joined drawing/control traffic
+(binary / malformed / oversized / strokes / cursor / history / repeated join).
+**Valid `ping` is exempt** so RTT probes cannot starve `stroke:end` (I17).
+Process every accepted history request under DO serialization (no debounce);
+on last leave, clear live state / expiry / alarms but retain committed ops.
 
 **Rejected.** Debouncing undo/redo (would silently drop intentional actions).
 Wiping the op log when empty or after arbitrary N (surprises rejoins; no
@@ -144,11 +146,11 @@ size bypass, rate limit, rapid history, zero-user cleanup).
 **Problem.** Interviewers ask for FPS / latency / scale evidence. Unmeasured
 “60 FPS / &lt;50 ms” claims violate the evidence rule.
 
-**Selected.** Collapsed **Metrics** dock in every room: Display rAF rate (only
-while expanded), WebSocket RTT via `ping`/`pong`, inbound/outbound messages/s,
+**Selected.** Collapsed **Metrics** dock in every room: Display rAF rate **and**
+RTT `ping`/`pong` only while expanded (I17), inbound/outbound messages/s,
 participants, sequence head. Reproducible `scripts/synthetic-load.mjs`
-(5×100 strokes). Never invent Worker CPU%. Never label display cadence as
-“Canvas FPS.”
+(5×100 strokes; protocol v2). Never invent Worker CPU%. Never label display
+cadence as “Canvas FPS.”
 
 **Rejected.** Always-expanded marketing HUD. Hiding metrics behind `?debug=1`
 only (reviewers need access without a secret flag).

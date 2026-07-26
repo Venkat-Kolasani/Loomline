@@ -168,6 +168,66 @@ describe("room input boundaries", () => {
     await setRoomRateLimitMax(roomId, null);
   });
 
+  it("does not let valid ping flood block stroke commit", async () => {
+    const roomId = "bbbb9024";
+    await setRoomRateLimitMax(roomId, 5);
+    const socket = await openRoomSocket(roomId);
+    await joinAndDrain(socket, roomId, "Ping-Exempt");
+
+    // More pings than the drawing budget; they must not consume it.
+    for (let i = 0; i < 12; i += 1) {
+      socket.send(
+        JSON.stringify({
+          type: "ping",
+          protocolVersion: PROTOCOL_VERSION,
+          roomId,
+          clientTime: i,
+        }),
+      );
+    }
+
+    const committed = waitForMessage(
+      socket,
+      (message): message is Extract<ServerMessage, { type: "operation:committed" }> =>
+        message.type === "operation:committed" &&
+        message.operation.kind === "stroke" &&
+        message.operation.strokeId === "after-pings",
+    );
+    socket.send(
+      JSON.stringify({
+        type: "stroke:start",
+        protocolVersion: PROTOCOL_VERSION,
+        roomId,
+        strokeId: "after-pings",
+        tool: "brush",
+        color: "#0f6a5a",
+        width: 4,
+        point: { x: 1, y: 1 },
+      }),
+    );
+    socket.send(
+      JSON.stringify({
+        type: "stroke:points",
+        protocolVersion: PROTOCOL_VERSION,
+        roomId,
+        strokeId: "after-pings",
+        points: [{ x: 2, y: 2 }],
+      }),
+    );
+    socket.send(
+      JSON.stringify({
+        type: "stroke:end",
+        protocolVersion: PROTOCOL_VERSION,
+        roomId,
+        strokeId: "after-pings",
+      }),
+    );
+    const op = await committed;
+    expect(op.operation.sequence).toBe(1);
+    socket.close(1000, "done");
+    await setRoomRateLimitMax(roomId, null);
+  });
+
   it("serializes rapid undo/redo without corrupting sequence or redo", async () => {
     const roomId = "bbbb9014";
     const socket = await openRoomSocket(roomId);

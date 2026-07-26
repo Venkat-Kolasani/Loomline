@@ -156,7 +156,9 @@ These are real constraints of the current code — not a backlog wishlist:
 4. **One SQLite JSON blob per completed stroke.** Very long strokes are not
    checkpoint-compacted (see DECISIONS D7).
 5. **In-memory rate limit.** The 120 messages / 1s per-participant limit resets
-   if the Durable Object is evicted mid-abuse. It is anti-spam, not auth.
+   if the Durable Object is evicted mid-abuse. It is anti-spam, not auth. Valid
+   `ping` frames are exempt so Metrics RTT probes cannot drop stroke commits;
+   Metrics pings run only while the dock is expanded.
 6. **Client chunks `stroke:points` at 64 points** (`MAX_POINTS_PER_MESSAGE`).
 7. **No measured room-size cap.** Local synthetic load reached 500 committed
    ops; there is no automatic log reset. Future checkpoint/retention needs a

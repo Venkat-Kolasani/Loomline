@@ -96,8 +96,10 @@ export class DiagnosticsPanel {
     this.root.addEventListener("toggle", () => {
       if (this.root.open && this.running) {
         this.scheduleRafSampler();
+        this.schedulePingTimer();
       } else {
         this.pauseRafSampler();
+        this.clearPingTimer();
       }
       this.render();
     });
@@ -115,11 +117,10 @@ export class DiagnosticsPanel {
       this.outboundWindow = 0;
       this.render();
     }, 1_000);
-    this.pingTimer = setInterval(() => {
-      this.sendPing?.();
-    }, 2_000);
-    this.sendPing();
+    // Ping/RTT only while Metrics is expanded so diagnostics never compete
+    // with stroke:points / stroke:end for the room rate-limit budget.
     if (this.root.open) {
+      this.schedulePingTimer();
       this.scheduleRafSampler();
     }
     this.render();
@@ -208,15 +209,29 @@ export class DiagnosticsPanel {
     this.displayRafRate = null;
   }
 
+  private schedulePingTimer(): void {
+    if (this.pingTimer !== null || !this.sendPing) {
+      return;
+    }
+    this.pingTimer = setInterval(() => {
+      this.sendPing?.();
+    }, 2_000);
+    this.sendPing();
+  }
+
+  private clearPingTimer(): void {
+    if (this.pingTimer !== null) {
+      clearInterval(this.pingTimer);
+      this.pingTimer = null;
+    }
+  }
+
   private clearIntervalTimers(): void {
     if (this.rateTimer !== null) {
       clearInterval(this.rateTimer);
       this.rateTimer = null;
     }
-    if (this.pingTimer !== null) {
-      clearInterval(this.pingTimer);
-      this.pingTimer = null;
-    }
+    this.clearPingTimer();
   }
 
   private render(): void {

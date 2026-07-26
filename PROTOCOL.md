@@ -246,13 +246,14 @@ restores via full visible `sync_state`.
 `stroke:points` batch per display frame, plus `start` / `end` / clear / history
 headroom. Cursor updates are sent only while not drawing; they do not compete
 with active stroke batches.
-Once a socket has a participant id, **every** incoming frame (text or binary)
-counts toward that budget **before** the binary reject, size checks, JSON parse,
-or type dispatch — including binary floods, malformed, oversized, unknown-type,
-and repeated `join` frames. Exceeding the budget returns `error` `rate_limited`;
-the room stays alive. History is **not** debounced — each accepted
-`history:undo` / `history:redo` runs to completion under Durable Object
-serialization.
+Once a socket has a participant id, drawing and control frames count toward that
+budget (binary floods, malformed JSON, oversized frames, unknown types, cursor,
+strokes, history, repeated `join`). **Valid `ping` frames are exempt** so RTT
+probes cannot drop `stroke:points` / `stroke:end`. Exceeding the budget returns
+`error` `rate_limited`; the room stays alive. History is **not** debounced —
+each accepted `history:undo` / `history:redo` runs to completion under Durable
+Object serialization. Clients send `ping` only while the Metrics dock is
+expanded.
 
 ### Typed boundary errors (non-exhaustive)
 
@@ -263,7 +264,7 @@ serialization.
 | `unsupported_type` | Unknown `type` |
 | `protocol_mismatch` | Wrong `protocolVersion` |
 | `invalid_payload` | Bad shape / binary frames / field constraints |
-| `rate_limited` | Per-participant frame budget exceeded (all post-join frames) |
+| `rate_limited` | Per-participant frame budget exceeded (valid `ping` exempt) |
 | `not_joined` / `room_mismatch` | Join / room binding failures |
 
 ## HTTP endpoints

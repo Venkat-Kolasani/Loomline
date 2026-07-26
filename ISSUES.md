@@ -487,6 +487,46 @@ a long stroke — hole must not shrink after the stroke commits.
 
 ---
 
+## I17 — Metrics pings could drop stroke:end (ghost local ink)
+
+**When:** 26 July 2026 systematic multi-client acceptance / browser proof.
+
+**What the issue was**
+
+A peer (or Node observer) sometimes saw `stroke:live` `start` only. The drawer
+kept local ink after pointer-up, but Undo stayed disabled and
+`/api/room-metrics` showed no new committed operation.
+
+**Root cause**
+
+Per-participant rate limiting counted **every** joined frame before parse,
+including valid `ping`. The always-on Metrics dock sent RTT pings every 2s while
+connected. Under slow frames / long strokes that budget could fill so
+`stroke:points` / `stroke:end` returned `rate_limited`. The client had already
+moved the stroke into awaiting-commit, so ink looked stuck with no server seq.
+
+**What we fixed**
+
+1. Ping only while the Metrics `<details>` is expanded (same policy as Display
+   rAF sampling).
+2. Exempt **valid** `ping` from the drawing rate-limit budget; still count
+   binary / malformed / oversized floods.
+3. On `rate_limited` / `unknown_stroke` / `stroke_expired`, abandon local
+   uncommitted ink so ghost brushes do not linger.
+
+**Why this way**
+
+Dropping diagnostics traffic during drawing is cheaper than raising the global
+cap. Keeping anti-abuse on garbage frames preserves invariant 10. Clearing
+provisional ink on those errors is better than leaving an un-undoable ghost.
+
+**Verification**
+`test/boundaries.test.ts` “ping flood does not block stroke commit”;
+`npm run typecheck && npm run test && npm run build`; browser: draw with Metrics
+collapsed → peer live ink + Undo enables after pointer-up.
+
+---
+
 Copy this block when logging a future issue:
 
 ```markdown

@@ -31,7 +31,7 @@ size and per-participant rate limits are enforced in `RoomDurableObject`
 
 | Message | Direction | Meaning |
 | --- | --- | --- |
-| `join` | client → server | Enter the room (optional `displayName`) |
+| `join` | client → server | Enter the room with optional `displayName` |
 | `welcome` | server → client | Assigned participant id, colour, display name |
 | `sync_state` | server → client | Visible committed ops + `sequenceHead` + undo/redo flags after join/reconnect |
 | `presence` | server → all | Full participant list for the room |
@@ -77,7 +77,10 @@ size and per-participant rate limits are enforced in `RoomDurableObject`
    `operation:committed` events (late fan-out / overlapping reconnect).
 5. Ephemeral live ink and awaiting-commit local strokes are cleared on reconnect
    schedule; only durable ops are restored from `sync_state`.
-6. Participant id is reassigned on each join (no sticky identity in this slice).
+6. Participant id and colour are reassigned on each join (no sticky identity in
+   this slice). Loomline's landing page remembers the chosen display name only
+   in that browser and sends it again on reconnect; the Durable Object still
+   trims/caps the value and falls back to `Artist-<id>` when it is blank.
 
 ### Live stroke stall contract (implemented)
 
@@ -236,7 +239,7 @@ restores via full visible `sync_state`.
 | `points` per `stroke:points` | 1–64 (`MAX_POINTS_PER_MESSAGE`) |
 | `width` | integer 1–32 |
 | `color` | `#RRGGBB` |
-| `displayName` | trimmed, max 24 chars |
+| `displayName` | optional; server trims/caps at 24 characters and falls back when blank |
 | Client messages / participant / 1s | ≤ `120` (`MAX_MESSAGES_PER_WINDOW`) |
 
 `120` frames/s is sized for normal rAF drawing: at most one

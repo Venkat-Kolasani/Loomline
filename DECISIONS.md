@@ -360,3 +360,37 @@ sequence and history tables.
 persistence, undo/redo convergence, a stroke completing after clear, and
 recoverable malformed clear input. `test/committed-ops.test.ts` verifies replay
 order `stroke → clear → stroke`.
+
+## D11 — Browser-local artist name, not an account or sticky identity
+
+### Problem / invariant
+
+The old server fallback (`Artist-<id>`) was safe but unfriendly in a live demo.
+Invitees opening a room link need a clear way to choose a readable name before
+they appear in presence. This must not create authentication, a server profile,
+or a client-controlled participant identity.
+
+### Selected design
+
+The landing page offers a 1–24-character name with a readable random fallback.
+The normalized value is stored only in browser `localStorage` and passed through
+the existing optional `join.displayName` field. A first-time `/r/<roomId>` visit
+stays on the landing page until the user joins; a returning browser can rejoin
+with its saved name. The Durable Object still trims/caps the wire value and
+assigns a fresh participant id and deterministic colour on every join.
+
+### Rejected alternatives
+
+- **Keep opaque generated names only:** requires no UI but makes people and
+  cursor labels harder to follow in a collaboration demo.
+- **Persist a server-side profile or auth account:** exceeds assignment scope
+  and does not improve authoritative canvas ordering.
+- **Live rename / client-provided participant id:** adds a new presence protocol
+  and gives clients authority that belongs to the room server.
+
+### Verification
+
+`test/artist-name.test.ts` covers validation, readable fallback, persistence,
+and unavailable storage. `test/rooms.test.ts` proves the Worker trims/caps a
+supplied name and falls back for blank input. Local browser proof is recorded in
+[TESTING.md](./TESTING.md).

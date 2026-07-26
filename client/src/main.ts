@@ -4,6 +4,13 @@ import { LocalDrawingController } from "./canvas/local-drawing";
 import { RemoteStrokeStore } from "./canvas/remote-strokes";
 import type { DrawingTool } from "./canvas/stroke";
 import {
+  createArtistName,
+  loadArtistName,
+  normalizeArtistName,
+  saveArtistName,
+  type NameStorage,
+} from "./identity/artist-name";
+import {
   DiagnosticsPanel,
   isDebugEnabled,
   withDebugQuery,
@@ -46,8 +53,16 @@ const joinRoomInput = requireElement(
   "#join-room-id",
   (node): node is HTMLInputElement => node instanceof HTMLInputElement,
 );
-const joinError = requireElement(
-  "#join-error",
+const artistNameInput = requireElement(
+  "#artist-name",
+  (node): node is HTMLInputElement => node instanceof HTMLInputElement,
+);
+const newArtistNameButton = requireElement(
+  "#new-artist-name",
+  (node): node is HTMLButtonElement => node instanceof HTMLButtonElement,
+);
+const landingError = requireElement(
+  "#landing-error",
   (node): node is HTMLElement => node instanceof HTMLElement,
 );
 
@@ -135,6 +150,9 @@ let liveStrokeTransport: LiveStrokeTransport | null = null;
 let pendingCursor: StrokePoint | null = null;
 let cursorRaf: number | null = null;
 const diagnostics = isDebugEnabled() ? new DiagnosticsPanel() : null;
+const artistNameStorage = getArtistNameStorage();
+const savedArtistName = loadArtistName(artistNameStorage);
+artistNameInput.value = savedArtistName ?? createArtistName();
 
 const surface = new LayeredCanvasSurface({
   committedCanvas,
@@ -228,7 +246,7 @@ function clearNetworkHelpers(): void {
   drawing.setNetworkHooks(undefined);
 }
 
-function showLanding(): void {
+function showLanding(roomIdToJoin?: string): void {
   roomSocket?.disconnect();
   roomSocket = null;
   selfParticipant = null;
@@ -244,7 +262,31 @@ function showLanding(): void {
   landingView.hidden = false;
   roomView.hidden = true;
   document.title = "Loomline";
+  joinRoomInput.value = roomIdToJoin ?? "";
+  landingError.hidden = true;
   updateEmptyState();
+}
+
+function getArtistNameStorage(): NameStorage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function requireArtistName(): string | null {
+  const displayName = normalizeArtistName(artistNameInput.value);
+  if (displayName === null) {
+    landingError.hidden = false;
+    landingError.textContent = "Your name must be 1–24 characters after trimming.";
+    artistNameInput.focus();
+    return null;
+  }
+  artistNameInput.value = displayName;
+  saveArtistName(artistNameStorage, displayName);
+  landingError.hidden = true;
+  return displayName;
 }
 
 function renderPresence(participants: Participant[]): void {
@@ -343,7 +385,7 @@ function wireDrawingNetwork(socket: RoomSocket): void {
   });
 }
 
-function enterRoom(roomId: string): void {
+function enterRoom(roomId: string, displayName: string): void {
   // Tear down any prior room session before wiring a new socket.
   roomSocket?.disconnect();
   roomSocket = null;
@@ -551,7 +593,7 @@ function enterRoom(roomId: string): void {
       connectionStatus.textContent = `Error: ${code}`;
       console.warn("Room error", code, message);
     },
-  });
+  }, displayName);
   roomSocket = socket;
   wireDrawingNetwork(socket);
   roomSocket.connect();
@@ -566,26 +608,46 @@ function routeFromLocation(): void {
     showLanding();
     return;
   }
-  enterRoom(roomId);
+  const rememberedName = loadArtistName(artistNameStorage);
+  if (rememberedName === null) {
+    showLanding(roomId);
+    return;
+  }
+  enterRoom(roomId, rememberedName);
 }
 
 createRoomButton.addEventListener("click", () => {
+  const displayName = requireArtistName();
+  if (displayName === null) {
+    return;
+  }
   const roomId = createRoomId();
   history.pushState(null, "", withDebugQuery(`/r/${roomId}`));
-  enterRoom(roomId);
+  enterRoom(roomId, displayName);
 });
 
 joinForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  const roomId = joinRoomInput.value.trim().toLowerCase();
-  if (!isValidRoomId(roomId)) {
-    joinError.hidden = false;
-    joinError.textContent = "Room id must be 8 lowercase letters or digits.";
+  const displayName = requireArtistName();
+  if (displayName === null) {
     return;
   }
-  joinError.hidden = true;
+  const roomId = joinRoomInput.value.trim().toLowerCase();
+  if (!isValidRoomId(roomId)) {
+    landingError.hidden = false;
+    landingError.textContent = "Room id must be 8 lowercase letters or digits.";
+    return;
+  }
+  landingError.hidden = true;
   history.pushState(null, "", withDebugQuery(`/r/${roomId}`));
-  enterRoom(roomId);
+  enterRoom(roomId, displayName);
+});
+
+newArtistNameButton.addEventListener("click", () => {
+  artistNameInput.value = createArtistName();
+  landingError.hidden = true;
+  artistNameInput.focus();
+  artistNameInput.select();
 });
 
 brushButton.addEventListener("click", () => {

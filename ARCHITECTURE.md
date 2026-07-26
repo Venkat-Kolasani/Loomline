@@ -55,7 +55,7 @@ Verified in `test/rooms.test.ts`.
 
 | Piece | Role |
 | --- | --- |
-| Landing / room client | Presence, cursors, live + committed sync |
+| Landing / room client | Browser-local artist name, presence, cursors, live + committed sync |
 | Canvas layers | `committed-canvas` = server ops; `live-canvas` = in-progress |
 | Point batching | ≤ one `stroke:points` per animation frame |
 | `RoomDurableObject` | Live fan-out + SQLite ops + tombstones + stall alarm + `sync_state` |
@@ -107,7 +107,8 @@ drawing so stroke point batches stay under the room rate limit.
 
 ## Planned
 
-- Sticky participant identity across reconnect (optional polish)
+- Sticky participant identity/colour across reconnect (optional polish; the
+  browser-local artist name already persists without becoming an account)
 - Checkpoint / retention after a measured room-size baseline (DECISIONS D7)
 
 ## Diagnostics (`?debug=1`) and load baseline (implemented)
@@ -154,9 +155,12 @@ sequenceDiagram
 
 ### Room lifecycle
 
-1. `/r/<roomId>` loads the SPA; `/ws?room=<roomId>` validates the id and routes
-   through `idFromName(roomId)`.
-2. `join` assigns participant attachment metadata and returns `welcome`,
+1. `/r/<roomId>` loads the SPA. A returning browser reuses its local validated
+   artist name; a first-time browser sees the landing name gate before any
+   WebSocket joins. `/ws?room=<roomId>` validates the id and routes through
+   `idFromName(roomId)`.
+2. `join` carries that optional name; the server trims/caps it, assigns fresh
+   participant attachment metadata and returns `welcome`,
    `sync_state`, then room `presence`.
 3. Live points fan out from in-memory state; only minimal expiry metadata is
    durable until a stroke ends.

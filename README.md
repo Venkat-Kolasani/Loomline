@@ -14,8 +14,11 @@ JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
 
 - Vite vanilla TypeScript client shell
 - Landing page: create/join shareable `/r/<roomId>` links
+- Browser-local artist name: readable random fallback or user nickname (1–24
+  trimmed characters); returning users rejoin with that name without an account
 - Worker routes `/ws?room=` to one Durable Object per room via `idFromName`
-- Presence: join/leave list with deterministic participant colours
+- Presence: join/leave list with the chosen name and deterministic participant
+  colours
 - Live stroke fan-out (`stroke:start` / `points` / `end` → `stroke:live`)
 - Durable stroke/clear `operation:committed` records with SQLite + strictly
   increasing sequence
@@ -52,8 +55,10 @@ npm run build
 npm run dev
 ```
 
-Then open `http://127.0.0.1:8787/`, create a room, and open the same room URL in
-a second browser profile. Draw in one client — the peer should see the stroke
+Then open `http://127.0.0.1:8787/`, choose a name (or accept **New name**),
+create a room, and open the same room URL in a second browser profile. A
+first-time visitor is asked for a name before joining; a returning browser uses
+its remembered local name. Draw in one client — the peer should see the stroke
 **while it is still in progress**.
 
 This setup was re-run from a clean clone on 26 July 2026: `npm ci`, typecheck,
@@ -76,9 +81,9 @@ needed only for `npm run deploy`; no credentials or tokens are stored here.
 Use the live URL above, or run `npm run dev` and use
 `http://127.0.0.1:8787/`.
 
-1. Click **Create room** and copy the room link.
-2. Open the same link in a second browser/profile — both presence lists should
-   show two distinct participants.
+1. Choose a name, then click **Create room** and copy the room link.
+2. Open the same link in a second browser/profile. On a first visit, choose a
+   name before joining; both presence lists should show the supplied names.
 3. Draw slowly in client A — client B must show the stroke **before** A lifts
    the pointer (live overlay).
 4. After A ends the stroke, both clients keep it via `operation:committed`.
@@ -116,7 +121,8 @@ Full commands and constraints are in [TESTING.md](./TESTING.md).
 ## Known limitations
 
 - Live in-progress strokes are not undoable (only completed ops)
-- Reconnect assigns a new participant id (no sticky identity yet)
+- Reconnect assigns a new participant id and colour (no sticky identity), while
+  the browser-local artist name is reused
 - Reconnect uses a full visible `sync_state` snapshot (not a delta by last-seq)
 - Very long strokes are stored as one JSON blob per completed op (no checkpoint
   compaction yet — see DECISIONS D7)

@@ -14,6 +14,23 @@
         Create a shareable room link. Each room id maps to its own Durable
         Object. Peers see live strokes as you draw.
       </p>
+      <section class="artist-identity" aria-labelledby="artist-name-label">
+        <label id="artist-name-label" for="artist-name">Your name</label>
+        <div class="artist-name-controls">
+          <input
+            id="artist-name"
+            name="artistName"
+            maxlength="24"
+            autocomplete="nickname"
+            spellcheck="false"
+            aria-describedby="artist-name-hint landing-error"
+          />
+          <button type="button" id="new-artist-name">New name</button>
+        </div>
+        <p id="artist-name-hint" class="artist-name-hint">
+          Remembered only in this browser. No account required.
+        </p>
+      </section>
       <div class="landing-actions">
         <button type="button" id="create-room">Create room</button>
         <form id="join-form" class="join-form">
@@ -34,7 +51,7 @@
           <button type="submit">Join</button>
         </form>
       </div>
-      <p id="join-error" class="join-error" hidden></p>
+      <p id="landing-error" class="join-error" role="alert" hidden></p>
     </div>
 
     <div id="view-room" class="app" hidden>

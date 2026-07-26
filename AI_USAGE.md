@@ -207,10 +207,24 @@ Product name is **Loomline** (repository and Worker name match).
 - Owns every evidence boundary: Chromium was tested; Firefox, Safari, a physical
   mobile device, and a demo recording are not claimed
 
+## Artist identity (`feat(identity): remember artist name before joining`)
+
+### Assisted by AI
+
+- Browser-local name helper, random readable fallback, landing flow wiring,
+  Worker-boundary tests, and documentation drafts
+
+### Manually reviewed / owned by the author
+
+- Explains why `localStorage` is a convenience only: it never controls the
+  participant id, colour, room membership, or persisted canvas history
+- Owns the first-time shared-link gate and reconnect behavior: the same saved
+  name is resent, while the room still assigns a new anonymous participant id
+- Verified name gate, welcome label, presence label, and reload path locally
+
 ## Retained-code understanding statement
 
 The author is responsible for every retained line and can explain its purpose,
 inputs/outputs, failure modes, and verification. AI output was treated as a
 draft or debugging aid, not as proof; commands, tests, browser observations, and
 deployed protocol results are recorded separately in [TESTING.md](./TESTING.md).
-

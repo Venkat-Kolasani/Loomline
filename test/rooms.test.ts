@@ -138,6 +138,27 @@ describe("presence departure", () => {
   });
 });
 
+describe("display-name sanitation", () => {
+  it("trims a supplied name, caps it at 24 characters, and falls back when blank", async () => {
+    const roomId = "name2222";
+    const socketA = await openRoomSocket(roomId);
+    const trimmed = await joinAndWaitWelcome(socketA, roomId, "  Moss Finch  ");
+    expect(trimmed.participant.displayName).toBe("Moss Finch");
+
+    const socketB = await openRoomSocket(roomId);
+    const capped = await joinAndWaitWelcome(socketB, roomId, "x".repeat(30));
+    expect(capped.participant.displayName).toBe("x".repeat(24));
+
+    const socketC = await openRoomSocket(roomId);
+    const fallback = await joinAndWaitWelcome(socketC, roomId, "   ");
+    expect(fallback.participant.displayName).toMatch(/^Artist-[a-f0-9]{4}$/);
+
+    socketA.close(1000, "done");
+    socketB.close(1000, "done");
+    socketC.close(1000, "done");
+  });
+});
+
 async function openRoomSocket(roomId: string): Promise<WebSocket> {
   const response = await exports.default.fetch(
     new Request(`https://example.com/ws?room=${roomId}`, {

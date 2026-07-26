@@ -3,6 +3,46 @@
 Evidence log for Loomline. Record **exact commands and outcomes**. Do not claim
 untested behavior.
 
+## Artist identity gate (2026-07-26)
+
+### Automated
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files 21 passed (21)
+→ Tests 89 passed (89)
+→ Vite production build exit 0
+```
+
+Focused checks:
+
+- `test/artist-name.test.ts`: client-side 1–24-character validation, readable
+  deterministic random fallback, local persistence, and storage-denied fallback.
+- `test/rooms.test.ts`: the Durable Object trims an incoming name, caps it at
+  24 characters, and uses `Artist-<id>` only when the incoming name is blank.
+- Focused gate: `npm run typecheck && npm run test -- test/artist-name.test.ts
+  test/rooms.test.ts` → 2 files, 10 tests passed.
+
+### Local browser proof
+
+Environment: local `npm run dev` Worker at `http://127.0.0.1:8787`; Cursor
+embedded Chromium on macOS 26.2; room `name1111`.
+
+1. A first-time visit to `/r/name1111` showed the landing page, prefilled
+   readable fallback `Cedar Comet`, **New name**, and room id `name1111`; no
+   WebSocket room UI was visible before joining.
+2. Entered `Moss Finch` and clicked **Join**. The connected room showed
+   self badge `Moss Finch` and presence entry `Moss Finch (you)`.
+3. Reloaded `/r/name1111`. The saved browser-local name joined automatically;
+   landing stayed hidden and self/presence again showed `Moss Finch`.
+
+### Evidence boundary
+
+This slice has local browser proof only. The deployed URL has **not** yet been
+re-smoke-tested with artist names; that proof belongs to the later deployment
+acceptance prompt.
+
 ## Global durable Clear gate (2026-07-26)
 
 ### Automated

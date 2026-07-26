@@ -116,6 +116,14 @@ const shareStatus = requireElement(
   "#share-status",
   (node): node is HTMLElement => node instanceof HTMLElement,
 );
+const roomChrome = requireElement(
+  "#room-chrome",
+  (node): node is HTMLElement => node instanceof HTMLElement,
+);
+const roomChromeToggle = requireElement(
+  "#room-chrome-toggle",
+  (node): node is HTMLButtonElement => node instanceof HTMLButtonElement,
+);
 const presenceList = requireElement(
   "#presence-list",
   (node): node is HTMLElement => node instanceof HTMLElement,
@@ -238,6 +246,23 @@ function resizeSurface(): void {
 }
 
 /**
+ * After orientation / chrome show-hide the layout box often settles one frame
+ * late. ResizeObserver catches the final size; this schedules an extra pass so
+ * a mid-session rotate does not leave a stale backing bitmap.
+ */
+function scheduleSurfaceResize(): void {
+  if (roomView.hidden) {
+    return;
+  }
+  resizeSurface();
+  requestAnimationFrame(() => {
+    if (!roomView.hidden) {
+      resizeSurface();
+    }
+  });
+}
+
+/**
  * `ResizeObserver` does not fire when only the device pixel ratio changes
  * (browser zoom, dragging the window to a different-density display). Watch
  * the resolution media query so the backing bitmap is regenerated at the new
@@ -254,6 +279,23 @@ function watchDevicePixelRatio(): void {
     watchDevicePixelRatio();
   };
   query.addEventListener("change", onChange, { once: true });
+}
+
+const MOBILE_SHELL_QUERY =
+  "(max-width: 640px), (max-height: 500px) and (max-width: 960px)";
+
+function isMobileShell(): boolean {
+  return window.matchMedia(MOBILE_SHELL_QUERY).matches;
+}
+
+function setRoomChromeOpen(open: boolean): void {
+  roomChrome.classList.toggle("is-open", open);
+  roomChromeToggle.setAttribute("aria-expanded", open ? "true" : "false");
+  roomChromeToggle.textContent = open ? "Close" : "Room";
+}
+
+function closeRoomChrome(): void {
+  setRoomChromeOpen(false);
 }
 
 function setActiveTool(tool: DrawingTool): void {
@@ -380,6 +422,7 @@ function showLanding(roomIdToJoin?: string): void {
   drawing.clearLocal();
   setHistoryButtons(false, false);
   hideClearConfirmation();
+  closeRoomChrome();
   landingView.hidden = false;
   roomView.hidden = true;
   document.title = "Loomline";
@@ -532,6 +575,7 @@ function enterRoom(roomId: string, displayName: string): void {
   syncColorSwatches(colorInput.value);
   setActiveTool("brush");
   hideClearConfirmation();
+  closeRoomChrome();
   resizeSurface();
   surface.paintNow();
   updateEmptyState();
@@ -936,6 +980,44 @@ new ResizeObserver(() => {
 }).observe(stage);
 
 watchDevicePixelRatio();
+
+roomChromeToggle.addEventListener("click", () => {
+  setRoomChromeOpen(!roomChrome.classList.contains("is-open"));
+});
+
+// Close the mobile sheet when tapping the stage so drawing stays one gesture.
+stage.addEventListener(
+  "pointerdown",
+  () => {
+    if (isMobileShell() && roomChrome.classList.contains("is-open")) {
+      closeRoomChrome();
+    }
+  },
+  { capture: true },
+);
+
+window.addEventListener("orientationchange", () => {
+  // Browsers often update the layout after the event; double-pass covers both.
+  scheduleSurfaceResize();
+  window.setTimeout(scheduleSurfaceResize, 250);
+});
+
+window.addEventListener("resize", () => {
+  scheduleSurfaceResize();
+});
+
+// Mobile browser chrome show/hide often changes the visual viewport without a
+// matching `window.resize` that settles the stage box.
+window.visualViewport?.addEventListener("resize", () => {
+  scheduleSurfaceResize();
+});
+
+window.matchMedia(MOBILE_SHELL_QUERY).addEventListener("change", () => {
+  // Crossing the breakpoint: leave the sheet closed so desktop never inherits
+  // a stuck open overlay class, and mobile starts collapsed again.
+  closeRoomChrome();
+  scheduleSurfaceResize();
+});
 
 window.addEventListener("popstate", () => {
   routeFromLocation();

@@ -437,6 +437,30 @@ bounding box of `left 0.098, right 0.902, top 0.097, bottom 0.852`; emulating a
 portrait re-measured at `left 0.048, right 0.951` after returning to landscape.
 See [TESTING.md](./TESTING.md).
 
+## D23 — Canvas-dominant mobile shell (drawer + floating toolbar)
+
+**Problem.** On phones the previous responsive grid still stacked invite,
+presence, and tools above/below the stage, so drawing lost most of the dynamic
+viewport once mobile browser chrome appeared. `100vh` also ignored URL-bar
+show/hide.
+
+**Selected.** At `≤640px` wide **or** short landscape (`max-height: 500px` and
+`max-width: 960px`): `100dvh` app height; invite + presence collapse into one
+**Room** sheet closed by default; toolbar becomes a slim semi-transparent bar
+over the stage bottom. Desktop stays stacked. Resize /
+`orientationchange` / `visualViewport` regenerate the DPR bitmap and replay
+normalized ops (depends on D22).
+
+**Rejected.** Permanently hiding invite/presence on mobile (hurts the share
+demo). A bottom sheet that always reserves height (defeats canvas dominance).
+Width-only `max-width: 640px` (phone landscape often exceeds 640px and would
+fall back to the desktop stack).
+
+**Verified.** Local emulator: portrait 390×844 stage ~84% of viewport, toolbar
+`position: absolute` over stage, Room sheet closed by default and expands on
+tap; landscape 844×390 stays on the mobile shell with stage ~80%; ink bounding
+fractions held across the rotate (see TESTING 26 July 2026).
+
 ## Deferred
 
 These remain intentionally unimplemented:

@@ -60,69 +60,86 @@
         <div class="brand-block">
           <p class="eyebrow">Loomline</p>
           <h1 id="room-title">Room</h1>
-          <section class="room-invite" aria-labelledby="room-invite-label">
-            <p id="room-invite-label" class="room-invite-label">
-              Invite collaborators
-            </p>
-            <div class="room-invite-controls">
-              <input
-                id="room-link"
-                class="room-link"
-                type="text"
-                readonly
-                aria-label="Room invite link"
-              />
-              <button
-                type="button"
-                id="copy-room-link"
-                class="icon-button"
-                aria-label="Copy invite link"
-                title="Copy invite link"
-              >
-                <svg
-                  class="icon"
-                  viewBox="0 0 24 24"
-                  width="18"
-                  height="18"
-                  aria-hidden="true"
-                  focusable="false"
-                >
-                  <rect
-                    x="8"
-                    y="8"
-                    width="12"
-                    height="12"
-                    rx="2"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.75"
-                  />
-                  <path
-                    d="M6 16H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.75"
-                    stroke-linecap="round"
-                  />
-                </svg>
-              </button>
-              <button type="button" id="share-room">Share link</button>
-            </div>
-            <p id="share-status" class="share-status" role="status" aria-live="polite"></p>
-          </section>
         </div>
         <div class="topbar-meta">
           <p id="self-badge" class="self-badge" hidden></p>
           <p id="connection-status" class="connection-status" role="status">
             Disconnected
           </p>
+          <button
+            type="button"
+            id="room-chrome-toggle"
+            class="room-chrome-toggle"
+            aria-expanded="false"
+            aria-controls="room-chrome"
+          >
+            Room
+          </button>
         </div>
       </header>
 
-      <section class="presence-panel" aria-label="People in this room">
-        <h2 class="presence-heading">Present</h2>
-        <ul id="presence-list" class="presence-list"></ul>
-      </section>
+      <div
+        id="room-chrome"
+        class="room-chrome"
+        role="region"
+        aria-label="Invite and people"
+      >
+        <section class="room-invite" aria-labelledby="room-invite-label">
+          <p id="room-invite-label" class="room-invite-label">
+            Invite collaborators
+          </p>
+          <div class="room-invite-controls">
+            <input
+              id="room-link"
+              class="room-link"
+              type="text"
+              readonly
+              aria-label="Room invite link"
+            />
+            <button
+              type="button"
+              id="copy-room-link"
+              class="icon-button"
+              aria-label="Copy invite link"
+              title="Copy invite link"
+            >
+              <svg
+                class="icon"
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <rect
+                  x="8"
+                  y="8"
+                  width="12"
+                  height="12"
+                  rx="2"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                />
+                <path
+                  d="M6 16H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </button>
+            <button type="button" id="share-room">Share link</button>
+          </div>
+          <p id="share-status" class="share-status" role="status" aria-live="polite"></p>
+        </section>
+
+        <section class="presence-panel" aria-label="People in this room">
+          <h2 class="presence-heading">Present</h2>
+          <ul id="presence-list" class="presence-list"></ul>
+        </section>
+      </div>
 
       <div
         class="toolbar"

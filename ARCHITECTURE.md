@@ -306,11 +306,24 @@ Localhost Metrics RTT (≈1–3 ms) is not a multi-region SLA. Details:
 
 ## Responsive shell
 
-Desktop keeps header / presence / tools / stage. At `≤640px`, CSS uses a
-safe-area-aware `100dvh` grid: header → compact presence → canvas → horizontally
-scrollable tool row. Canvas DPR sizing still comes from `ResizeObserver`; pointer
-math normalizes against the canvas box, so committed ink reflows with the layout
-instead of shifting. Physical phone two-user proof recorded 26 July 2026.
+Desktop (`>640px` wide and taller than 500px) keeps a stacked shell: compact
+topbar → invite + presence chrome → toolbar → stage.
+
+On phone widths (`≤640px`) **or** short landscape viewports (`max-height: 500px`
+and `max-width: 960px`), the room uses a canvas-dominant `100dvh` grid:
+
+1. Compact topbar with a **Room** toggle (invite + presence start collapsed).
+2. Stage fills the remaining height.
+3. Slim semi-transparent toolbar is `position: absolute` over the bottom of the
+   stage so it does not steal vertical space from drawing.
+
+`ResizeObserver` on the stage, `window.resize`, `orientationchange`,
+`visualViewport.resize`, and a `matchMedia('(resolution: Ndppx)')` listener all
+call into the same path: recompute `cssSize × dpr`, regenerate both canvas
+backing bitmaps (never stretch), mark layers dirty, and replay the normalized
+operation log (D22). Physical phone two-user proof recorded 26 July 2026;
+canvas-dominant shell + mid-session rotate reflow recorded the same day in
+[TESTING.md](./TESTING.md).
 
 ## Scaling path (honest)
 

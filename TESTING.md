@@ -3,6 +3,40 @@
 Evidence log for Loomline. Record **exact commands and outcomes**. Do not claim
 untested behavior.
 
+## Canvas-dominant mobile shell (2026-07-26)
+
+Depends on normalized coordinates (D22 / commit `60cc752`).
+
+### Automated
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files 26 passed (26)
+→ Tests 113 passed (113)
+→ Vite production build exit 0
+```
+
+### Emulator shell + mid-session rotate (local `wrangler dev`)
+
+Room `8775510b`, Chromium DevTools phone metrics, no reload:
+
+| Step | Viewport | Mobile shell | Stage share | Toolbar | Ink fractions L/R/T/B |
+| --- | --- | --- | --- | --- | --- |
+| Portrait after draw | 390×844 @3 | yes | 84% | absolute over stage | 0.094 / 0.905 / 0.197 / 0.703 |
+| Landscape after `orientationchange` | 844×390 @3 | yes (short-height clause) | 80% | absolute over stage | 0.097 / 0.902 / 0.193 / 0.705 |
+
+Buffer regenerated 1116×2123 → 2478×937 (not stretched). Room sheet started
+collapsed (`aria-expanded=false`); expanded to show invite + presence; closed
+again on stage `pointerdown`. Desktop 1200×900: toggle hidden, chrome `display:
+grid`, toolbar `position: static`.
+
+### Evidence boundary
+
+Physical device rotation not re-run in this slice; emulator + prior physical
+phone two-user session (same day) stand in. Tablet landscape (>960px wide)
+intentionally uses the desktop stack.
+
 ## Normalized coordinates (2026-07-26)
 
 Stroke, cursor, and durable operation coordinates became fractions of the canvas

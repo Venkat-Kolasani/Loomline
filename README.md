@@ -29,6 +29,11 @@ WebSocket API. See [DECISIONS.md](./DECISIONS.md).
 - Normalized (0–1) coordinates: strokes and cursors are fractions of the canvas
   box, so committed ink reflows on window resize / rotation without a reload and
   peers on different screen sizes see the same drawing (DECISIONS D22)
+- Mobile-first room shell (≤640px wide, or short landscape ≤500px tall):
+  `100dvh` stage, invite+presence collapsed behind a **Room** sheet (closed by
+  default), slim semi-transparent floating toolbar over the canvas. Desktop
+  keeps stacked chrome. Resize / `orientationchange` / visualViewport regenerate
+  the DPR backing bitmap and replay the normalized log
 - Worker routes `/ws?room=` to one Durable Object per room via `idFromName`
 - Presence list with chosen name + deterministic participant colours
 - Live stroke fan-out; durable stroke/clear ops with strictly increasing sequence
@@ -140,9 +145,14 @@ isolation, reconnect snapshot, and an author-confirmed physical phone session.
 
 - **Verified:** Chromium-based Cursor browser on macOS; deployed 390px mobile
   layout + touch PointerEvent draw/erase; author-confirmed physical phone
-  two-user session on the live URL (26 July 2026).
+  two-user session on the live URL (26 July 2026). Canvas-dominant mobile shell
+  (drawer + floating toolbar) and mid-session portrait↔landscape reflow verified
+  in a DevTools phone emulator (26 July 2026) — see TESTING.md.
 - **Input path verified:** mouse, synthetic PointerEvent touch, physical mobile
   touch.
+- **Orientation / resize:** window resize, `orientationchange`, and
+  `visualViewport` resize regenerate the canvas bitmap at `cssSize × dpr` and
+  replay normalized ops (depends on D22).
 - **Not claimed:** Firefox or Safari as primary review browsers.
 
 ## Known limitations
@@ -193,6 +203,13 @@ These are real constraints of the current code — not a backlog wishlist:
 19. **Tests are not typechecked.** `test/tsconfig.json` inherits the root
     `exclude: ["test"]`, so `npm run typecheck` skips every spec. Specs are
     still executed by Vitest. Tracked as ISSUES I19.
+20. **Mobile floating toolbar can cover the lowest ink.** On narrow/short
+    viewports the tool bar sits over the bottom of the stage so the canvas can
+    stay ~80%+ of `100dvh`. Strokes near the bottom edge remain in the log and
+    reflow correctly; they may be briefly obscured while the bar is visible.
+21. **Mobile shell uses width *or* short-height.** Phones in landscape often
+    exceed 640px width, so the shell also activates when height ≤500px and
+    width ≤960px. Larger tablets in landscape use the desktop stacked layout.
 
 ## AI use
 

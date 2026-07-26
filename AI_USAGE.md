@@ -339,6 +339,21 @@ Product name is **Loomline** (repository and Worker name match).
 - Owns the measured resize evidence in TESTING.md and the known typecheck gap
   recorded as I19 rather than silently fixed inside this slice
 
+## Canvas-dominant mobile shell (`feat(ui): canvas-first mobile room shell`)
+
+### Assisted by AI
+
+- HTML/CSS/JS for the mobile Room sheet, floating toolbar, `100dvh` stage grid,
+  short-landscape media query, and orientation / visualViewport resize hooks
+
+### Manually reviewed / owned by the author
+
+- Owns why the mobile shell also keys off short height (phone landscape often
+  exceeds 640px width) and the accepted trade-off that the floating toolbar can
+  cover the lowest ink
+- Owns keeping desktop stacked layout and the measured emulator rotate evidence
+  in TESTING.md
+
 ## Retained-code understanding statement
 
 The author is responsible for every retained line and can explain its purpose,

@@ -199,6 +199,46 @@ h1 {
   color: var(--ink);
 }
 
+.width-presets {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.width-presets button {
+  min-width: 2.5rem;
+  padding-inline: 0.55rem;
+}
+
+.clear-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.clear-confirmation {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.45rem;
+  border: 1px solid color-mix(in srgb, #b42318 28%, var(--line));
+  border-radius: 0.35rem;
+  background: color-mix(in srgb, #b42318 6%, #fff);
+  color: var(--ink);
+  font-size: 0.88rem;
+}
+
+.clear-confirmation[hidden] {
+  display: none;
+}
+
+.toolbar button.danger {
+  border-color: color-mix(in srgb, #b42318 45%, var(--line));
+  color: #9f1d14;
+  background: color-mix(in srgb, #b42318 8%, #fff);
+}
+
 .field {
   display: inline-flex;
   align-items: center;
@@ -690,6 +730,15 @@ h1 {
 
   .field input[type="range"] {
     width: 6.25rem;
+  }
+
+  .width-presets button {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+
+  .clear-confirmation {
+    flex: none;
   }
 
   .stage-wrap {

@@ -487,3 +487,34 @@ presence/reconnect cleanup.
 the full typecheck/test/build gate is recorded in [TESTING.md](./TESTING.md).
 Fresh interactive browser proof remains explicitly pending while the embedded
 browser's local-navigation policy is active.
+
+## D15 — Separate brush and partial-eraser controls without new history modes
+
+### Problem / invariant
+
+Artists need brush colour/width and a labelled partial eraser with its own size,
+plus accidental-clear protection, without changing the durable operation model
+or inventing a third eraser mode that would complicate global undo.
+
+### Selected design
+
+Client-only `ToolSettings` retains brush and eraser widths independently (1–32px,
+same clamp as the renderer). The toolbar shows contextual width label + presets,
+keeps colour disabled for eraser, and uses the existing circular eraser cursor.
+Clear requires an explicit “Clear for everyone?” confirmation because clear is
+room-global and durable. Keyboard shortcuts (`B`/`E`, modifier undo/redo) are
+ignored while focus is in an editable control.
+
+### Rejected alternatives
+
+- **One shared width for brush and eraser:** forces awkward size changes when
+  switching tools and hides the Notability-style partial-eraser affordance.
+- **Whole-stroke eraser / object deletion:** would require targeting completed
+  ops and new conflict rules; deferred past submission.
+- **Immediate Clear without confirmation:** too easy to wipe a collaborative
+  room mid-demo.
+
+### Verification
+
+`test/tool-settings.test.ts` covers independent widths and clamping; the full
+gate is recorded in [TESTING.md](./TESTING.md).

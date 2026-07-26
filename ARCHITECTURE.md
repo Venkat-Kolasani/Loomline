@@ -55,8 +55,9 @@ Verified in `test/rooms.test.ts`.
 
 | Piece | Role |
 | --- | --- |
-| Landing / room client | Browser-local artist name, canonical invite sharing, presence, cursors, live + committed sync |
+| Landing / room client | Browser-local artist name, canonical invite sharing, presence, cursors, live + committed sync, per-tool width UI |
 | Canvas layers | `committed-canvas` = server ops; `live-canvas` = in-progress |
+| Tool shell | Separate retained brush/eraser widths, presets, clear confirmation, input-safe shortcuts |
 | Point batching | ≤ one `stroke:points` per animation frame |
 | `RoomDurableObject` | Live fan-out + SQLite ops + tombstones + stall alarm + `sync_state` |
 | Shared protocol | Validated versioned messages + frame/rate limits |

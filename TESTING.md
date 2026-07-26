@@ -3,6 +3,33 @@
 Evidence log for Loomline. Record **exact commands and outcomes**. Do not claim
 untested behavior.
 
+## Tool ergonomics gate (2026-07-26)
+
+### Automated
+
+```text
+Focused: npm run test -- test/tool-settings.test.ts
+→ Test Files 1 passed (1)
+→ Tests 2 passed (2)
+
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files 24 passed (24)
+→ Tests 98 passed (98)
+→ Vite production build exit 0
+```
+
+`test/tool-settings.test.ts` covers independent brush/eraser width retention and
+1–32px clamping. Production build markup includes `Partial eraser`, width
+presets (`2`/`4`/`8`/`16`), and `Clear for everyone?` confirmation controls.
+
+### Evidence boundary
+
+Embedded browser localhost navigation remains blocked. Interactive proof of
+preset clicks, circular eraser cursor sizing, clear confirmation, and
+input-safe keyboard shortcuts is deferred to the deployed/mobile acceptance
+pass rather than claimed here.
+
 ## Active collaborator-cue gate (2026-07-26)
 
 ### Automated
@@ -191,9 +218,9 @@ received clear sequence `2`; undo exposed `["stroke"]`; redo converged to
 The embedded browser tool failed to retain a newly created tab (two
 create/navigate attempts returned “No browser tab available”), so no new visual
 clear screenshot is claimed. Exact manual check on the deployed URL: open the
-same room in two windows, draw, click Clear in either, verify both blank; Undo
-must restore both and Redo must blank both again. Automated Canvas replay and
-real deployed WebSocket convergence are proven above.
+same room in two windows, draw, click Clear room → Confirm in either, verify
+both blank; Undo must restore both and Redo must blank both again. Automated
+Canvas replay and real deployed WebSocket convergence are proven above.
 
 ## Submission gate and deployed smoke (2026-07-26)
 

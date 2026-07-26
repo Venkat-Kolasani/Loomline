@@ -39,10 +39,11 @@ JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
 - Remote collaborator labels: idle cursor positions plus live stroke-endpoint
   labels, with edge-aware placement (ephemeral)
 - rAF-batched outgoing points; immediate local drawing
-- Two stacked canvas layers with brush/eraser/colour/width/global Clear (eraser uses
-  `destination-out` punch-through on the committed view while dragging; width
-  shares the slider and shows as an eraser-sized cursor; Clear is durable,
-  room-wide, and undoable)
+- Two stacked canvas layers with brush / partial eraser / colour / per-tool
+  width presets (1–32px retained independently), circular eraser cursor, and a
+  confirmed room-wide Clear (durable and undoable). Keyboard: `B` / `E` for
+  tools; ⌘/Ctrl+Z and ⌘/Ctrl+Shift+Z (or Y) for global undo/redo when focus is
+  not in an input.
 - Dirty-layer paint API (no permanent render loop)
 - Scripts: `dev`, `dev:client`, `typecheck`, `test`, `load`, `build`, `deploy`
 - Vitest: isolation, protocol, live strokes, history, reconnect/expiry,
@@ -99,8 +100,9 @@ Use the live URL above, or run `npm run dev` and use
 5. In client B click **Undo** — both clients must remove the latest completed
    stroke and enable Redo.
 6. In client A click **Redo** — both clients must restore the same stroke.
-7. Click **Clear** in either client — both committed canvases blank. Click
-   **Undo** to restore the prior strokes in both, then **Redo** to clear again.
+7. Click **Clear room** → confirm **Clear for everyone?** — both committed
+   canvases blank. Click **Undo** to restore the prior strokes in both, then
+   **Redo** to clear again.
 7. Refresh either client — it gets a new participant id and restores the same
    committed canvas from `sync_state`.
 8. Open a **different** room id in a third client — presence and strokes must

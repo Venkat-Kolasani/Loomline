@@ -264,6 +264,20 @@ Product name is **Loomline** (repository and Worker name match).
 - Owns the separation between DOM presence labels and Canvas drawing layers,
   including leave/reconnect cleanup and reduced-motion behavior
 
+## Tool ergonomics (`feat(tools): separate brush and eraser controls`)
+
+### Assisted by AI
+
+- `tool-settings` helper, toolbar HTML/CSS, clear confirmation wiring, keyboard
+  shortcut guard, focused unit tests, and documentation drafts
+
+### Manually reviewed / owned by the author
+
+- Explains why brush and eraser widths stay client-local and do not change the
+  durable stroke schema
+- Owns the clear confirmation as product safety around a room-global durable op
+- Owns keyboard shortcut scoping so typing a name never triggers undo/tool swaps
+
 ## Retained-code understanding statement
 
 The author is responsible for every retained line and can explain its purpose,

@@ -4,6 +4,13 @@ import { LocalDrawingController } from "./canvas/local-drawing";
 import { RemoteStrokeStore } from "./canvas/remote-strokes";
 import type { DrawingTool } from "./canvas/stroke";
 import {
+  WIDTH_PRESETS,
+  createToolSettings,
+  widthForTool,
+  withToolWidth,
+  type ToolSettings,
+} from "./canvas/tool-settings";
+import {
   createArtistName,
   loadArtistName,
   normalizeArtistName,
@@ -147,7 +154,30 @@ const widthValue = requireElement(
   "#tool-width-value",
   (node): node is HTMLElement => node instanceof HTMLElement,
 );
+const widthLabel = requireElement(
+  "#tool-width-label",
+  (node): node is HTMLElement => node instanceof HTMLElement,
+);
+const widthPresetButtons = Array.from(
+  document.querySelectorAll<HTMLButtonElement>("[data-width-preset]"),
+);
+const clearConfirmation = requireElement(
+  "#clear-confirmation",
+  (node): node is HTMLElement => node instanceof HTMLElement,
+);
+const confirmClearButton = requireElement(
+  "#confirm-clear",
+  (node): node is HTMLButtonElement => node instanceof HTMLButtonElement,
+);
+const cancelClearButton = requireElement(
+  "#cancel-clear",
+  (node): node is HTMLButtonElement => node instanceof HTMLButtonElement,
+);
 
+let toolSettings: ToolSettings = createToolSettings(
+  Number(widthInput.value) || 4,
+  12,
+);
 let drawing!: LocalDrawingController;
 let roomSocket: RoomSocket | null = null;
 let selfParticipant: Participant | null = null;
@@ -213,11 +243,59 @@ function setActiveTool(tool: DrawingTool): void {
   eraserButton.classList.toggle("is-active", tool === "eraser");
   colorInput.disabled = tool === "eraser";
   colorInput.setAttribute("aria-disabled", tool === "eraser" ? "true" : "false");
+  applyActiveToolWidth();
+  hideClearConfirmation();
+}
+
+function applyActiveToolWidth(): void {
+  const width = widthForTool(toolSettings, drawing.getTool());
+  drawing.setWidth(width);
+  widthInput.value = String(width);
+  syncWidthControls();
   updateDrawingCursor();
 }
 
-function syncWidthLabel(): void {
-  widthValue.textContent = `${widthInput.value}px`;
+function syncWidthControls(): void {
+  const tool = drawing.getTool();
+  const width = widthForTool(toolSettings, tool);
+  widthLabel.textContent =
+    tool === "eraser" ? "Partial eraser width" : "Brush width";
+  widthValue.textContent = `${width}px`;
+  for (const button of widthPresetButtons) {
+    const preset = Number(button.dataset.widthPreset);
+    const isActive = WIDTH_PRESETS.includes(
+      preset as (typeof WIDTH_PRESETS)[number],
+    )
+      ? preset === width
+      : false;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+  }
+}
+
+function setWidthForActiveTool(width: number): void {
+  toolSettings = withToolWidth(toolSettings, drawing.getTool(), width);
+  applyActiveToolWidth();
+}
+
+function hideClearConfirmation(): void {
+  clearConfirmation.hidden = true;
+}
+
+function showClearConfirmation(): void {
+  clearConfirmation.hidden = false;
+  confirmClearButton.focus();
+}
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  if (target.isContentEditable) {
+    return true;
+  }
+  const tag = target.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
 }
 
 /** Crosshair for brush; circle sized to stroke width for eraser. */
@@ -268,6 +346,7 @@ function showLanding(roomIdToJoin?: string): void {
   selfBadge.hidden = true;
   drawing.clearLocal();
   setHistoryButtons(false, false);
+  hideClearConfirmation();
   landingView.hidden = false;
   roomView.hidden = true;
   document.title = "Loomline";
@@ -417,9 +496,8 @@ function enterRoom(roomId: string, displayName: string): void {
   renderPresence([]);
 
   drawing.setColor(colorInput.value);
-  drawing.setWidth(Number(widthInput.value));
   setActiveTool("brush");
-  syncWidthLabel();
+  hideClearConfirmation();
   resizeSurface();
   surface.paintNow();
   updateEmptyState();
@@ -705,16 +783,41 @@ colorInput.addEventListener("input", () => {
 });
 
 widthInput.addEventListener("input", () => {
-  drawing.setWidth(Number(widthInput.value));
-  syncWidthLabel();
-  updateDrawingCursor();
+  setWidthForActiveTool(Number(widthInput.value));
 });
+
+for (const button of widthPresetButtons) {
+  button.addEventListener("click", () => {
+    const preset = Number(button.dataset.widthPreset);
+    if (!Number.isFinite(preset)) {
+      return;
+    }
+    setWidthForActiveTool(preset);
+  });
+}
 
 clearButton.addEventListener("click", () => {
   if (!roomSocket?.isReady()) {
     return;
   }
+  if (clearConfirmation.hidden) {
+    showClearConfirmation();
+    return;
+  }
+  hideClearConfirmation();
+});
+
+confirmClearButton.addEventListener("click", () => {
+  if (!roomSocket?.isReady()) {
+    return;
+  }
+  hideClearConfirmation();
   roomSocket.sendCanvasClear();
+});
+
+cancelClearButton.addEventListener("click", () => {
+  hideClearConfirmation();
+  clearButton.focus();
 });
 
 undoButton.addEventListener("click", () => {
@@ -729,6 +832,48 @@ redoButton.addEventListener("click", () => {
     return;
   }
   roomSocket.sendHistoryRedo();
+});
+
+window.addEventListener("keydown", (event) => {
+  if (roomView.hidden || isEditableTarget(event.target)) {
+    return;
+  }
+
+  const key = event.key.toLowerCase();
+  if (key === "b" && !event.metaKey && !event.ctrlKey && !event.altKey) {
+    event.preventDefault();
+    setActiveTool("brush");
+    return;
+  }
+  if (key === "e" && !event.metaKey && !event.ctrlKey && !event.altKey) {
+    event.preventDefault();
+    setActiveTool("eraser");
+    return;
+  }
+
+  const modifier = event.metaKey || event.ctrlKey;
+  if (!modifier || event.altKey) {
+    return;
+  }
+
+  if (key === "z" && !event.shiftKey) {
+    if (!roomSocket?.isReady() || undoButton.disabled) {
+      return;
+    }
+    event.preventDefault();
+    hideClearConfirmation();
+    roomSocket.sendHistoryUndo();
+    return;
+  }
+
+  if ((key === "z" && event.shiftKey) || key === "y") {
+    if (!roomSocket?.isReady() || redoButton.disabled) {
+      return;
+    }
+    event.preventDefault();
+    hideClearConfirmation();
+    roomSocket.sendHistoryRedo();
+  }
 });
 
 new ResizeObserver(() => {

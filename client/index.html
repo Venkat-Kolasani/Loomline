@@ -100,26 +100,51 @@
           id="tool-brush"
           class="is-active"
           aria-pressed="true"
+          title="Brush (B)"
         >
           Brush
         </button>
-        <button type="button" id="tool-eraser" aria-pressed="false">
-          Eraser
+        <button
+          type="button"
+          id="tool-eraser"
+          aria-pressed="false"
+          title="Partial eraser (E)"
+        >
+          Partial eraser
         </button>
         <label class="field">
           <span>Color</span>
           <input id="tool-color" type="color" value="#0f6a5a" />
         </label>
         <label class="field">
-          <span>Width</span>
+          <span id="tool-width-label">Brush width</span>
           <input id="tool-width" type="range" min="1" max="32" value="4" />
           <span id="tool-width-value" class="width-value">4px</span>
         </label>
-        <button type="button" id="tool-clear">Clear</button>
-        <button type="button" id="tool-undo" disabled title="Undo last completed stroke (global)">
+        <div class="width-presets" role="group" aria-label="Stroke width presets">
+          <button type="button" data-width-preset="2" aria-pressed="false">2</button>
+          <button type="button" data-width-preset="4" aria-pressed="true" class="is-active">4</button>
+          <button type="button" data-width-preset="8" aria-pressed="false">8</button>
+          <button type="button" data-width-preset="16" aria-pressed="false">16</button>
+        </div>
+        <div class="clear-controls">
+          <button
+            type="button"
+            id="tool-clear"
+            aria-describedby="clear-confirmation-text"
+          >
+            Clear room
+          </button>
+          <div id="clear-confirmation" class="clear-confirmation" hidden>
+            <span id="clear-confirmation-text">Clear for everyone?</span>
+            <button type="button" id="confirm-clear" class="danger">Confirm</button>
+            <button type="button" id="cancel-clear">Cancel</button>
+          </div>
+        </div>
+        <button type="button" id="tool-undo" disabled title="Undo last completed stroke (global) · ⌘/Ctrl+Z">
           Undo
         </button>
-        <button type="button" id="tool-redo" disabled title="Redo last undone stroke (global)">
+        <button type="button" id="tool-redo" disabled title="Redo last undone stroke (global) · ⌘/Ctrl+Shift+Z">
           Redo
         </button>
       </div>

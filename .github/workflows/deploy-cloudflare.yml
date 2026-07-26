@@ -21,6 +21,9 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
+          # Keep in sync with the Node major used to regenerate package-lock.json
+          # (`nvm use 22`). Mismatched majors can make `npm ci` fail on optional
+          # transitive packages such as @emnapi/*.
           node-version: "22"
           cache: npm
 

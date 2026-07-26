@@ -2,6 +2,10 @@ name = "loomline"
 main = "worker/index.ts"
 compatibility_date = "2026-07-25"
 workers_dev = true
+# Not a secret — pins deploys to the account that owns
+# loomline.kolasanivenkat2.workers.dev (avoids CI 7003 from a wrong
+# CLOUDFLARE_ACCOUNT_ID / Zone ID pasted into Actions secrets).
+account_id = "06ff94e3e142ac402ca6504bcecd67db"
 
 [assets]
 directory = "./dist/client"

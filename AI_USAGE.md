@@ -237,6 +237,19 @@ Product name is **Loomline** (repository and Worker name match).
   the clipboard
 - Reviewed the manual-copy fallback for permission-denied or unsupported browsers
 
+## Responsive canvas-first shell (`feat(ui): prioritize canvas space on mobile`)
+
+### Assisted by AI
+
+- Dynamic viewport grid, safe-area/mobile toolbar CSS, and documentation drafts
+
+### Manually reviewed / owned by the author
+
+- Explains why `100dvh` is used only for layout while Canvas coordinates stay in
+  CSS pixels and are DPR-scaled by the existing sizing code
+- Owns the outstanding physical-device proof; the responsive implementation is
+  not a claim that iOS/Android was manually tested
+
 ## Retained-code understanding statement
 
 The author is responsible for every retained line and can explain its purpose,

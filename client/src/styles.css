@@ -36,8 +36,14 @@ body {
 
 .app {
   display: grid;
+  grid-template-areas:
+    "topbar"
+    "presence"
+    "toolbar"
+    "stage";
   grid-template-rows: auto auto auto minmax(0, 1fr);
-  min-height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
   max-width: 72rem;
   margin: 0 auto;
   padding: 1rem 1rem 1.25rem;
@@ -45,6 +51,7 @@ body {
 }
 
 .topbar {
+  grid-area: topbar;
   display: flex;
   flex-wrap: wrap;
   align-items: end;
@@ -142,6 +149,7 @@ h1 {
 }
 
 .toolbar {
+  grid-area: toolbar;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -164,7 +172,7 @@ h1 {
   background: #fff;
   color: var(--ink);
   padding: 0.45rem 0.75rem;
-  min-height: 2.25rem;
+  min-height: 2.5rem;
 }
 
 .toolbar button:focus-visible,
@@ -200,8 +208,8 @@ h1 {
 }
 
 .field input[type="color"] {
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 2.5rem;
+  height: 2.5rem;
   padding: 0;
   border: 1px solid var(--line);
   border-radius: 0.35rem;
@@ -213,6 +221,7 @@ h1 {
 }
 
 .stage-wrap {
+  grid-area: stage;
   position: relative;
   min-height: 18rem;
   border: 1px solid var(--line);
@@ -456,6 +465,7 @@ h1 {
 }
 
 .presence-panel {
+  grid-area: presence;
   padding: 0.65rem 0.85rem;
   border: 1px solid var(--line);
   border-radius: 0.5rem;
@@ -547,16 +557,104 @@ h1 {
 
 @media (max-width: 640px) {
   .app {
-    padding: 0.75rem;
-    gap: 0.6rem;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 100vh;
+    min-height: 100dvh;
+    grid-template-areas:
+      "topbar"
+      "presence"
+      "stage"
+      "toolbar";
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    max-width: none;
+    padding:
+      max(0.75rem, env(safe-area-inset-top))
+      max(0.75rem, env(safe-area-inset-right))
+      max(0.75rem, env(safe-area-inset-bottom))
+      max(0.75rem, env(safe-area-inset-left));
+    gap: 0.5rem;
+  }
+
+  .topbar {
+    align-items: start;
+    padding: 0.65rem 0.75rem;
+  }
+
+  .brand-block {
+    flex: 1 1 14rem;
+  }
+
+  .topbar-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    justify-items: initial;
+  }
+
+  .room-invite {
+    max-width: none;
+  }
+
+  .presence-panel {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    min-width: 0;
+    padding: 0.5rem 0.65rem;
+  }
+
+  .presence-heading {
+    flex: none;
+    margin: 0;
+  }
+
+  .presence-list {
+    min-width: 0;
+    flex: 1;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    padding-bottom: 0.1rem;
+  }
+
+  .presence-item {
+    flex: none;
+    white-space: nowrap;
   }
 
   .toolbar {
+    flex-wrap: nowrap;
     gap: 0.45rem;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    padding: 0.5rem;
+    scrollbar-width: thin;
+  }
+
+  .toolbar button {
+    flex: none;
+    min-height: 2.75rem;
+    white-space: nowrap;
+  }
+
+  .field {
+    flex: none;
+    white-space: nowrap;
+  }
+
+  .field input[type="color"] {
+    width: 2.75rem;
+    height: 2.75rem;
   }
 
   .field input[type="range"] {
-    width: 5.5rem;
+    width: 6.25rem;
+  }
+
+  .stage-wrap {
+    min-height: min(22rem, 48dvh);
+    height: 100%;
   }
 
   .artist-name-controls {

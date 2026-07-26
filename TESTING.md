@@ -3,6 +3,31 @@
 Evidence log for Loomline. Record **exact commands and outcomes**. Do not claim
 untested behavior.
 
+## Responsive canvas layout gate (2026-07-26)
+
+### Automated
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files 22 passed (22)
+→ Tests 94 passed (94)
+→ Vite production build exit 0
+```
+
+The built stylesheet contains the responsive contract: `100dvh`, mobile grid
+areas that place `stage` before `toolbar`, horizontal toolbar/presence overflow,
+and 44px (`2.75rem`) mobile controls. Existing `test/sizing.test.ts` and pointer
+tests remain in the green full suite; this CSS-only slice does not alter Canvas
+coordinate conversion or input handlers.
+
+### Evidence boundary
+
+The in-app browser currently blocks localhost navigation, so no fresh visual
+viewport screenshot or physical touch proof is claimed. The mobile checklist
+remains incomplete until a real device and browser-width drawing pass are
+recorded in the later acceptance prompt.
+
 ## Invite sharing gate (2026-07-26)
 
 ### Automated

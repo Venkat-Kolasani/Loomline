@@ -18,6 +18,8 @@ JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
   trimmed characters); returning users rejoin with that name without an account
 - Room invite control: native device share sheet when available, clipboard
   fallback otherwise, plus a selectable URL when browser APIs are unavailable
+- Responsive canvas-first shell: dynamic viewport sizing, safe-area padding,
+  compact presence, and a single horizontally scrollable mobile tool row
 - Worker routes `/ws?room=` to one Durable Object per room via `idFromName`
 - Presence: join/leave list with the chosen name and deterministic participant
   colours
@@ -137,7 +139,7 @@ Full commands and constraints are in [TESTING.md](./TESTING.md).
 - Room operation-log size under heavy load is **not** load-tested; there is no
   arbitrary reset. Future: checkpoint + retention after a measured threshold.
 - Browser evidence in this delivery pass is Chromium-based; Firefox, Safari,
-  narrow mobile layout, and a physical touch device remain unverified.
+  manual narrow-mobile layout, and a physical touch device remain unverified.
 - The GitHub repository is private by author choice; reviewer access is required.
 
 ## AI use

@@ -111,6 +111,15 @@ drawing so stroke point batches stay under the room rate limit.
   browser-local artist name already persists without becoming an account)
 - Checkpoint / retention after a measured room-size baseline (DECISIONS D7)
 
+## Responsive canvas shell (implemented; device proof pending)
+
+Desktop preserves the four-row document layout. At `≤640px`, the app becomes a
+definite `100dvh` grid with safe-area padding and visual order **header → compact
+presence → canvas → horizontally-scrollable tool row**. The stage receives the
+remaining grid height and keeps a bounded `dvh` minimum, so controls do not wrap
+above a tiny canvas. Canvas DPR sizing still derives from `ResizeObserver`; no
+pointer or rendering contract changes in this CSS-only slice.
+
 ## Diagnostics (`?debug=1`) and load baseline (implemented)
 
 Developer-only overlay (not product chrome):

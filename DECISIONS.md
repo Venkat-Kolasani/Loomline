@@ -424,3 +424,34 @@ clipboard untouched.
 `test/invite.test.ts` covers canonical URL creation, native share, clipboard
 fallback, cancellation, and manual fallback. Current automated/local-server
 evidence is recorded in [TESTING.md](./TESTING.md).
+
+## D13 — Canvas-first responsive grid over a fixed-height canvas
+
+### Problem / invariant
+
+On a narrow viewport, wrapped controls and browser chrome could leave the
+current fixed-minimum stage visually cramped. Mobile drawing must remain a
+Pointer Events canvas with its full visible CSS box reflected in DPR sizing.
+
+### Selected design
+
+At `≤640px`, use a safe-area-aware `100dvh` CSS grid. The canvas sits before a
+single horizontal-scroll toolbar, receives the remaining row height, and keeps a
+bounded dynamic-viewport minimum. Presence becomes a compact horizontal strip;
+interactive tool controls are at least 44 CSS pixels high. Desktop layout and
+the Canvas/ResizeObserver implementation remain unchanged.
+
+### Rejected alternatives
+
+- **`100vh` with a fixed canvas height:** mobile browser chrome can make it
+  overflow or waste available space.
+- **Hide controls on mobile:** improves space at the cost of discoverability and
+  keyboard/accessibility parity.
+- **Change pointer coordinates for mobile:** unnecessary and risks breaking the
+  existing CSS-pixel/DPR invariant.
+
+### Verification
+
+Production build accepts the CSS and existing canvas sizing/pointer tests stay
+green. A physical mobile and browser-viewport drawing pass remains required and
+is explicitly not claimed in [TESTING.md](./TESTING.md).

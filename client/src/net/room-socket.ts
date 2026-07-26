@@ -145,6 +145,22 @@ export class RoomSocket {
     });
   }
 
+  /** One durable rectangle; no intermediate live frames. */
+  sendShapeRect(payload: {
+    shapeId: string;
+    color: string;
+    width: number;
+    start: StrokePoint;
+    end: StrokePoint;
+  }): void {
+    this.send({
+      type: "shape:rect",
+      protocolVersion: PROTOCOL_VERSION,
+      roomId: this.roomId,
+      ...payload,
+    });
+  }
+
   sendCursor(x: number, y: number): void {
     this.send({
       type: "cursor",

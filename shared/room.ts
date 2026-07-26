@@ -1,12 +1,13 @@
 /** Room identity helpers and participant metadata shared by client and Worker. */
 
 /**
+ * 4: adds `shape:rect` / `kind: "rect"` committed ops (normalized start/end).
  * 3: stroke and cursor coordinates are normalized fractions of the sender's
  * canvas box instead of that client's CSS pixels. A version 2 client mixed
  * into a version 3 room would paint pixel values as fractions, so the bump is
  * what keeps the two coordinate spaces from meeting.
  */
-export const PROTOCOL_VERSION = 3 as const;
+export const PROTOCOL_VERSION = 4 as const;
 
 export const ROOM_ID_PATTERN = /^[a-z0-9]{8}$/;
 

@@ -1,6 +1,6 @@
 /**
  * Durable room operation records and SQLite helpers for RoomDurableObject.
- * One row per committed stroke/clear; sequence is the authoritative order key.
+ * One row per committed stroke/rect/clear; sequence is the authoritative order key.
  */
 
 import type { DrawingTool, StrokePoint } from "../shared/protocol";
@@ -21,11 +21,28 @@ export interface StoredStrokeOperation extends StoredOperationBase {
   points: StrokePoint[];
 }
 
+export interface StoredRectOperation extends StoredOperationBase {
+  kind: "rect";
+  shapeId: string;
+  color: string;
+  width: number;
+  start: StrokePoint;
+  end: StrokePoint;
+}
+
 export interface StoredClearOperation extends StoredOperationBase {
   kind: "clear";
 }
 
-export type StoredOperation = StoredStrokeOperation | StoredClearOperation;
+export type StoredOperation =
+  | StoredStrokeOperation
+  | StoredRectOperation
+  | StoredClearOperation;
+
+interface RectGeometryJson {
+  start: StrokePoint;
+  end: StrokePoint;
+}
 
 export function ensureOperationSchema(sql: SqlStorage): void {
   sql.exec(`
@@ -64,7 +81,29 @@ export function nextSequence(sql: SqlStorage): number {
 }
 
 export function insertOperation(sql: SqlStorage, op: StoredOperation): void {
-  const stroke = op.kind === "stroke" ? op : null;
+  let strokeId = "";
+  let tool = "";
+  let color = "";
+  let width = 0;
+  let pointsJson = "[]";
+
+  if (op.kind === "stroke") {
+    strokeId = op.strokeId;
+    tool = op.tool;
+    color = op.color;
+    width = op.width;
+    pointsJson = JSON.stringify(op.points);
+  } else if (op.kind === "rect") {
+    // Reuse stroke_id for shapeId; points_json holds { start, end }.
+    strokeId = op.shapeId;
+    color = op.color;
+    width = op.width;
+    pointsJson = JSON.stringify({
+      start: op.start,
+      end: op.end,
+    } satisfies RectGeometryJson);
+  }
+
   sql.exec(
     `INSERT INTO operations (
       sequence, op_id, participant_id, operation_type, stroke_id, tool, color,
@@ -74,11 +113,11 @@ export function insertOperation(sql: SqlStorage, op: StoredOperation): void {
     op.opId,
     op.participantId,
     op.kind,
-    stroke?.strokeId ?? "",
-    stroke?.tool ?? "",
-    stroke?.color ?? "",
-    stroke?.width ?? 0,
-    JSON.stringify(stroke?.points ?? []),
+    strokeId,
+    tool,
+    color,
+    width,
+    pointsJson,
     op.createdAt,
   );
 }
@@ -108,6 +147,18 @@ export function listOperations(sql: SqlStorage): StoredOperation[] {
     };
     if (row.operation_type === "clear") {
       return { ...base, kind: "clear" };
+    }
+    if (row.operation_type === "rect") {
+      const geometry = JSON.parse(row.points_json) as RectGeometryJson;
+      return {
+        ...base,
+        kind: "rect",
+        shapeId: row.stroke_id,
+        color: row.color,
+        width: row.width,
+        start: geometry.start,
+        end: geometry.end,
+      };
     }
     return {
       ...base,

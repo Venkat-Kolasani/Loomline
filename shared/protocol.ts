@@ -46,6 +46,19 @@ export interface CommittedStrokeOperation extends CommittedOperationBase {
   points: StrokePoint[];
 }
 
+/**
+ * One durable axis-aligned rectangle. Geometry is two normalized corners
+ * (drag start / drag end), not a freehand point list.
+ */
+export interface CommittedRectOperation extends CommittedOperationBase {
+  kind: "rect";
+  shapeId: string;
+  color: string;
+  width: number;
+  start: StrokePoint;
+  end: StrokePoint;
+}
+
 /** Durable replay barrier: erase all pixels produced by earlier visible ops. */
 export interface CommittedClearOperation extends CommittedOperationBase {
   kind: "clear";
@@ -53,6 +66,7 @@ export interface CommittedClearOperation extends CommittedOperationBase {
 
 export type CommittedOperation =
   | CommittedStrokeOperation
+  | CommittedRectOperation
   | CommittedClearOperation;
 
 export type ClientMessage =
@@ -85,6 +99,21 @@ export type ClientMessage =
       roomId: string;
       strokeId: string;
       point?: StrokePoint;
+    }
+  | {
+      /**
+       * Commit one finished rectangle. No live fan-out: the author renders a
+       * local preview while dragging; peers see the shape only after
+       * `operation:committed`.
+       */
+      type: "shape:rect";
+      protocolVersion: typeof PROTOCOL_VERSION;
+      roomId: string;
+      shapeId: string;
+      color: string;
+      width: number;
+      start: StrokePoint;
+      end: StrokePoint;
     }
   | {
       type: "cursor";
@@ -240,6 +269,8 @@ export function parseClientMessage(value: unknown): ParseClientResult {
       return parseStrokePoints(record);
     case "stroke:end":
       return parseStrokeEnd(record);
+    case "shape:rect":
+      return parseShapeRect(record);
     case "cursor":
       return parseCursor(record);
     case "canvas:clear":
@@ -411,6 +442,57 @@ function parseStrokeEnd(
       roomId: record.roomId as string,
       strokeId: strokeId.value,
       point: point.value,
+    },
+  };
+}
+
+function parseShapeRect(record: Record<string, unknown>): ParseClientResult {
+  const shapeId = parseStrokeId(record.shapeId);
+  if (!shapeId.ok) {
+    return {
+      ok: false,
+      code: shapeId.code,
+      message: shapeId.message.replaceAll("strokeId", "shapeId"),
+    };
+  }
+  if (typeof record.color !== "string" || !HEX_COLOR.test(record.color)) {
+    return {
+      ok: false,
+      code: "invalid_payload",
+      message: "color must be a #RRGGBB hex string.",
+    };
+  }
+  const width = parseWidth(record.width);
+  if (!width.ok) {
+    return width;
+  }
+  const start = parsePoint(record.start);
+  if (!start.ok) {
+    return {
+      ok: false,
+      code: start.code,
+      message: `start ${start.message.replace(/^point /, "")}`,
+    };
+  }
+  const end = parsePoint(record.end);
+  if (!end.ok) {
+    return {
+      ok: false,
+      code: end.code,
+      message: `end ${end.message.replace(/^point /, "")}`,
+    };
+  }
+  return {
+    ok: true,
+    message: {
+      type: "shape:rect",
+      protocolVersion: PROTOCOL_VERSION,
+      roomId: record.roomId as string,
+      shapeId: shapeId.value,
+      color: record.color,
+      width: width.value,
+      start: start.value,
+      end: end.value,
     },
   };
 }

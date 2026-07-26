@@ -1,6 +1,6 @@
 import type { CommittedOperation } from "../../../shared/protocol";
 import type { CanvasSpace } from "./normalized-coords";
-import { paintStroke, type Stroke } from "./stroke";
+import { paintRect, paintStroke, type Stroke } from "./stroke";
 
 /**
  * Server-authoritative committed operations, keyed by sequence.
@@ -79,6 +79,15 @@ export class CommittedOperationStore {
     return false;
   }
 
+  hasShapeId(shapeId: string): boolean {
+    for (const op of this.bySequence.values()) {
+      if (op.kind === "rect" && op.shapeId === shapeId) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /** Deterministic replay against the canvas box that is current right now. */
   paint(ctx: CanvasRenderingContext2D, space: CanvasSpace): void {
     for (const op of this.getOperations()) {
@@ -87,6 +96,19 @@ export class CommittedOperationStore {
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
         ctx.restore();
+        continue;
+      }
+      if (op.kind === "rect") {
+        paintRect(
+          ctx,
+          {
+            color: op.color,
+            width: op.width,
+            start: op.start,
+            end: op.end,
+          },
+          space,
+        );
         continue;
       }
       const stroke: Stroke = {

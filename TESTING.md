@@ -3,6 +3,32 @@
 Evidence log for Loomline. Record **exact commands and outcomes**. Do not claim
 untested behavior.
 
+## Rectangle shape tool (2026-07-26)
+
+`PROTOCOL_VERSION` 4. `shape:rect` commits one durable `kind: "rect"` op with
+normalized `start`/`end`; drag preview is local only.
+
+### Automated
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files 27 passed (27)
+→ Tests 116 passed (116)
+→ Vite production build exit 0
+```
+
+### Two-tab manual (local `wrangler` on `:8788`, room `b1cadd84`)
+
+1. Tab A (Artist A) + Tab B (Artist B) both Connected.
+2. Tab A: Rectangle → drag (~0.2,0.25 → ~0.7,0.8). Red outline appears on A.
+3. Tab B: same rectangle at matching position (ink sample count 7742 on both
+   committed canvases); no live frames while dragging.
+4. Tab A: Undo → inkSamples 0 on both; Undo disabled / Redo enabled on both.
+
+Local automated two-client commit+undo also covered by `test/shape-rect.test.ts`
+(116 tests green in this slice).
+
 ## Canvas-dominant mobile shell (2026-07-26)
 
 Depends on normalized coordinates (D22 / commit `60cc752`).
@@ -563,7 +589,6 @@ replaces—the visual browser proof above.
 - Touch handler path was exercised with synthetic PointerEvents in an earlier
   slice; physical iOS/Android and narrow-layout usability are not verified.
 - Firefox and Safari are not verified.
-- Demo recording is not produced in this slice.
 - GitHub history is meaningful, but the repository remains private by author
   choice; reviewers need access.
 

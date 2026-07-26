@@ -293,6 +293,7 @@ export class RoomDurableObject extends DurableObject<Env> {
       case "stroke:start":
       case "stroke:points":
       case "stroke:end":
+      case "shape:rect":
       case "cursor":
       case "canvas:clear":
       case "history:undo":
@@ -433,6 +434,9 @@ export class RoomDurableObject extends DurableObject<Env> {
         return;
       case "stroke:end":
         this.handleStrokeEnd(ws, attachment, message, roomId);
+        return;
+      case "shape:rect":
+        this.handleShapeRect(attachment, message, roomId);
         return;
       case "cursor":
         this.broadcastExcept(ws, {
@@ -601,6 +605,39 @@ export class RoomDurableObject extends DurableObject<Env> {
         protocolVersion: PROTOCOL_VERSION,
         roomId,
         operation,
+      } satisfies ServerMessage),
+    );
+  }
+
+  /**
+   * Commit one finished rectangle as a durable op. No live fan-out — peers
+   * only see the shape after operation:committed (same append-only log as strokes).
+   */
+  private handleShapeRect(
+    attachment: SocketAttachment,
+    message: Extract<ClientMessage, { type: "shape:rect" }>,
+    roomId: string,
+  ): void {
+    clearRedoBranch(this.ctx.storage.sql);
+    const stored: StoredOperation = {
+      kind: "rect",
+      sequence: nextSequence(this.ctx.storage.sql),
+      opId: crypto.randomUUID(),
+      participantId: attachment.participantId,
+      shapeId: message.shapeId,
+      color: message.color,
+      width: message.width,
+      start: message.start,
+      end: message.end,
+      createdAt: Date.now(),
+    };
+    insertOperation(this.ctx.storage.sql, stored);
+    this.broadcastRaw(
+      JSON.stringify({
+        type: "operation:committed",
+        protocolVersion: PROTOCOL_VERSION,
+        roomId,
+        operation: toCommitted(stored),
       } satisfies ServerMessage),
     );
   }
@@ -924,6 +961,17 @@ function toCommitted(op: StoredOperation): CommittedOperation {
     return {
       ...base,
       kind: "clear",
+    };
+  }
+  if (op.kind === "rect") {
+    return {
+      ...base,
+      kind: "rect",
+      shapeId: op.shapeId,
+      color: op.color,
+      width: op.width,
+      start: op.start,
+      end: op.end,
     };
   }
   return {

@@ -1,4 +1,4 @@
-import type { DrawingTool } from "./stroke";
+import type { ActiveTool } from "./stroke";
 
 export interface ToolSettings {
   brushWidth: number;
@@ -19,17 +19,18 @@ export function createToolSettings(
   };
 }
 
-export function widthForTool(settings: ToolSettings, tool: DrawingTool): number {
-  return tool === "brush" ? settings.brushWidth : settings.eraserWidth;
+/** Rect shares the brush width control (outline stroke weight). */
+export function widthForTool(settings: ToolSettings, tool: ActiveTool): number {
+  return tool === "eraser" ? settings.eraserWidth : settings.brushWidth;
 }
 
 export function withToolWidth(
   settings: ToolSettings,
-  tool: DrawingTool,
+  tool: ActiveTool,
   width: number,
 ): ToolSettings {
   const nextWidth = clampToolWidth(width);
-  return tool === "brush"
-    ? { ...settings, brushWidth: nextWidth }
-    : { ...settings, eraserWidth: nextWidth };
+  return tool === "eraser"
+    ? { ...settings, eraserWidth: nextWidth }
+    : { ...settings, brushWidth: nextWidth };
 }

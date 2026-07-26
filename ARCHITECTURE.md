@@ -85,7 +85,7 @@ What this is **not**:
 
 Transport: native browser `WebSocket` to same origin.  
 Path: `/ws?room=<roomId>`.  
-Every JSON message includes `type`, `protocolVersion` (`3`), and `roomId`.
+Every JSON message includes `type`, `protocolVersion` (`4`), and `roomId`.
 All coordinates are normalized (see [Coordinate space](#coordinate-space)).
 
 | Message | Direction | Meaning |
@@ -98,8 +98,9 @@ All coordinates are normalized (see [Coordinate space](#coordinate-space)).
 | `stroke:points` | client → server | Batched points (1–64); client sends ≤ one batch per animation frame |
 | `stroke:end` | client → server | Finish provisional stroke; may produce one durable stroke op |
 | `stroke:live` | server → peers | Fan-out start / points / end for live overlay (not to author for own ink) |
+| `shape:rect` | client → server | Commit one finished rectangle (`shapeId`, colour, width, normalized `start`/`end`); no live intermediate frames |
 | `canvas:clear` | client → server | Request one room-global durable clear operation |
-| `operation:committed` | server → **all** | Durable op with authoritative increasing `sequence` |
+| `operation:committed` | server → **all** | Durable op with authoritative increasing `sequence` (`stroke` / `rect` / `clear`) |
 | `history:undo` | client → server | Tombstone latest **visible** completed op |
 | `history:redo` | client → server | Restore newest redoable tombstone |
 | `history:changed` | server → **all** | Visible op set after undo/redo; clients rebuild |
@@ -107,6 +108,15 @@ All coordinates are normalized (see [Coordinate space](#coordinate-space)).
 | `ping` | client → server | RTT probe with `clientTime` |
 | `pong` | server → client | Echoes `clientTime` + `serverTime` |
 | `error` | server → client | Recoverable typed failure; room stays alive |
+
+### Protocol extensibility
+
+`shape:rect` was added without redesigning sequencing, persistence, or undo.
+It is another `operation_type` in the same append-only SQLite log: the Durable
+Object still assigns one increasing `sequence`, broadcasts
+`operation:committed`, and undo/redo tombstone visibility exactly as for
+strokes. Only the payload differs (two corners instead of a freehand point
+list), and drag preview stays local so the live WebSocket path is unused.
 
 ### Payload / rate limits (enforced)
 

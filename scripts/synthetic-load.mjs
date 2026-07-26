@@ -9,7 +9,7 @@
  * counts, and GET /api/room-metrics when available. Does not invent CPU %.
  */
 
-const PROTOCOL_VERSION = 3;
+const PROTOCOL_VERSION = 4;
 const CLIENTS = 5;
 const STROKES_PER_CLIENT = 100;
 const BASE_URL = (process.env.LOOMLINE_URL ?? "http://127.0.0.1:8787").replace(

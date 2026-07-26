@@ -2,6 +2,8 @@ import type { Point } from "./points";
 import { toCssPixelPoint, type CanvasSpace } from "./normalized-coords";
 
 export type DrawingTool = "brush" | "eraser";
+/** Toolbar selection: freehand tools plus axis-aligned rectangle. */
+export type ActiveTool = DrawingTool | "rect";
 
 export interface Stroke {
   tool: DrawingTool;
@@ -9,6 +11,13 @@ export interface Stroke {
   width: number;
   /** Normalized points; resolved against `space` at paint time. */
   points: Point[];
+}
+
+export interface RectShape {
+  color: string;
+  width: number;
+  start: Point;
+  end: Point;
 }
 
 /**
@@ -57,6 +66,29 @@ export function paintStroke(
   }
 
   ctx.stroke();
+  ctx.restore();
+}
+
+/** Axis-aligned outline from two normalized corners; width is CSS pixels. */
+export function paintRect(
+  ctx: CanvasRenderingContext2D,
+  shape: RectShape,
+  space: CanvasSpace,
+): void {
+  const a = toCssPixelPoint(shape.start, space);
+  const b = toCssPixelPoint(shape.end, space);
+  const x = Math.min(a.x, b.x);
+  const y = Math.min(a.y, b.y);
+  const w = Math.abs(b.x - a.x);
+  const h = Math.abs(b.y - a.y);
+
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.strokeStyle = shape.color;
+  ctx.lineWidth = shape.width;
+  ctx.lineJoin = "miter";
+  ctx.lineCap = "butt";
+  ctx.strokeRect(x, y, w, h);
   ctx.restore();
 }
 

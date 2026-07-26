@@ -9,7 +9,7 @@
  * reconnect snapshot, and room isolation. Prints PASS/FAIL per check.
  */
 
-const PROTOCOL_VERSION = 3;
+const PROTOCOL_VERSION = 4;
 const BASE_URL = (process.env.LOOMLINE_URL ?? "http://127.0.0.1:8787").replace(
   /\/$/,
   "",

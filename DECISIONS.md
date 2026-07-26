@@ -461,6 +461,22 @@ fall back to the desktop stack).
 tap; landscape 844×390 stays on the mobile shell with stage ~80%; ink bounding
 fractions held across the rotate (see TESTING 26 July 2026).
 
+## D24 — Rectangle as one sequenced op, not live frames
+
+**Problem.** A shape tool must collaborate and undo/redo like strokes without
+flooding the room with intermediate geometry.
+
+**Selected.** `shape:rect` carries normalized `start`/`end`, colour, and width.
+Drag preview is local only; pointer-up commits one durable `kind: "rect"` row
+in the same append-only log. Undo/redo and sequence layering need no new
+machinery (`PROTOCOL_VERSION` 4).
+
+**Rejected.** Live fan-out of every resize frame (bandwidth and flicker). A
+separate shape store or CRDT (overkill vs the existing sequenced log).
+
+**Verified.** `test/shape-rect.test.ts` two-client commit + undo; protocol parse
+tests; manual two-tab draw/undo.
+
 ## Deferred
 
 These remain intentionally unimplemented:

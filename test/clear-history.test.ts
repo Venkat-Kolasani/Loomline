@@ -171,9 +171,13 @@ describe("global durable canvas clear", () => {
 });
 
 function operationLabel(operation: CommittedOperation): string {
-  return operation.kind === "clear"
-    ? "clear"
-    : `stroke:${operation.strokeId}`;
+  if (operation.kind === "clear") {
+    return "clear";
+  }
+  if (operation.kind === "rect") {
+    return `rect:${operation.shapeId}`;
+  }
+  return `stroke:${operation.strokeId}`;
 }
 
 function sendClear(socket: WebSocket, roomId: string): void {

@@ -31,7 +31,13 @@ function clearOp(sequence: number): CommittedOperation {
 }
 
 function label(operation: CommittedOperation): string {
-  return operation.kind === "clear" ? "clear" : operation.strokeId;
+  if (operation.kind === "clear") {
+    return "clear";
+  }
+  if (operation.kind === "rect") {
+    return operation.shapeId;
+  }
+  return operation.strokeId;
 }
 
 describe("CommittedOperationStore", () => {

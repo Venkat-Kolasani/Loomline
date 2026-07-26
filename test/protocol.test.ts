@@ -156,6 +156,49 @@ describe("parseClientMessage", () => {
     expect(withoutPoint.ok).toBe(true);
   });
 
+  it("accepts shape:rect with normalized corners", () => {
+    const result = parseClientMessage({
+      type: "shape:rect",
+      protocolVersion: PROTOCOL_VERSION,
+      roomId: "abcd1234",
+      shapeId: "rect-1",
+      color: "#0f6a5a",
+      width: 4,
+      start: { x: 0.1, y: 0.2 },
+      end: { x: 0.8, y: 0.9 },
+    });
+    expect(result).toEqual({
+      ok: true,
+      message: {
+        type: "shape:rect",
+        protocolVersion: PROTOCOL_VERSION,
+        roomId: "abcd1234",
+        shapeId: "rect-1",
+        color: "#0f6a5a",
+        width: 4,
+        start: { x: 0.1, y: 0.2 },
+        end: { x: 0.8, y: 0.9 },
+      },
+    });
+  });
+
+  it("rejects shape:rect with invalid color", () => {
+    const result = parseClientMessage({
+      type: "shape:rect",
+      protocolVersion: PROTOCOL_VERSION,
+      roomId: "abcd1234",
+      shapeId: "rect-1",
+      color: "teal",
+      width: 4,
+      start: { x: 0.1, y: 0.2 },
+      end: { x: 0.8, y: 0.9 },
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("invalid_payload");
+    }
+  });
+
   it("accepts cursor messages", () => {
     const result = parseClientMessage({
       type: "cursor",

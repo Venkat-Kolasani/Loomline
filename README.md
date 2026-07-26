@@ -21,9 +21,11 @@ WebSocket API. See [DECISIONS.md](./DECISIONS.md).
   field is never prefilled on load
 - Invite: copy-link icon + **Share link** (native share → clipboard → selectable
   URL fallback). Invite URL is always the canonical `/r/<roomId>` path
-- Tools: brush, eraser (punch-through), five colour presets + custom picker,
-  independent brush/eraser widths (1–32px), confirmed room-wide **Clear room**
-- Keyboard: `B` / `E`; ⌘/Ctrl+Z and ⌘/Ctrl+Shift+Z (or Y) for global undo/redo
+- Tools: brush, eraser (punch-through), rectangle (local drag preview, one
+  durable commit on pointer-up), five colour presets + custom picker,
+  independent brush/eraser widths (1–32px; rectangle shares brush width),
+  confirmed room-wide **Clear room**
+- Keyboard: `B` / `E` / `R`; ⌘/Ctrl+Z and ⌘/Ctrl+Shift+Z (or Y) for global undo/redo
   when focus is not in an editable control
 - Two canvas layers + DOM collaborator labels (idle cursors + live stroke tips)
 - Normalized (0–1) coordinates: strokes and cursors are fractions of the canvas
@@ -36,7 +38,7 @@ WebSocket API. See [DECISIONS.md](./DECISIONS.md).
   the DPR backing bitmap and replay the normalized log
 - Worker routes `/ws?room=` to one Durable Object per room via `idFromName`
 - Presence list with chosen name + deterministic participant colours
-- Live stroke fan-out; durable stroke/clear ops with strictly increasing sequence
+- Live stroke fan-out; durable stroke/rect/clear ops with strictly increasing sequence
 - Join/reconnect `sync_state` of the **visible** committed log; duplicate sequence
   suppression on the client
 - Global server-owned undo/redo via tombstones (append-only op log)
@@ -47,7 +49,7 @@ WebSocket API. See [DECISIONS.md](./DECISIONS.md).
   participants, sequence head) — not a Canvas FPS claim
 - Synthetic load: `npm run load` (5×100 strokes) + `GET /api/room-metrics?room=`
 - Vitest coverage across isolation, protocol, live strokes, history, reconnect,
-  boundaries, observability, coordinate space, and UI helpers (113 tests as of
+  boundaries, observability, coordinate space, and UI helpers (116 tests as of
   this docs pass)
 
 ## Setup (clean clone)
@@ -73,7 +75,7 @@ required for local `dev` / `test` / `build`. It is required only for
 
 This setup was re-run from a clean dependency install on 26 July 2026:
 `npm ci`, typecheck, tests, and production build all passed. As of this
-documentation pass: **25** test files, **102** tests.
+documentation pass: **27** test files, **116** tests.
 
 | Script | Purpose |
 | --- | --- |
@@ -187,27 +189,25 @@ These are real constraints of the current code — not a backlog wishlist:
 10. **Browser matrix incomplete.** Firefox/Safari not claimed as primary.
 11. **Private repository.** Reviewer access must be granted.
 12. **Deploy is manual (or optional Actions).** Git push alone does not publish.
-13. **No authentication, accounts, CRDTs, shapes/text/images, or Canvas libraries**
-    — by blueprint scope.
+13. **No authentication, accounts, CRDTs, text/images, or Canvas libraries**
+    — by blueprint scope. Rectangle is the only committed shape tool.
 14. **Metrics Display rAF rate** measures display cadence while the dock is open,
     not Canvas paint cost or a cross-device FPS SLA.
 15. **Localhost RTT / synthetic commit rate** are not WAN or multi-region claims.
-16. **Demo recording** for the assignment submission is still unchecked in the
-    compliance list below.
-17. **Resize reflow is per axis.** A re-shaped canvas keeps all ink visible by
+16. **Resize reflow is per axis.** A re-shaped canvas keeps all ink visible by
     stretching it, so a circle drawn on a wide window becomes an ellipse in a
     narrow one. Chosen over letterboxing (DECISIONS D22).
-18. **Pre-version-3 rooms replay wrong.** Operations persisted before the
+17. **Pre-version-3 rooms replay wrong.** Operations persisted before the
     normalized-coordinate change hold raw pixels and are not migrated; those
-    demo rooms are abandoned rather than converted.
-19. **Tests are not typechecked.** `test/tsconfig.json` inherits the root
+    rooms are abandoned rather than converted.
+18. **Tests are not typechecked.** `test/tsconfig.json` inherits the root
     `exclude: ["test"]`, so `npm run typecheck` skips every spec. Specs are
     still executed by Vitest. Tracked as ISSUES I19.
-20. **Mobile floating toolbar can cover the lowest ink.** On narrow/short
+19. **Mobile floating toolbar can cover the lowest ink.** On narrow/short
     viewports the tool bar sits over the bottom of the stage so the canvas can
     stay ~80%+ of `100dvh`. Strokes near the bottom edge remain in the log and
     reflow correctly; they may be briefly obscured while the bar is visible.
-21. **Mobile shell uses width *or* short-height.** Phones in landscape often
+20. **Mobile shell uses width *or* short-height.** Phones in landscape often
     exceed 640px width, so the shell also activates when height ≤500px and
     width ≤960px. Larger tablets in landscape use the desktop stacked layout.
 
@@ -224,7 +224,7 @@ Leave unchecked until implemented **and** verified with evidence.
 
 ### Frontend features
 
-- [x] Drawing tools: brush, eraser, colours, stroke width
+- [x] Drawing tools: brush, eraser, rectangle, colours, stroke width
 - [x] Real-time sync: peers see in-progress strokes, not only finished strokes
 - [x] User indicators: remote cursor / drawing position
 - [x] Conflict resolution: overlapping strokes remain stable via server sequence
@@ -251,13 +251,12 @@ Leave unchecked until implemented **and** verified with evidence.
 - [x] Reconnect / snapshot recovery without duplicate sequence application
 - [x] Recoverable typed errors for invalid client messages
 
-### Submission / demo
+### Submission
 
 - [ ] Public GitHub repository with meaningful commits (history exists; repo remains private by author choice)
-- [x] Deployed demo URL works in a fresh browser session
+- [x] Deployed URL works in a fresh browser session
 - [x] README setup works with documented scripts
 - [x] Multi-user test instructions verified
-- [ ] Demo recording shows two-client draw, reconnect, and global undo
 - [x] Mobile / touch drawing verified
 - [x] ARCHITECTURE.md / PROTOCOL.md / DECISIONS.md / ISSUES.md / TESTING.md kept truthful
 

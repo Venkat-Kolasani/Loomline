@@ -2,7 +2,7 @@ import { CommittedOperationStore } from "./canvas/committed-ops";
 import { LayeredCanvasSurface } from "./canvas/layers";
 import { LocalDrawingController } from "./canvas/local-drawing";
 import { RemoteStrokeStore } from "./canvas/remote-strokes";
-import type { DrawingTool } from "./canvas/stroke";
+import type { ActiveTool } from "./canvas/stroke";
 import {
   createToolSettings,
   widthForTool,
@@ -138,6 +138,10 @@ const brushButton = requireElement(
 );
 const eraserButton = requireElement(
   "#tool-eraser",
+  (node): node is HTMLButtonElement => node instanceof HTMLButtonElement,
+);
+const rectButton = requireElement(
+  "#tool-rect",
   (node): node is HTMLButtonElement => node instanceof HTMLButtonElement,
 );
 const colorInput = requireElement(
@@ -298,15 +302,17 @@ function closeRoomChrome(): void {
   setRoomChromeOpen(false);
 }
 
-function setActiveTool(tool: DrawingTool): void {
+function setActiveTool(tool: ActiveTool): void {
   drawing.setTool(tool);
   brushButton.setAttribute("aria-pressed", tool === "brush" ? "true" : "false");
   eraserButton.setAttribute(
     "aria-pressed",
     tool === "eraser" ? "true" : "false",
   );
+  rectButton.setAttribute("aria-pressed", tool === "rect" ? "true" : "false");
   brushButton.classList.toggle("is-active", tool === "brush");
   eraserButton.classList.toggle("is-active", tool === "eraser");
+  rectButton.classList.toggle("is-active", tool === "rect");
   colorInput.disabled = tool === "eraser";
   colorInput.setAttribute("aria-disabled", tool === "eraser" ? "true" : "false");
   for (const swatch of colorSwatchButtons) {
@@ -344,7 +350,12 @@ function applyActiveToolWidth(): void {
 function syncWidthControls(): void {
   const tool = drawing.getTool();
   const width = widthForTool(toolSettings, tool);
-  widthLabel.textContent = tool === "eraser" ? "Eraser width" : "Brush width";
+  widthLabel.textContent =
+    tool === "eraser"
+      ? "Eraser width"
+      : tool === "rect"
+        ? "Rectangle width"
+        : "Brush width";
   widthValue.textContent = `${width}px`;
 }
 
@@ -540,6 +551,13 @@ function wireDrawingNetwork(socket: RoomSocket): void {
       }
       return transport.onStrokeEnd(strokeId, point);
     },
+    onShapeRect: (event) => {
+      if (roomSocket !== socket || !socket.isReady()) {
+        return false;
+      }
+      socket.sendShapeRect(event);
+      return true;
+    },
     onCursor: (point) => {
       if (roomSocket !== socket) {
         return;
@@ -733,6 +751,12 @@ function enterRoom(roomId: string, displayName: string): void {
           surface.markDirty("committed");
         }
       }
+      if (
+        operation.kind === "rect" &&
+        (applied || committedOps.hasShapeId(operation.shapeId))
+      ) {
+        drawing.acknowledgeRectCommitted(operation.shapeId);
+      }
       updateEmptyState();
     },
     onHistoryChanged: (sequenceHead, operations, _roomId, canUndo, canRedo) => {
@@ -874,6 +898,10 @@ eraserButton.addEventListener("click", () => {
   setActiveTool("eraser");
 });
 
+rectButton.addEventListener("click", () => {
+  setActiveTool("rect");
+});
+
 colorInput.addEventListener("input", () => {
   setBrushColor(colorInput.value);
 });
@@ -945,6 +973,11 @@ window.addEventListener("keydown", (event) => {
   if (key === "e" && !event.metaKey && !event.ctrlKey && !event.altKey) {
     event.preventDefault();
     setActiveTool("eraser");
+    return;
+  }
+  if (key === "r" && !event.metaKey && !event.ctrlKey && !event.altKey) {
+    event.preventDefault();
+    setActiveTool("rect");
     return;
   }
 

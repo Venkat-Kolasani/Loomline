@@ -354,6 +354,19 @@ Product name is **Loomline** (repository and Worker name match).
 - Owns keeping desktop stacked layout and the measured emulator rotate evidence
   in TESTING.md
 
+## Rectangle shape tool (`feat(canvas): add rectangle shape tool`)
+
+### Assisted by AI
+
+- Protocol `shape:rect` / `kind: "rect"`, worker storage encoding, local preview
+  + single commit path, toolbar button, and integration test scaffolding
+
+### Manually reviewed / owned by the author
+
+- Owns why rectangles skip live fan-out and reuse the same sequenced log /
+  undo machinery without a second history system (`PROTOCOL_VERSION` 4)
+- Owns two-tab draw/undo verification recorded in TESTING.md
+
 ## Retained-code understanding statement
 
 The author is responsible for every retained line and can explain its purpose,

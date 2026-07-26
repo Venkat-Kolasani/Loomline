@@ -10,6 +10,12 @@ Product markdown (architecture, protocol, decisions, testing, issues, AI usage,
 blueprint, assignment) moved under `docs/`. Root `README.md` is the reviewer
 entry with Mermaid overview diagrams; deep detail stays here.
 
+## I19 / D27 — test `tsc` gap accepted (2026-07-27)
+
+Submission decision: `npm run typecheck` does **not** typecheck `test/**`
+(inherited `exclude`). Specs stay gated by Vitest. Still open by design; see
+ISSUES I19 and DECISIONS D27. Not a forgotten TODO.
+
 ## Expiry-touch throttle (2026-07-26)
 
 D26. `live_stroke_expiry` upserts are wall-clock throttled (`EXPIRY_TOUCH_INTERVAL_MS`
@@ -888,7 +894,7 @@ npm run typecheck && npm run test && npm run build
 | Command | Purpose |
 | --- | --- |
 | `npm ci` | Clean install from lockfile |
-| `npm run typecheck` | TypeScript for app + tests |
+| `npm run typecheck` | `tsc` for `client/` + `worker/` + `shared/` only (I19 / D27: specs are not in the test tsconfig file set; Vitest is the test gate) |
 | `npm run test` | Vitest + `@cloudflare/vitest-pool-workers` |
 | `npm run build` | Vite production build → `dist/client` |
 | `npm run dev` | Build client, then `wrangler dev` |

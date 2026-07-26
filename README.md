@@ -76,7 +76,7 @@ Open http://127.0.0.1:8787/
 | Script | Purpose |
 | --- | --- |
 | `npm run dev` | Build client + local Worker / Durable Objects |
-| `npm run typecheck` | TypeScript check |
+| `npm run typecheck` | `tsc` for app sources (`client` / `worker` / `shared`) |
 | `npm run test` | Vitest (Workers pool) |
 | `npm run build` | Production client → `dist/client` |
 | `npm run deploy` | Build + deploy to Cloudflare |

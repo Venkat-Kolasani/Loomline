@@ -536,6 +536,11 @@ build`; browser on local `wrangler dev` — ink bounding box measured at
 
 ## I19 — `npm run typecheck` never actually typechecked the tests
 
+**Status (27 July 2026 — submission decision):** **Accepted / deferred past
+feature freeze.** Still open by design: app sources are `tsc`-checked; specs
+are gated by Vitest only. Formalized as [DECISIONS.md](./DECISIONS.md) D27.
+Not a silent gap for Prompt 12 audits.
+
 **When:** 26 July 2026, discovered while migrating call sites for I18.
 
 **What the issue was**
@@ -553,23 +558,27 @@ root config, so every spec was excluded from its own project.
 
 **What we fixed**
 
-Nothing yet — deliberately. Resetting `"exclude": []` immediately surfaces ~40
-pre-existing type errors in unrelated specs (`cloudflare:test` module types,
-union narrowing on `CommittedOperation`). Fixing those belongs in its own slice
-rather than inside a coordinate-space change, so this is recorded as a known
-gap: **test files are currently checked by Vitest at runtime, not by `tsc`.**
+Nothing in production code — deliberately accepted for submission. Probing
+`"exclude": []` on 27 July still surfaces ~40 pre-existing errors in specs
+(`cloudflare:test` module types, `CommittedOperation` narrowing,
+`fetch` arity under Workers types). Cleaning that is a post-freeze chore, not
+a must-ship blocker: **test files are checked by Vitest at runtime, not by
+`tsc`.** Root `tsc` still typechecks `client/`, `worker/`, and `shared/`.
 
 **Why this way**
 
-Bundling an unrelated ~10-file test cleanup into this commit would make the
-diff unreviewable, and the alternative — landing `"exclude": []` with a red
-typecheck — violates the "never commit a known failure" rule outright.
+Bundling an unrelated multi-file test typing cleanup into a feature slice would
+make the diff unreviewable. Landing `"exclude": []` with a red typecheck
+violates the "never commit a known failure" rule. Vitest already executes every
+spec under the Workers pool, which is the evidence gate for collaboration
+behavior.
 
 **Verification**
 
 `npx tsc --noEmit -p test/tsconfig.json --listFiles | grep -c "/test/"` → `0`
-(gap confirmed). Coordinate migration was instead verified by the 113 passing
-Vitest specs plus the browser proof above.
+(gap confirmed). Coordinate migration was verified by the Vitest suite plus
+browser proof. Re-probed 27 July with a temporary exclude override: ~40 errors;
+decision left in place (D27).
 
 ---
 

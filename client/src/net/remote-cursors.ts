@@ -2,10 +2,40 @@
  * DOM overlays for remote cursors (ephemeral; not painted into canvas buffers).
  */
 
+import type { StrokePoint } from "../../../shared/protocol";
+
+const LABEL_SAFE_WIDTH = 144;
+const LABEL_SAFE_HEIGHT = 42;
+
 export interface CursorParticipant {
   id: string;
   displayName: string;
   color: string;
+}
+
+export interface CursorEdgePlacement {
+  nearRight: boolean;
+  nearBottom: boolean;
+}
+
+/** The last streamed point is the most accurate remote-drawing cursor source. */
+export function latestLivePoint(
+  points: readonly StrokePoint[],
+): StrokePoint | null {
+  return points.at(-1) ?? null;
+}
+
+/** Flip the DOM label before it would overflow the canvas edge. */
+export function getCursorEdgePlacement(
+  x: number,
+  y: number,
+  containerWidth: number,
+  containerHeight: number,
+): CursorEdgePlacement {
+  return {
+    nearRight: x > containerWidth - LABEL_SAFE_WIDTH,
+    nearBottom: y > containerHeight - LABEL_SAFE_HEIGHT,
+  };
 }
 
 export class RemoteCursorLayer {
@@ -36,6 +66,7 @@ export class RemoteCursorLayer {
     x: number,
     y: number,
     selfId: string | null,
+    isDrawing = false,
   ): void {
     if (selfId && participantId === selfId) {
       return;
@@ -58,10 +89,23 @@ export class RemoteCursorLayer {
     const name = this.names.get(participantId) ?? "Peer";
     el.style.setProperty("--cursor-color", color);
     el.style.transform = `translate(${x}px, ${y}px)`;
+    el.classList.toggle("is-drawing", isDrawing);
+    const placement = getCursorEdgePlacement(
+      x,
+      y,
+      this.root.clientWidth,
+      this.root.clientHeight,
+    );
+    el.classList.toggle("is-near-right", placement.nearRight);
+    el.classList.toggle("is-near-bottom", placement.nearBottom);
     const label = el.querySelector(".remote-cursor-label");
     if (label) {
       label.textContent = name;
     }
+  }
+
+  setDrawing(participantId: string, isDrawing: boolean): void {
+    this.cursors.get(participantId)?.classList.toggle("is-drawing", isDrawing);
   }
 
   remove(participantId: string): void {
@@ -70,6 +114,8 @@ export class RemoteCursorLayer {
       el.remove();
       this.cursors.delete(participantId);
     }
+    this.names.delete(participantId);
+    this.colors.delete(participantId);
   }
 
   clear(): void {

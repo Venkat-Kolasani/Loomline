@@ -272,21 +272,27 @@ h1 {
   position: absolute;
   left: 0;
   top: 0;
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
+  width: 0;
+  height: 0;
   will-change: transform;
 }
 
 .remote-cursor-dot {
+  position: absolute;
+  left: 0;
+  top: 0;
   width: 0.65rem;
   height: 0.65rem;
   border-radius: 50%;
   background: var(--cursor-color, #334155);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.85);
+  transform: translate(-50%, -50%);
 }
 
 .remote-cursor-label {
+  position: absolute;
+  left: 0.55rem;
+  top: 0.55rem;
   font-size: 0.7rem;
   line-height: 1;
   padding: 0.15rem 0.35rem;
@@ -295,6 +301,40 @@ h1 {
   border: 1px solid color-mix(in srgb, var(--cursor-color, #334155) 35%, var(--line));
   color: var(--ink);
   white-space: nowrap;
+}
+
+.remote-cursor.is-near-right .remote-cursor-label {
+  left: auto;
+  right: 0.55rem;
+}
+
+.remote-cursor.is-near-bottom .remote-cursor-label {
+  top: auto;
+  bottom: 0.55rem;
+}
+
+.remote-cursor.is-drawing .remote-cursor-dot {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.9),
+    0 0 0 5px color-mix(in srgb, var(--cursor-color, #334155) 20%, transparent);
+  animation: remote-cursor-pulse 1.15s ease-in-out infinite;
+}
+
+.remote-cursor.is-drawing .remote-cursor-label {
+  border-color: var(--cursor-color, #334155);
+  font-weight: 650;
+}
+
+@keyframes remote-cursor-pulse {
+  50% {
+    transform: translate(-50%, -50%) scale(1.22);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .remote-cursor.is-drawing .remote-cursor-dot {
+    animation: none;
+  }
 }
 
 .empty-state {

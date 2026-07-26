@@ -36,7 +36,8 @@ JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
 - Empty rooms clear live state + alarms (hibernation-eligible; ops retained)
 - Developer diagnostics panel (`?debug=1`): FPS, WS RTT, msg/s, presence, seq
 - Synthetic load script: `npm run load` (5×100 strokes) + `/api/room-metrics`
-- Remote cursors (ephemeral)
+- Remote collaborator labels: idle cursor positions plus live stroke-endpoint
+  labels, with edge-aware placement (ephemeral)
 - rAF-batched outgoing points; immediate local drawing
 - Two stacked canvas layers with brush/eraser/colour/width/global Clear (eraser uses
   `destination-out` punch-through on the committed view while dragging; width
@@ -92,7 +93,8 @@ Use the live URL above, or run `npm run dev` and use
 2. Open the same link in a second browser/profile. On a first visit, choose a
    name before joining; both presence lists should show the supplied names.
 3. Draw slowly in client A — client B must show the stroke **before** A lifts
-   the pointer (live overlay).
+   the pointer (live overlay); A's name label should track the current stroke
+   endpoint without a separate drawing-time cursor stream.
 4. After A ends the stroke, both clients keep it via `operation:committed`.
 5. In client B click **Undo** — both clients must remove the latest completed
    stroke and enable Redo.

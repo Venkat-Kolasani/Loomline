@@ -250,6 +250,20 @@ Product name is **Loomline** (repository and Worker name match).
 - Owns the outstanding physical-device proof; the responsive implementation is
   not a claim that iOS/Android was manually tested
 
+## Active collaborator cues (`feat(presence): anchor collaborator labels to live drawing`)
+
+### Assisted by AI
+
+- Live-stroke endpoint cursor helper, DOM edge-placement treatment, focused
+  tests, and documentation drafts
+
+### Manually reviewed / owned by the author
+
+- Explains why a stroke batch is the authoritative active-drawing position and
+  why adding cursor messages during drawing would be redundant
+- Owns the separation between DOM presence labels and Canvas drawing layers,
+  including leave/reconnect cleanup and reduced-motion behavior
+
 ## Retained-code understanding statement
 
 The author is responsible for every retained line and can explain its purpose,

@@ -455,3 +455,35 @@ the Canvas/ResizeObserver implementation remain unchanged.
 Production build accepts the CSS and existing canvas sizing/pointer tests stay
 green. A physical mobile and browser-viewport drawing pass remains required and
 is explicitly not claimed in [TESTING.md](./TESTING.md).
+
+## D14 — Derive active collaborator labels from live stroke batches
+
+### Problem / invariant
+
+People need an unambiguous indication of who is drawing at a particular stroke
+tip. Sending a parallel cursor message during pointer drawing would compete with
+the rAF-batched live-stroke stream and consume room rate-limit budget without
+improving the cursor's underlying coordinates.
+
+### Selected design
+
+For `stroke:live` start/points/end frames, the client uses the latest existing
+point as that participant's DOM cursor position and marks the cue active until
+the end frame. Idle pointer movement continues to use the existing cursor
+message. The label stays outside the two Canvas buffers, flips before a stage
+edge, honours reduced-motion preference, and is removed through existing
+presence/reconnect cleanup.
+
+### Rejected alternatives
+
+- **Send cursor frames alongside every drawing batch:** redundant network and
+  limiter pressure for the same position data.
+- **Paint names into the live canvas:** would blur semantic UI with ephemeral
+  drawing pixels and make accessibility/edge placement harder.
+
+### Verification
+
+`test/remote-cursors.test.ts` verifies latest-point selection and edge placement;
+the full typecheck/test/build gate is recorded in [TESTING.md](./TESTING.md).
+Fresh interactive browser proof remains explicitly pending while the embedded
+browser's local-navigation policy is active.

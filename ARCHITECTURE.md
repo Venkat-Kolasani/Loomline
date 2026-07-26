@@ -74,7 +74,12 @@ Verified in `test/rooms.test.ts`.
    sync_state / operation:committed / history:changed / eraser live updates.
 2. **live-canvas** — brush-only: local active + awaiting-commit brushes, remote
    in-progress brushes. Eraser never draws the gray pencil preview here.
-3. **cursor-layer** (DOM) — remote cursors.
+3. **cursor-layer** (DOM) — remote cursors and collaborator labels. While a
+   peer draws, the label follows the last point already present in that peer's
+   `stroke:live` batch; when idle, it follows the lower-frequency `cursor`
+   message. This avoids an extra drawing-time WebSocket stream. Labels flip
+   before the stage's right/bottom edges and are removed on presence leave or
+   reconnect reset.
 
 Local finished strokes stay provisional until `operation:committed`
 acknowledges them (brush on live; eraser on committed view), then the store

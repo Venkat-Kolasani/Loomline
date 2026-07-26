@@ -3,6 +3,35 @@
 Evidence log for Loomline. Record **exact commands and outcomes**. Do not claim
 untested behavior.
 
+## Active collaborator-cue gate (2026-07-26)
+
+### Automated
+
+```text
+Focused: npm run test -- test/remote-cursors.test.ts
+→ Test Files 1 passed (1)
+→ Tests 2 passed (2)
+
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files 23 passed (23)
+→ Tests 96 passed (96)
+→ Vite production build exit 0
+```
+
+`test/remote-cursors.test.ts` covers choosing the latest existing live-stroke
+point (rather than emitting a second cursor frame) and right/bottom edge-aware
+label placement. Presence and reconnect tests already cover removal of departed
+and reset peers.
+
+### Evidence boundary
+
+The embedded browser currently forbids new localhost navigation, so a new visual
+two-tab cursor screenshot is not claimed in this session. Reproduce with two
+clients in one room: hold a brush stroke in A and verify B's highlighted name
+label follows the stroke tip; release and verify it becomes an idle cue; close A
+and verify its cue disappears from B.
+
 ## Responsive canvas layout gate (2026-07-26)
 
 ### Automated

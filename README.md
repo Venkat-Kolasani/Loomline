@@ -178,34 +178,6 @@ These are real constraints of the current code — not a backlog wishlist:
 16. **Demo recording** for the assignment submission is still unchecked in the
     compliance list below.
 
-## Time spent (honest estimate)
-
-Calendar work ran **25–26 July 2026** (deadline 29 July 15:00 IST). Hours below
-are **estimated focused build + verify time** derived from commit clusters and
-session work — not billable invoices. AI assisted drafting; the author owns
-review and explanation of retained code ([AI_USAGE.md](./AI_USAGE.md)).
-
-| Phase | Approx. hours | What landed |
-| --- | ---: | --- |
-| Planning / blueprint / agent contract | 2.0 | Scope, stack, invariants, docs skeleton |
-| Scaffold (Worker + Vite + Vitest) | 1.5 | Health, DO skeleton, scripts, deploy path |
-| Canvas layers + local drawing + touch | 3.0 | Two layers, tools, point filter, dirty paint |
-| Rooms, landing, presence | 2.5 | `idFromName` isolation, join UI, presence bugs |
-| Live stroke fan-out + rAF batching | 2.0 | Protocol start/points/end → `stroke:live` |
-| Durable ops + committed sync | 2.5 | SQLite sequences, `sync_state`, overlap tests |
-| Global undo/redo | 1.5 | Tombstones, redo invalidation, two-client proof |
-| Reconnect + hibernation-safe expiry | 2.0 | Backoff UI, full snapshot, expiry rows + alarm |
-| Input boundaries / rate limits | 1.5 | UTF-8 size, 120/s limit, zero-user cleanup |
-| Observability + synthetic load | 1.5 | Metrics dock, ping/pong, `npm run load` |
-| Clear-as-op + eraser punch-through | 2.5 | Clear history, provisional eraser retain |
-| Identity, invite, mobile shell, tools polish | 4.0 | Name gate, share/copy, responsive grid, swatches |
-| Deploy refresh + mobile acceptance | 1.5 | Manual deploy, phone proof, CI lockfile |
-| Documentation pass (this commit) | 1.5 | Full README / ARCHITECTURE / DECISIONS rewrite |
-| **Total (estimate)** | **≈ 29.5** | Across two calendar days |
-
-Stretch items still deferred: sticky identity, checkpoint compaction, replay UI,
-network-chaos controls.
-
 ## AI use
 
 AI assisted implementation, tests, debugging, deployment workflow, and

@@ -126,10 +126,11 @@ remaining grid height and keeps a bounded `dvh` minimum, so controls do not wrap
 above a tiny canvas. Canvas DPR sizing still derives from `ResizeObserver`; no
 pointer or rendering contract changes in this CSS-only slice.
 
-## Diagnostics (`?debug=1`) and load baseline (implemented)
+## Diagnostics and load baseline (implemented)
 
-Developer-only collapsed **Metrics** disclosure anchored to the canvas corner
-(not product chrome). Closed by default; expand to read live values:
+Always-on collapsed **Metrics** disclosure in the canvas corner (visible in every
+room without `?debug=1`). Closed by default so drawing stays primary; expand to
+read live values:
 
 | Metric | Source |
 | --- | --- |

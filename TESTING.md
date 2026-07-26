@@ -3,6 +3,38 @@
 Evidence log for Loomline. Record **exact commands and outcomes**. Do not claim
 untested behavior.
 
+## Slice 7 complete — metrics on demo + mobile acceptance (2026-07-26)
+
+### Metrics on the live demo
+
+The canvas-corner **Metrics** disclosure is now mounted for every room (no
+`?debug=1` required). It stays collapsed until clicked and reports Display rAF
+rate, WebSocket RTT, inbound/outbound messages/s, participants, and sequence
+head.
+
+### Physical phone two-user proof
+
+Author-confirmed on 26 July 2026: a real phone and a second client used the same
+live room on <https://loomline.kolasanivenkat2.workers.dev>, exercising touch
+draw, collaboration visibility, and basic room controls. Narrow-viewport
+Chromium device-metrics proof from earlier the same day remains recorded below.
+
+### Automated regression
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files 24 passed (24)
+→ Tests 99 passed (99)
+→ Vite production build exit 0
+```
+
+### Checklist status
+
+- [x] Narrow viewport / touch emulation on deployed URL
+- [x] Physical phone two-user session on live URL
+- [x] Metrics control visible on the demo without a debug query flag
+
 ## Deploy refresh + mobile acceptance gate (2026-07-26)
 
 ### Root cause of stale live URL
@@ -46,10 +78,10 @@ Room `https://loomline.kolasanivenkat2.workers.dev/r/92cd5054` as **Cedar Lanter
 | Reload reconnect restores committed ink (`opaque` 2402, Undo on) | Pass |
 | Tablet 768×1024 layout usable | Pass (desktop toolbar order; breakpoint is ≤640px) |
 
-### Still unchecked (physical device)
+### Physical device
 
-- [ ] Real iOS or Android two-user session on a phone/tablet (required before
-  claiming the mobile compliance checkbox / starting rectangle stretch work)
+- [x] Real iOS or Android two-user session on a phone/tablet (author-confirmed
+  2026-07-26 on the live URL; completes slice 7 with the always-on Metrics dock)
 
 ## Collapsed metrics dock gate (2026-07-26)
 
@@ -652,7 +684,8 @@ npm run typecheck && npm run test && npm run build
 - [x] Touch drawing path exercised via PointerEvent emulation (earlier slice)
 - [x] Narrow viewport (390px) canvas-first grid + touch draw/erase/clear UX on
   deployed URL (embedded Chromium device metrics; 2026-07-26)
-- [ ] Controls usable on physical iOS/Android device (two-user)
+- [x] Controls usable on physical iOS/Android device (two-user; author-confirmed
+  2026-07-26)
 
 ### Deployed smoke
 
@@ -662,8 +695,8 @@ npm run typecheck && npm run test && npm run build
 - [x] Separate room isolation
 - [x] Global undo/redo convergence
 - [x] Reconnect snapshot recovery
-- [x] 2026-07-26 polish redeploy (`7f696ade…`) verified with Partial eraser /
-  Share link / artist name on production
+- [x] 2026-07-26 polish redeploy verified on production
+- [x] Always-on canvas Metrics disclosure (no `?debug=1` required)
 
 ## Results — live stroke streaming (2026-07-25)
 

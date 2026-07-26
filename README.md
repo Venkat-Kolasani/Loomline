@@ -35,9 +35,9 @@ JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
   metadata is durable so hibernation cannot leave peer overlays stuck)
 - Typed rejection of malformed / oversized / rate-limited client frames
 - Empty rooms clear live state + alarms (hibernation-eligible; ops retained)
-- Developer metrics dock (`?debug=1`): collapsed canvas-corner **Metrics**
-  disclosure with Display rAF rate, WebSocket RTT, message rates, participants,
-  and sequence head (not a Canvas FPS claim)
+- Canvas-corner **Metrics** disclosure (always available in a room): Display rAF
+  rate, WebSocket RTT, message rates, participants, and sequence head — collapsed
+  by default so it does not dominate the drawing surface (not a Canvas FPS claim)
 - Synthetic load script: `npm run load` (5×100 strokes) + `/api/room-metrics`
 - Remote collaborator labels: idle cursor positions plus live stroke-endpoint
   labels, with edge-aware placement (ephemeral)
@@ -131,10 +131,11 @@ Full commands and constraints are in [TESTING.md](./TESTING.md).
 ## Supported browsers
 
 - **Verified:** Chromium-based Cursor browser on macOS 26.2, local and deployed;
-  deployed 390px mobile layout + touch PointerEvent draw/erase on
-  <https://loomline.kolasanivenkat2.workers.dev>.
-- **Input path verified:** mouse and synthetic PointerEvent touch emulation.
-- **Not yet claimed:** physical iOS/Android two-user session, Firefox, or Safari.
+  deployed 390px mobile layout + touch PointerEvent draw/erase; author-confirmed
+  physical phone two-user session on the live URL (26 July 2026).
+- **Input path verified:** mouse, synthetic PointerEvent touch, and physical
+  mobile touch.
+- **Not yet claimed:** Firefox or Safari as primary review browsers.
 
 ## Known limitations
 
@@ -149,8 +150,8 @@ Full commands and constraints are in [TESTING.md](./TESTING.md).
 - Client chunks outgoing `stroke:points` at `MAX_POINTS_PER_MESSAGE` (64)
 - Room operation-log size under heavy load is **not** load-tested; there is no
   arbitrary reset. Future: checkpoint + retention after a measured threshold.
-- Browser evidence in this delivery pass is Chromium-based; Firefox, Safari,
-  manual narrow-mobile layout, and a physical touch device remain unverified.
+- Browser evidence includes Chromium and an author-confirmed physical phone
+  two-user session; Firefox and Safari remain unverified as primary browsers.
 - The GitHub repository is private by author choice; reviewer access is required.
 
 ## AI use
@@ -199,7 +200,7 @@ Leave unchecked until implemented **and** verified with evidence.
 - [x] README setup works with documented scripts
 - [x] Multi-user test instructions verified
 - [ ] Demo recording shows two-client draw, reconnect, and global undo
-- [ ] Mobile / touch drawing verified
+- [x] Mobile / touch drawing verified
 - [x] ARCHITECTURE.md / PROTOCOL.md / DECISIONS.md / ISSUES.md / TESTING.md kept truthful
 
 ### Documentation completeness

@@ -573,7 +573,7 @@ h1 {
   border: 1px solid rgba(0, 0, 0, 0.12);
 }
 
-/* Developer-only (`?debug=1`) — collapsed canvas-corner dock, not product chrome. */
+/* Collapsed canvas-corner Metrics dock — always available in a room, non-dominant. */
 .debug-panel {
   position: absolute;
   right: 0.5rem;
@@ -591,6 +591,7 @@ h1 {
   font-size: 0.72rem;
   line-height: 1.35;
   box-shadow: 0 0.35rem 0.9rem rgba(15, 23, 42, 0.18);
+  pointer-events: auto;
 }
 
 .debug-summary {

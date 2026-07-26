@@ -1,5 +1,5 @@
 /**
- * Developer-only runtime metrics (`?debug=1`).
+ * Demo metrics dock (collapsed by default on the canvas corner).
  * Display rAF rate is sampled from rAF deltas only while the dock is expanded —
  * not a permanent canvas paint loop, and not a Canvas FPS claim.
  */
@@ -17,7 +17,7 @@ export function withDebugQuery(path: string): string {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
-/** Honest metric names shown in the debug dock. */
+/** Honest metric names shown in the metrics dock. */
 export const METRIC_LABELS = {
   displayRafRate: "Display rAF rate",
   wsRtt: "WebSocket RTT",
@@ -68,7 +68,7 @@ export class DiagnosticsPanel {
     this.root = document.createElement("details");
     this.root.id = "debug-panel";
     this.root.className = "debug-panel";
-    this.root.setAttribute("aria-label", "Developer metrics");
+    this.root.setAttribute("aria-label", "Room metrics");
     this.root.innerHTML = `
       <summary class="debug-summary">Metrics</summary>
       <dl class="debug-metrics">

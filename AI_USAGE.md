@@ -306,6 +306,19 @@ Product name is **Loomline** (repository and Worker name match).
 - Owns keeping the physical-device checklist unchecked until a real phone test
 - Owns the redeploy version id and live acceptance evidence in TESTING.md
 
+## Always-on demo Metrics dock (`feat(observability): show metrics on demo`)
+
+### Assisted by AI
+
+- Removing the `?debug=1` gate so the collapsed Metrics control is always
+  available in a room, plus slice-7 documentation completion
+
+### Manually reviewed / owned by the author
+
+- Owns keeping Metrics collapsed and corner-sized so it does not cover drawing
+- Owns author-confirmed physical phone two-user acceptance for slice 7
+- Still owns honest metric naming (Display rAF rate ≠ Canvas FPS)
+
 ## Retained-code understanding statement
 
 The author is responsible for every retained line and can explain its purpose,

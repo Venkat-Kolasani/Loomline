@@ -18,7 +18,6 @@ import {
 import { createInviteUrl, shareInvite } from "./rooms/invite";
 import {
   DiagnosticsPanel,
-  isDebugEnabled,
   withDebugQuery,
 } from "./debug/diagnostics";
 import { LiveStrokeTransport } from "./net/live-stroke-transport";
@@ -183,7 +182,7 @@ const remoteCursors = new RemoteCursorLayer(cursorLayerRoot);
 let liveStrokeTransport: LiveStrokeTransport | null = null;
 let pendingCursor: StrokePoint | null = null;
 let cursorRaf: number | null = null;
-const diagnostics = isDebugEnabled() ? new DiagnosticsPanel() : null;
+const diagnostics = new DiagnosticsPanel();
 const artistNameStorage = getArtistNameStorage();
 artistNameInput.value = "";
 
@@ -321,7 +320,7 @@ function showLanding(roomIdToJoin?: string): void {
   roomSocket = null;
   selfParticipant = null;
   clearNetworkHelpers();
-  diagnostics?.stop();
+  diagnostics.stop();
   remoteStrokes.clearAll();
   committedOps.clear();
   remoteCursors.clear();
@@ -363,7 +362,7 @@ function requireArtistName(): string | null {
 function renderPresence(participants: Participant[]): void {
   presenceList.replaceChildren();
   remoteCursors.syncParticipants(participants);
-  diagnostics?.setParticipants(participants.length);
+  diagnostics.setParticipants(participants.length);
   for (const participant of participants) {
     const item = document.createElement("li");
     item.className = "presence-item";
@@ -496,30 +495,30 @@ function enterRoom(roomId: string, displayName: string): void {
         const attempt = detail?.attempt ?? 0;
         connectionStatus.textContent =
           attempt > 0 ? `Reconnecting… (try ${attempt})` : "Reconnecting…";
-        diagnostics?.stop();
+        diagnostics.stop();
       } else if (state === "connected") {
         connectionStatus.textContent = "Connected";
-        diagnostics?.start(() => {
+        diagnostics.start(() => {
           if (roomSocket === socket && socket.isReady()) {
             socket.sendPing(performance.now());
           }
         });
       } else if (state === "error") {
         connectionStatus.textContent = "Connection error";
-        diagnostics?.stop();
+        diagnostics.stop();
       } else {
         connectionStatus.textContent = "Disconnected";
-        diagnostics?.stop();
+        diagnostics.stop();
       }
     },
     onOutboundMessage: () => {
-      diagnostics?.noteOutbound();
+      diagnostics.noteOutbound();
     },
     onInboundMessage: () => {
-      diagnostics?.noteInbound();
+      diagnostics.noteInbound();
     },
     onPong: (clientTime) => {
-      diagnostics?.notePong(clientTime);
+      diagnostics.notePong(clientTime);
     },
     onReconnectScheduled: () => {
       if (roomSocket !== socket) {
@@ -599,7 +598,7 @@ function enterRoom(roomId: string, displayName: string): void {
       if (remoteStrokes.clearProvisionalErasers()) {
         surface.markDirty("committed");
       }
-      diagnostics?.setSequenceHead(sequenceHead);
+      diagnostics.setSequenceHead(sequenceHead);
       setHistoryButtons(canUndo, canRedo);
       surface.markDirty("committed");
       updateEmptyState();
@@ -612,7 +611,7 @@ function enterRoom(roomId: string, displayName: string): void {
       if (applied) {
         surface.markDirty("committed");
       }
-      diagnostics?.setSequenceHead(committedOps.getSequenceHead());
+      diagnostics.setSequenceHead(committedOps.getSequenceHead());
       // New commits clear the server redo branch.
       setHistoryButtons(committedOps.getOperations().length > 0, false);
       // Clear is only a committed replay barrier. Active/provisional strokes
@@ -650,7 +649,7 @@ function enterRoom(roomId: string, displayName: string): void {
       if (remoteStrokes.clearProvisionalErasers()) {
         surface.markDirty("committed");
       }
-      diagnostics?.setSequenceHead(sequenceHead);
+      diagnostics.setSequenceHead(sequenceHead);
       setHistoryButtons(canUndo, canRedo);
       surface.markDirty("committed");
       updateEmptyState();

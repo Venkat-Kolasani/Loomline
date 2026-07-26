@@ -268,9 +268,9 @@ fixed RTT budget without a stated workload violates the evidence rule.
 
 ### Selected design
 
-- Optional collapsed **Metrics** dock when `?debug=1` is present: Display rAF
-  rate from rAF deltas (only while expanded), WebSocket RTT from `ping`/`pong`,
-  inbound/outbound messages/s, presence count, sequence head.
+- Collapsed **Metrics** dock always available in a room (canvas corner): Display
+  rAF rate from rAF deltas (only while expanded), WebSocket RTT from
+  `ping`/`pong`, inbound/outbound messages/s, presence count, sequence head.
 - Reproducible `scripts/synthetic-load.mjs`: 5 clients × 100 strokes; record
   wall clock, commit rate, `/api/room-metrics` head — never invent CPU%.
 - Document browser/machine/network and limitations next to the numbers.
@@ -278,11 +278,12 @@ fixed RTT budget without a stated workload violates the evidence rule.
 
 ### Rejected alternative
 
-**Always-on HUD and marketing “60 FPS / &lt;50 ms” badges.**
+**Always-expanded HUD and marketing “60 FPS / &lt;50 ms” badges.**
 
 Rejected: permanent UI noise for reviewers; unmeasured SLA claims are dishonest.
-A always-expanded corner panel was also rejected for the polish pass — the dock
-stays collapsed until a developer opens it.
+Hiding metrics behind `?debug=1` only was also rejected for the demo — reviewers
+must be able to open Metrics without a hidden query flag, while the control stays
+collapsed and corner-sized so it does not steal canvas space.
 
 ### Verification
 
@@ -547,15 +548,17 @@ canvas or implying an unmeasured “Canvas FPS” SLA.
 
 ### Selected design
 
-Keep `?debug=1` only. Mount a canvas-corner `<details>` labelled **Metrics**,
-collapsed by default. Expanded labels are Display rAF rate, WebSocket RTT,
-inbound/outbound messages/s, participants, and sequence head. The rAF sampler
-runs only while the disclosure is open so a closed dock does not keep a
-permanent measurement loop.
+Keep a canvas-corner `<details>` labelled **Metrics**, collapsed by default, on
+every room session (no `?debug=1` gate). Expanded labels are Display rAF rate,
+WebSocket RTT, inbound/outbound messages/s, participants, and sequence head. The
+rAF sampler runs only while the disclosure is open so a closed dock does not keep
+a permanent measurement loop.
 
 ### Rejected alternatives
 
 - **Always-expanded fixed HUD:** steals attention from the drawing surface.
+- **`?debug=1` only:** hides the control from demo reviewers who do not know the
+  query flag.
 - **Calling the metric “FPS” / “Canvas FPS”:** conflates display refresh cadence
   with Canvas paint cost and invites false performance claims.
 

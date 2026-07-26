@@ -189,11 +189,62 @@
             <input id="tool-color" type="color" value="#0f6a5a" title="Custom color" />
           </label>
         </div>
-        <label class="field">
+        <label class="field" id="brush-width-field">
           <span id="tool-width-label">Brush width</span>
           <input id="tool-width" type="range" min="1" max="32" value="4" />
           <span id="tool-width-value" class="width-value">4px</span>
         </label>
+        <div
+          class="eraser-size-field"
+          id="eraser-size-field"
+          role="group"
+          aria-label="Eraser size"
+          hidden
+        >
+          <span class="eraser-size-label" id="eraser-size-label">Eraser size</span>
+          <div class="eraser-size-presets" role="group" aria-labelledby="eraser-size-label">
+            <button
+              type="button"
+              class="eraser-size-preset"
+              data-eraser-width="6"
+              aria-label="Small eraser"
+              aria-pressed="false"
+              title="Small"
+            >
+              <span class="eraser-size-dot" style="--eraser-dot: 8px" aria-hidden="true"></span>
+            </button>
+            <button
+              type="button"
+              class="eraser-size-preset is-active"
+              data-eraser-width="12"
+              aria-label="Medium eraser"
+              aria-pressed="true"
+              title="Medium"
+            >
+              <span class="eraser-size-dot" style="--eraser-dot: 12px" aria-hidden="true"></span>
+            </button>
+            <button
+              type="button"
+              class="eraser-size-preset"
+              data-eraser-width="20"
+              aria-label="Large eraser"
+              aria-pressed="false"
+              title="Large"
+            >
+              <span class="eraser-size-dot" style="--eraser-dot: 18px" aria-hidden="true"></span>
+            </button>
+            <button
+              type="button"
+              class="eraser-size-preset"
+              data-eraser-width="32"
+              aria-label="Extra large eraser"
+              aria-pressed="false"
+              title="Extra large"
+            >
+              <span class="eraser-size-dot" style="--eraser-dot: 24px" aria-hidden="true"></span>
+            </button>
+          </div>
+        </div>
         <div class="clear-controls">
           <button
             type="button"

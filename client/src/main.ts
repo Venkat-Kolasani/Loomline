@@ -169,9 +169,20 @@ const colorInput = requireElement(
 const colorSwatchButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>("[data-color-preset]"),
 );
+const brushWidthField = requireElement(
+  "#brush-width-field",
+  (node): node is HTMLElement => node instanceof HTMLElement,
+);
 const widthInput = requireElement(
   "#tool-width",
   (node): node is HTMLInputElement => node instanceof HTMLInputElement,
+);
+const eraserSizeField = requireElement(
+  "#eraser-size-field",
+  (node): node is HTMLElement => node instanceof HTMLElement,
+);
+const eraserSizeButtons = Array.from(
+  document.querySelectorAll<HTMLButtonElement>("[data-eraser-width]"),
 );
 const clearButton = requireElement(
   "#tool-clear",
@@ -358,9 +369,12 @@ function syncColorSwatches(activeColor: string): void {
 }
 
 function applyActiveToolWidth(): void {
-  const width = widthForTool(toolSettings, drawing.getTool());
+  const tool = drawing.getTool();
+  const width = widthForTool(toolSettings, tool);
   drawing.setWidth(width);
-  widthInput.value = String(width);
+  if (tool !== "eraser") {
+    widthInput.value = String(width);
+  }
   syncWidthControls();
   updateDrawingCursor();
 }
@@ -368,18 +382,39 @@ function applyActiveToolWidth(): void {
 function syncWidthControls(): void {
   const tool = drawing.getTool();
   const width = widthForTool(toolSettings, tool);
+  const eraserActive = tool === "eraser";
+  brushWidthField.hidden = eraserActive;
+  eraserSizeField.hidden = !eraserActive;
+  if (eraserActive) {
+    syncEraserSizePresets(width);
+    return;
+  }
   widthLabel.textContent =
-    tool === "eraser"
-      ? "Eraser width"
-      : tool === "rect"
-        ? "Rectangle width"
-        : "Brush width";
+    tool === "rect" ? "Rectangle width" : "Brush width";
   widthValue.textContent = `${width}px`;
+}
+
+function syncEraserSizePresets(activeWidth: number): void {
+  for (const button of eraserSizeButtons) {
+    const presetWidth = Number(button.dataset.eraserWidth);
+    const isActive = presetWidth === activeWidth;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+  }
 }
 
 function setWidthForActiveTool(width: number): void {
   toolSettings = withToolWidth(toolSettings, drawing.getTool(), width);
   applyActiveToolWidth();
+}
+
+function setEraserWidthPreset(width: number): void {
+  toolSettings = withToolWidth(toolSettings, "eraser", width);
+  if (drawing.getTool() === "eraser") {
+    applyActiveToolWidth();
+  } else {
+    syncEraserSizePresets(toolSettings.eraserWidth);
+  }
 }
 
 function hideClearConfirmation(): void {
@@ -934,8 +969,22 @@ for (const swatch of colorSwatchButtons) {
 }
 
 widthInput.addEventListener("input", () => {
+  if (drawing.getTool() === "eraser") {
+    return;
+  }
   setWidthForActiveTool(Number(widthInput.value));
 });
+
+for (const button of eraserSizeButtons) {
+  button.addEventListener("click", () => {
+    const width = Number(button.dataset.eraserWidth);
+    if (!Number.isFinite(width)) {
+      return;
+    }
+    setActiveTool("eraser");
+    setEraserWidthPreset(width);
+  });
+}
 
 clearButton.addEventListener("click", () => {
   if (!roomSocket?.isReady()) {

@@ -23,8 +23,9 @@ WebSocket API. See [DECISIONS.md](./DECISIONS.md).
   URL fallback). Invite URL is always the canonical `/r/<roomId>` path
 - Tools: brush, eraser (punch-through), rectangle (local drag preview, one
   durable commit on pointer-up), five colour presets + custom picker,
-  independent brush/eraser widths (1–32px; rectangle shares brush width),
-  confirmed room-wide **Clear room**
+  brush/rectangle width slider (1–32px), eraser size as four circle presets
+  (6 / 12 / 20 / 32px), confirmed room-wide **Clear room**
+  (optional follow-up: matching circle presets for brush)
 - Keyboard: `B` / `E` / `R`; ⌘/Ctrl+Z and ⌘/Ctrl+Shift+Z (or Y) for global undo/redo
   when focus is not in an editable control
 - Two canvas layers + DOM collaborator labels (idle cursors + live stroke tips)

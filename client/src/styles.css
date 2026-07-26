@@ -250,6 +250,47 @@ h1 {
   color: var(--ink);
 }
 
+.eraser-size-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.eraser-size-label {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.eraser-size-presets {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.toolbar button.eraser-size-preset {
+  display: inline-grid;
+  place-items: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  min-height: 2.35rem;
+  padding: 0;
+  border-radius: 0.4rem;
+}
+
+.eraser-size-dot {
+  width: var(--eraser-dot, 12px);
+  height: var(--eraser-dot, 12px);
+  border-radius: 50%;
+  background: #64748b;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.25);
+}
+
+.toolbar button.eraser-size-preset.is-active .eraser-size-dot {
+  background: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(15, 106, 90, 0.35);
+}
+
 .clear-controls {
   display: inline-flex;
   align-items: center;
@@ -982,6 +1023,12 @@ h1 {
 
   .field input[type="range"] {
     width: 5.5rem;
+  }
+
+  .toolbar button.eraser-size-preset {
+    width: 2.5rem;
+    height: 2.5rem;
+    min-height: 2.5rem;
   }
 
   .clear-confirmation {

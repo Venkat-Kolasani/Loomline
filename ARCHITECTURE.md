@@ -1,221 +1,204 @@
 # Architecture
 
-Status legend: **Implemented** vs **Planned**.
+Loomline is a room-scoped collaborative drawing app. Clients paint with the
+native Canvas 2D API. Presence, live strokes, and durable ordered operations
+travel over a same-origin WebSocket to a Cloudflare Worker that routes each
+room id to **one** Durable Object.
 
-## Overview
+Production origin: <https://loomline.kolasanivenkat2.workers.dev>  
+Static assets, `/api/*`, and `wss` share that origin.
 
-Loomline is a room-scoped collaborative drawing app. Clients render locally with
-the Canvas 2D API. Presence, live strokes, and durable ordered operations go
-through a Cloudflare Worker that routes each room id to one Durable Object.
+This is **not** a Node.js server. The Worker runs on Cloudflare's edge JavaScript
+runtime. Rationale: [DECISIONS.md](./DECISIONS.md) D1.
 
-Production origin: <https://loomline.kolasanivenkat2.workers.dev>. Static assets,
-HTTP health/metrics, and `wss` use this one origin. Deployment `a1fc2216-2c09-4bf7-b6b9-d9cf4f431c76`
-was smoke-tested on 26 July 2026.
+## System diagram
 
 ```mermaid
 flowchart LR
-  L["Landing /r create"] --> C1["Client A /r/id"]
+  L["Landing: create / join"] --> C1["Client A /r/id"]
   C1 -->|"wss /ws?room=id"| W["Cloudflare Worker"]
   C2["Client B /r/id"] -->|"wss /ws?room=id"| W
   W -->|"idFromName(roomId)"| R["RoomDurableObject"]
   R --> P["Presence via WS attachments"]
   R --> L2["Ephemeral live stroke / cursor fan-out"]
-  R --> S["SQLite: committed operations"]
-  W -->|"ASSETS"| A["Static SPA"]
+  R --> S["SQLite: operations + history + live expiry"]
+  W -->|"ASSETS"| A["Static SPA dist/client"]
 ```
 
-## Committed operation data flow (implemented)
+## Data flow (committed stroke)
 
 ```mermaid
 sequenceDiagram
   participant A as Client A
-  participant DO as Room DO
+  participant DO as Room Durable Object
   participant B as Client B
-  A->>DO: stroke:start / points (rAF batches)
-  DO->>B: stroke:live
+  A->>A: Local paint (immediate)
+  A->>DO: stroke:start
+  DO->>B: stroke:live phase=start
+  A->>DO: stroke:points (≤1 rAF batch, ≤64 pts)
+  DO->>B: stroke:live phase=points
   A->>DO: stroke:end
   DO->>B: stroke:live phase=end
-  DO->>DO: next sequence + SQLite INSERT
+  DO->>DO: next sequence + SQLite INSERT + clear redo stack
   DO->>A: operation:committed
   DO->>B: operation:committed
-  Note over A,B: Rebuild committed-canvas by sequence order
+  Note over A,B: Rebuild committed canvas by sequence order
   participant C as Joining client
   C->>DO: join
-  DO->>C: welcome + sync_state snapshot
+  DO->>C: welcome + sync_state (visible ops) + presence
 ```
 
-## Why `idFromName(roomId)` is safe isolation
+## Why `idFromName(roomId)` isolates rooms
 
 Cloudflare maps the string passed to `idFromName` through an internal hash to a
-**unique Durable Object id**. Different room id strings never share that instance.
+**unique Durable Object id**. Different room id strings never share that
+instance. Loomline validates room ids as `/^[a-z0-9]{8}$/` before routing.
 
 Verified in `test/rooms.test.ts`.
 
-## Implemented
+## Conflict resolution (Durable Object single-threaded model)
 
-| Piece | Role |
+Overlapping strokes are **valid composition**, not errors. There is no pixel
+merge, OT, or CRDT.
+
+What prevents conflicting orders:
+
+1. **One Durable Object per room** is the only writer that assigns `sequence`.
+2. Cloudflare runs that object's handlers with **single-threaded concurrency
+   control** for the instance: messages for the same room are processed one at a
+   time (constructor schema setup also uses `blockConcurrencyWhile`).
+3. On `stroke:end` or `canvas:clear`, the DO computes `sequence = MAX(sequence)+1`,
+   inserts **one** SQLite row, then broadcasts the same
+   `operation:committed` to every joined socket.
+4. Clients paint visible ops in ascending sequence. Later sequence paints later.
+   Two clients finishing strokes “at the same wall-clock time” still get a total
+   order because only one commit handler runs at a time inside the room DO.
+
+What this is **not**:
+
+- Not last-writer-wins on pixels.
+- Not client-assigned order.
+- Not a claim that live overlays are durable — mid-stroke disconnect abandons
+  the provisional stroke; it never receives a sequence.
+
+## Complete WebSocket protocol table
+
+Transport: native browser `WebSocket` to same origin.  
+Path: `/ws?room=<roomId>`.  
+Every JSON message includes `type`, `protocolVersion` (`2`), and `roomId`.
+
+| Message | Direction | Meaning |
+| --- | --- | --- |
+| `join` | client → server | Enter room; optional `displayName` (server trims/caps to 24 chars) |
+| `welcome` | server → client | Assigned `participantId`, colour, display name |
+| `sync_state` | server → client | Visible committed ops + `sequenceHead` + `canUndo` / `canRedo` |
+| `presence` | server → all | Full participant list for the room |
+| `stroke:start` | client → server | Begin provisional stroke (`strokeId`, tool, colour, width, first point) |
+| `stroke:points` | client → server | Batched points (1–64); client sends ≤ one batch per animation frame |
+| `stroke:end` | client → server | Finish provisional stroke; may produce one durable stroke op |
+| `stroke:live` | server → peers | Fan-out start / points / end for live overlay (not to author for own ink) |
+| `canvas:clear` | client → server | Request one room-global durable clear operation |
+| `operation:committed` | server → **all** | Durable op with authoritative increasing `sequence` |
+| `history:undo` | client → server | Tombstone latest **visible** completed op |
+| `history:redo` | client → server | Restore newest redoable tombstone |
+| `history:changed` | server → **all** | Visible op set after undo/redo; clients rebuild |
+| `cursor` | client → server → peers | Ephemeral idle pointer position (suppressed while drawing) |
+| `ping` | client → server | RTT probe with `clientTime` |
+| `pong` | server → client | Echoes `clientTime` + `serverTime` |
+| `error` | server → client | Recoverable typed failure; room stays alive |
+
+### Payload / rate limits (enforced)
+
+| Limit | Value |
 | --- | --- |
-| Landing / room client | Browser-local artist name, canonical invite sharing, presence, cursors, live + committed sync, per-tool width UI |
-| Canvas layers | `committed-canvas` = server ops; `live-canvas` = in-progress |
-| Tool shell | Separate retained brush/eraser widths, presets, clear confirmation, input-safe shortcuts |
-| Point batching | ≤ one `stroke:points` per animation frame |
-| `RoomDurableObject` | Live fan-out + SQLite ops + tombstones + stall alarm + `sync_state` |
-| Shared protocol | Validated versioned messages + frame/rate limits |
-| Client reconnect | Exponential backoff; full snapshot on re-join |
-| Empty-room cleanup | No live timers/expiry; hibernation-eligible |
+| Text frame size | ≤ 16_384 **UTF-8 bytes** (`TextEncoder`) before parse |
+| `strokeId` | 1–64 characters |
+| Points per `stroke:points` | 1–64 |
+| Stroke width | integer 1–32 |
+| Colour | `#RRGGBB` |
+| Display name | optional; trim/cap 24; blank → `Artist-<id prefix>` |
+| Client frames / participant / 1s | ≤ 120 (all post-join frames, before parse) |
 
-### Rendering layers (current)
+Typed `error` codes include: `invalid_json`, `payload_too_large`,
+`unsupported_type`, `protocol_mismatch`, `invalid_payload`, `rate_limited`,
+`not_joined`, `room_mismatch`, `already_joined`, `stroke_active`,
+`unknown_stroke`, `stroke_expired`. Full schemas and examples:
+[PROTOCOL.md](./PROTOCOL.md).
+
+### HTTP helpers
+
+| Endpoint | Behavior |
+| --- | --- |
+| `GET /api/health` | `{ ok, service: "loomline", phase: "observability" }` |
+| `GET /api/room-metrics?room=` | DO head snapshot for load scripts |
+| Static assets via `ASSETS` | Landing + SPA `/r/:roomId` |
+
+## Client rendering layers
 
 1. **committed-canvas** — deterministic replay of **visible**
    `CommittedOperation`s ordered by server `sequence`. A visible `kind: "clear"`
    resets the pixel buffer at its replay position; later strokes paint normally.
-   The same pass then adds **provisional
-   eraser** strokes (local active/awaiting + remote in-progress) painted with
-   `destination-out` so erase punches through while dragging. Dirty on
-   sync_state / operation:committed / history:changed / eraser live updates.
+   The same paint pass then draws **provisional eraser** strokes (local
+   active/awaiting + remote in-progress) with `destination-out` so erase punches
+   through while dragging. Marked dirty on `sync_state` / `operation:committed` /
+   `history:changed` / eraser live updates.
 2. **live-canvas** — brush-only: local active + awaiting-commit brushes, remote
-   in-progress brushes. Eraser never draws the gray pencil preview here.
-3. **cursor-layer** (DOM) — remote cursors and collaborator labels. While a
-   peer draws, the label follows the last point already present in that peer's
-   `stroke:live` batch; when idle, it follows the lower-frequency `cursor`
-   message. This avoids an extra drawing-time WebSocket stream. Labels flip
-   before the stage's right/bottom edges and are removed on presence leave or
-   reconnect reset.
+   in-progress brushes. Eraser never draws a gray pencil preview here.
+3. **cursor-layer** (DOM) — remote cursors and collaborator name labels. While a
+   peer draws, the label follows the latest point already present in that peer's
+   `stroke:live` batch; when idle, it follows lower-frequency `cursor` messages.
+   Labels flip before stage edges and clear on presence leave / reconnect reset.
 
 Local finished strokes stay provisional until `operation:committed`
-acknowledges them (brush on live; eraser on committed view), then the store
-owns the ink/hole (no double paint). If a committed eraser arrives with fewer
-points than the provisional path (dropped batches), the provisional hole is
-kept so erased ink cannot reappear; leftovers clear on `sync_state` /
-`history:changed`. Eraser width shares the brush width slider; the live canvas
-cursor shows a circle sized to that width. Cursor messages are not sent while
-drawing so stroke point batches stay under the room rate limit.
+acknowledges them, then the committed store owns the ink/hole. If a committed
+eraser arrives with fewer points than the provisional path (dropped batches),
+the provisional hole is retained so erased ink cannot reappear; leftovers clear
+on `sync_state` / `history:changed`.
 
-### Storage
+There is **no permanent `requestAnimationFrame` render loop**. Layers paint only
+when marked dirty. The Metrics dock runs an rAF sampler **only while expanded**.
 
-- Table `operations`: one row per committed discriminated operation
-  (`operation_type = stroke | clear`, `sequence` PK). Stroke rows hold full
-  `points_json`; clear rows are replay barriers. Existing pre-clear rows migrate
-  in place with `operation_type = stroke`. Rows are never updated or deleted by
-  undo/redo.
-- Tables `history_hidden` / `history_redo_stack`: durable visibility + redo.
-- Schema created in the DO constructor via `blockConcurrencyWhile` (safe after
-  hibernation wake). Live map starts empty on wake; constructor re-arms the
-  stall alarm from `live_stroke_expiry` if any rows remain.
-- Live pointer **points** are never written as SQLite rows.
-- Table `live_stroke_expiry`: participant/stroke/room + `expires_at` only, so a
-  post-hibernation alarm can still clear peer overlays (`LIVE_STROKE_STALL_MS`).
-  Upserted on start/points (correctness-first; may be ~1 small write per rAF
-  batch per active drawer — see DECISIONS D6; measure before optimizing).
-- Empty rooms (`0` joined participants): clear in-memory live strokes + rate
-  counters, delete all `live_stroke_expiry` rows, and `deleteAlarm` so the DO
-  is eligible for normal hibernation. Committed ops are **not** wiped.
+## Storage (per room Durable Object)
 
-## Planned
-
-- Sticky participant identity/colour across reconnect (optional polish; the
-  browser-local artist name already persists without becoming an account)
-- Checkpoint / retention after a measured room-size baseline (DECISIONS D7)
-
-## Responsive canvas shell (implemented; device proof pending)
-
-Desktop preserves the four-row document layout. At `≤640px`, the app becomes a
-definite `100dvh` grid with safe-area padding and visual order **header → compact
-presence → canvas → horizontally-scrollable tool row**. The stage receives the
-remaining grid height and keeps a bounded `dvh` minimum, so controls do not wrap
-above a tiny canvas. Canvas DPR sizing still derives from `ResizeObserver`; no
-pointer or rendering contract changes in this CSS-only slice.
-
-## Diagnostics and load baseline (implemented)
-
-Always-on collapsed **Metrics** disclosure in the canvas corner (visible in every
-room without `?debug=1`). Closed by default so drawing stays primary; expand to
-read live values:
-
-| Metric | Source |
+| Store | Contents |
 | --- | --- |
-| Display rAF rate | `requestAnimationFrame` deltas **only while the dock is open** (display cadence, not Canvas paint cost) |
-| WebSocket RTT | `ping` / `pong` echo of `clientTime` |
-| Inbound / outbound messages/s | Client counters reset each second |
-| Participants | Latest `presence` length |
-| Sequence head | `sync_state` / commits / `history:changed` |
+| `operations` | Append-only committed ops (`sequence` PK; `stroke` or `clear`) |
+| `history_hidden` | Sequences currently not painted |
+| `history_redo_stack` | LIFO redoable undos (`position`, `sequence`) |
+| `live_stroke_expiry` | participant/stroke/room + `expires_at` only (never points) |
+| In-memory `liveStrokes` | Provisional points; empty after hibernation wake |
 
-Synthetic load: `npm run load` → `scripts/synthetic-load.mjs` (5 Node WebSocket
-clients × 100 completed strokes). Server snapshot via
-`GET /api/room-metrics?room=` (sequenceHead, operationCount, live counts).
-**No Worker CPU%** is available from the runtime; do not invent it.
+Schema is ensured in the DO constructor via `blockConcurrencyWhile`. Live pointer
+**points** are never written as independent SQLite rows. Empty rooms (0 joined
+participants) clear live maps, rate counters, expiry rows, and alarms; committed
+ops and history remain for later joins.
 
-Measured results live in [TESTING.md](./TESTING.md). Do not treat idle display
-rAF rate or localhost RTT as a cross-network SLA.
+## Global undo / redo strategy
 
-## Reconnect / hibernation (implemented)
-
-```mermaid
-sequenceDiagram
-  participant B as Client B
-  participant DO as Room DO
-  Note over B: Unexpected WS close
-  B->>B: Reconnecting… exponential backoff
-  B->>DO: new WS + join
-  DO->>B: welcome + sync_state (visible ops)
-  Note over B: Replace committed store; skip duplicate sequences
-```
-
-- Hibernation retains healthy sockets at the platform layer; Loomline still shows
-  reconnect UI for real drops and refreshes.
-- Full snapshot on join (not last-seq delta) because undo tombstones change
-  visibility independently of sequence head.
-- Zero participants ⇒ no pending stall alarm and no retained live-stroke state
-  (verified in `test/boundaries.test.ts`). The Workers test runtime cannot prove
-  platform hibernation itself; it proves Loomline clears the state that would
-  block hibernation.
-
-### Room lifecycle
-
-1. `/r/<roomId>` loads the SPA. A returning browser reuses its local validated
-   artist name; a first-time browser sees the landing name gate before any
-   WebSocket joins. `/ws?room=<roomId>` validates the id and routes through
-   `idFromName(roomId)`.
-   The room header derives its invite URL from the canonical room path only;
-   device sharing/clipboard are client conveniences and never alter room state.
-2. `join` carries that optional name; the server trims/caps it, assigns fresh
-   participant attachment metadata and returns `welcome`,
-   `sync_state`, then room `presence`.
-3. Live points fan out from in-memory state; only minimal expiry metadata is
-   durable until a stroke ends.
-4. `stroke:end` or `canvas:clear` inserts one sequenced SQLite operation and
-   broadcasts the same commit to every joined socket.
-5. Close/error removes presence and abandons that participant's live strokes.
-6. When the final socket leaves, live maps, expiry rows, limiter entries, and
-   alarms are cleared; committed operations and history remain for later joins.
-
-## Global tombstone undo/redo (implemented)
-
-History is **server-owned and global**. The `operations` table is append-only.
+History is **server-owned and global**. Any joined client may undo/redo. The
+`operations` table is never UPDATEd or DELETEd by history actions.
 
 | Store | Role |
 | --- | --- |
-| `operations` | Every completed stroke and clear forever (`sequence` PK) |
-| `history_hidden` | Sequences currently not painted |
-| `history_redo_stack` | LIFO of redoable undos (`position` + `sequence`) |
+| `operations` | Every completed stroke/clear forever |
+| `history_hidden` | Tombstoned sequences (not painted) |
+| `history_redo_stack` | Redo branch (cleared by any new commit) |
 
 ### Worked example
 
 Start: ops `{1:A, 2:B, 3:C}` all visible. Redo stack empty.
 
-1. **Undo** → tombstone `3`. Hidden `{3}`. Redo stack `[3]`. Visible `{1:A, 2:B}`.
-2. **Undo** → tombstone `2`. Hidden `{3,2}`. Redo stack `[3,2]`. Visible `{1:A}`.
+1. **Undo** → hide `3`. Hidden `{3}`. Redo stack `[3]`. Visible `{1:A, 2:B}`.
+2. **Undo** → hide `2`. Hidden `{3,2}`. Redo stack `[3,2]`. Visible `{1:A}`.
 3. **Redo** → pop `2`. Hidden `{3}`. Redo stack `[3]`. Visible `{1:A, 2:B}`.
 4. **Commit D** as sequence `4` → **clear redo stack**. Hidden still `{3}` so `C`
-   stays gone. Visible `{1:A, 2:B, 4:D}`. A further **Redo** is a no-op.
-5. Clients rebuild committed-canvas from the visible list in `history:changed`
-   or `sync_state` (joiners never see tombstoned strokes).
+   stays gone. Visible `{1:A, 2:B, 4:D}`. Further **Redo** is a no-op.
+5. Clients rebuild from the visible list in `history:changed` or `sync_state`.
 
-Clear is a normal undoable operation. Undoing a clear hides its sequence, so
-earlier visible strokes replay again; redo restores the barrier. Clear never
-drops active strokes: an active stroke stays on the live overlay and, if it ends
-after clear, receives a later sequence and remains visible above the cleared
-history. Live strokes themselves never enter `operations`, so they are not
+Clear is a normal undoable operation: undoing a clear hides its sequence so
+earlier strokes replay again; redo restores the barrier. Clear does **not**
+cancel active strokes — a stroke ending after clear gets a later sequence and
+paints above the clear. Live strokes never enter `operations`, so they are not
 undoable.
 
 ```mermaid
@@ -225,35 +208,97 @@ sequenceDiagram
   participant B as Client B
   A->>DO: history:undo
   DO->>DO: hide latest visible seq + push redo stack
-  DO->>A: history:changed (visible ops)
+  DO->>A: history:changed (same visible ops)
   DO->>B: history:changed (same visible ops)
 ```
 
-## Explicit runtime note
-
-This is **not** a Node.js server. The Worker runs on Cloudflare's edge JavaScript
-runtime. Rationale: [DECISIONS.md](./DECISIONS.md).
-
-## Deployment and scaling path
+## Reconnect / hibernation
 
 ```mermaid
-flowchart LR
-  U["Browser / mobile browser"] -->|"HTTPS + WSS"| W["loomline Worker + assets"]
-  W -->|"idFromName(room A)"| A["Room DO A + SQLite"]
-  W -->|"idFromName(room B)"| B["Room DO B + SQLite"]
+sequenceDiagram
+  participant B as Client B
+  participant DO as Room DO
+  Note over B: Unexpected WS close
+  B->>B: Reconnecting… exponential backoff (500 ms base, 15 s cap, jitter)
+  B->>DO: new WS + join
+  DO->>B: welcome + sync_state (visible ops)
+  Note over B: Replace committed store; skip duplicate sequences
 ```
 
-- **Across rooms:** room ids map to independent Durable Objects, so unrelated
-  rooms can be placed and scheduled independently by Cloudflare.
-- **Within one room:** one Durable Object is intentionally the serialization
-  point for sequence and global undo/redo. This gives correctness but is also
-  the honest single-room throughput ceiling; the project has not measured a
-  1,000-participant room and does not claim it.
-- **Growth path:** measure replay time and operation bytes first, then add
-  immutable checkpoints plus retention/compaction metadata. Keep recent
-  operations in the authoritative room DO. Do not shard one room unless the
-  protocol also gains an explicit ordering coordinator; naive sharding would
-  weaken deterministic layering and global history.
-- **Current evidence:** local synthetic commit/fan-out reached 500/500 completed
-  strokes (5 clients × 100) in 3.257 s. That is not a production capacity SLA,
-  browser rendering benchmark, or cross-region measurement.
+- Platform hibernation can retain healthy sockets while the DO is evicted;
+  Loomline still shows reconnect UI for real drops and refreshes.
+- Full visible snapshot on join (not last-seq delta) because tombstones change
+  visibility independently of sequence head.
+- After wake, live points map starts empty; constructor re-arms the stall alarm
+  from remaining `live_stroke_expiry` rows (`LIVE_STROKE_STALL_MS = 30_000`).
+- Zero participants ⇒ no pending stall alarm and no retained live-stroke state
+  (`test/boundaries.test.ts`). Vitest cannot prove platform hibernation itself.
+
+### Room lifecycle
+
+1. `/r/<roomId>` loads the SPA. Landing always requires an explicit name (field
+   starts empty). `/ws?room=` validates the id and routes via `idFromName`.
+2. `join` → `welcome` + `sync_state` + `presence`. Fresh participant id/colour
+   every join.
+3. Live points fan out from memory; expiry metadata is durable until end/close.
+4. `stroke:end` / `canvas:clear` insert one sequenced op and broadcast
+   `operation:committed` to all joined sockets (including the author).
+5. Close/error removes presence and abandons that participant's live strokes.
+6. Last socket leave clears live maps, expiry rows, limiter entries, and alarms;
+   committed ops + history remain.
+
+## Performance decisions (implemented)
+
+These are deliberate trade-offs present in the code — measured where noted:
+
+| Decision | Why | Evidence / bound |
+| --- | --- | --- |
+| Immediate local paint; network later | Keep pointer-to-pixel under one frame | Invariant 1; local drawing path |
+| Distance filter (`minPointDistance` default **1.5** CSS px) | Drop micro-moves before batching | `client/src/canvas/points.ts` |
+| ≤ one `stroke:points` per `requestAnimationFrame` | Avoid one WS message per pointer event | `StrokePointBatcher`; unit + live tests |
+| Chunk points at **64** / message | Bound frame size under rate limit | `MAX_POINTS_PER_MESSAGE` |
+| Suppress `cursor` while drawing | Leave rate-limit headroom for point batches | Client drawing hooks |
+| Dirty-layer paint only (no permanent loop) | Idle rooms do not burn frames | `LayeredCanvasSurface` |
+| One SQLite row per completed op | Persist geometry without per-point rows | `worker/operations.ts` |
+| Full visible `sync_state` on join | Correct with tombstones; simpler than delta | D6 |
+| Metrics rAF only while dock open | Avoid permanent measurement loop | `DiagnosticsPanel` |
+| Expiry upsert on points (correctness-first) | Hibernation-safe stall cleanup | D6 trade-off; not yet coalesced |
+
+### Measured load baseline (localhost, 25 July 2026)
+
+`npm run load` → 5 Node WebSocket clients × 100 completed strokes:
+
+| Field | Value |
+| --- | --- |
+| Wall clock | 3257 ms |
+| Commits | 500 / 500 |
+| Commit rate | 153.5 commits/s |
+| `/api/room-metrics` | `sequenceHead: 500`, `operationCount: 500` |
+
+Not claimed: Worker CPU%, memory, WAN RTT, Canvas paint FPS under that load.
+Localhost Metrics RTT (≈1–3 ms) is not a multi-region SLA. Details:
+[TESTING.md](./TESTING.md).
+
+## Responsive shell
+
+Desktop keeps header / presence / tools / stage. At `≤640px`, CSS uses a
+safe-area-aware `100dvh` grid: header → compact presence → canvas → horizontally
+scrollable tool row. Canvas DPR sizing still comes from `ResizeObserver`; pointer
+math is unchanged. Physical phone two-user proof recorded 26 July 2026.
+
+## Scaling path (honest)
+
+- **Across rooms:** independent Durable Objects; Cloudflare can schedule them
+  separately.
+- **Within one room:** the single DO is the intentional serialization point for
+  sequence and global history. That is the correctness model and the throughput
+  ceiling. This project has **not** measured a 1,000-participant room.
+- **Growth:** measure replay time and operation bytes first, then add immutable
+  checkpoints + retention. Do not shard one room without an explicit ordering
+  coordinator — naive sharding would break deterministic layering and global undo.
+
+## Planned (not implemented)
+
+- Sticky participant identity/colour across reconnect
+- Checkpoint / retention after a measured room-size baseline
+- Delta sync once a versioned visibility token exists

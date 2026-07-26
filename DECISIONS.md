@@ -1,568 +1,372 @@
 # Decisions
 
-Each entry records the problem, selected design, rejected alternative, and how
-it was (or will be) verified.
+Each entry records the problem, selected design, rejected alternative(s), and
+how the behavior was verified. Claims below match the current codebase unless
+marked **historical**.
 
 ## D1 — Cloudflare Workers + Durable Objects instead of Node.js + `ws`
 
-### Problem / invariant
+**Problem.** The brief says `Node.js + WebSockets`. The product needs a
+deployable, interview-defensible realtime coordinator where each room has a
+single authoritative sequence and shared undo/redo. Sleeping free-tier
+containers make multi-user demos unreliable.
 
-The assignment brief says `Node.js + WebSockets`. We need a deployable,
-interview-defensible realtime coordinator where each room has a single
-authoritative sequence and shared undo/redo history. A sleeping free-tier
-container would make multi-user demos unreliable.
+**Selected.** Cloudflare Workers (edge JavaScript runtime) with **one Durable
+Object per room** and Durable Object SQLite for committed operations. Clients
+still use the **native browser WebSocket API**. Static assets and `wss` share
+one origin. This is **not** Node.js and must never be described as Node to
+reviewers.
 
-### Selected design
+**Rejected.** A traditional Node HTTP + `ws` (or Socket.io) server on a
+VM/PaaS container — cold starts break demos; sticky room affinity and
+authoritative sequencing need extra infrastructure. Socket.io was also rejected
+to keep the protocol explicit.
 
-Use **Cloudflare Workers** (edge JavaScript runtime) with **one Durable Object
-per room** and Durable Object **SQLite** for committed operations. Clients still
-use the **native browser WebSocket API**. Static assets and `wss` share one
-origin via Workers static assets.
+**Verified.** Production Worker at
+<https://loomline.kolasanivenkat2.workers.dev>; automated isolation / sequencing
+/ history / boundary / expiry tests; deployed two-client smoke in
+[TESTING.md](./TESTING.md).
 
-This is **not** Node.js. We will never describe Workers as Node to reviewers.
+## D2 — Scaffold before product features (historical build-order)
 
-### Rejected alternative
+**Problem.** `PROJECT_BLUEPRINT.md` forbids starting stretch or product features
+before the deployment skeleton works.
 
-A traditional Node HTTP + `ws` (or Socket.io) server on a VM/PaaS container.
+**Selected (at the time).** First implementation commit only added tooling,
+static asset serving, DO skeleton, scripts, and docs with planned-vs-implemented
+labels.
 
-Rejected for this submission because:
+**Rejected.** Generating Canvas, rooms, and protocol stubs in the first commit —
+would mix unverified behavior into the baseline.
 
-1. Free/hobby containers often sleep; cold starts break live multi-user demos.
-2. Sticky room affinity and authoritative sequencing need extra design (Redis,
-   single process, etc.).
-3. A Durable Object is already a natural single-threaded coordinator per room id.
-
-Socket.io was also rejected to keep the protocol explicit and interviewable.
-
-### Verification
-
-- Production Worker serves assets + health at
-  <https://loomline.kolasanivenkat2.workers.dev>; the `ROOM` binding and v1
-  SQLite migration deployed successfully.
-- Automated tests prove room isolation, sequencing, history, boundary recovery,
-  and hibernation-safe expiry. The deployed smoke proves two-client live fan-out,
-  isolation, global undo/redo, and reconnect snapshot recovery. See
-  [TESTING.md](./TESTING.md).
-
-## D2 — Scaffold now; Canvas/WebSocket later
-
-### Problem / invariant
-
-Build order in `PROJECT_BLUEPRINT.md` forbids starting stretch or product
-features before the deployment skeleton works.
-
-### Selected design
-
-This commit only adds tooling, static asset serving, DO skeleton, scripts, and
-docs with clear planned-vs-implemented labels.
-
-### Rejected alternative
-
-Generating Canvas, rooms, and protocol stubs in the first commit.
-
-Rejected because it would mix unverified behavior into the baseline and weaken
-the reviewability of each slice.
-
-### Verification
-
-No Canvas/WebSocket/room routing code exists in this slice; tests cover health
-and DO skeleton only.
-
-## Deferred decisions (planned)
-
-These will get full decision records when implemented:
-
-- Sticky participant identity across reconnect
-- Checkpoint / retention for very large operation logs
+**Verified then.** Health + DO skeleton tests only. **Current code** has since
+grown through the full must-ship path; D2 remains as the build-order decision,
+not a description of today's feature set.
 
 ## D3 — rAF point batching for live stroke network sends
 
-### Problem / invariant
+**Problem.** Raw pointer events fire faster than display refresh. One WebSocket
+message per sample would flood the room and couple responsiveness to send rate.
 
-Raw pointer events can fire far more often than one frame. Emitting one
-WebSocket message per sample would flood the room and fight the “local paint
-before network” invariant by coupling responsiveness to send rate.
+**Selected.** Local canvas updates on every accepted filtered point immediately.
+`StrokePointBatcher` flushes outbound points **at most once per
+`requestAnimationFrame`** as `stroke:points`. `stroke:start` / `stroke:end` send
+immediately (end flushes the batcher first). The DO fans out `stroke:live` to
+peers only — no SQLite for live points.
 
-### Selected design
-
-- Local canvas updates on every accepted filtered point immediately.
-- `StrokePointBatcher` queues outbound points and flushes **at most once per
-  `requestAnimationFrame`** as `stroke:points`.
-- `stroke:start` and `stroke:end` send immediately (end flushes the batcher
-  first). The Durable Object fans out `stroke:live` to peers only — no SQLite.
-
-### Rejected alternative
-
-One network message per pointer event, or a fixed timer (e.g. 50 ms) independent
+**Rejected.** One network message per pointer event, or a fixed timer independent
 of frames.
 
-Rejected because per-event floods the wire under fast input, and a fixed timer
-decouples from display refresh without improving local latency.
+**Verified.** `test/stroke-batcher.test.ts`, `test/live-strokes.test.ts`, manual
+two-browser mid-stroke proof in [TESTING.md](./TESTING.md).
 
-### Verification
+## D4 — Durable ops are append-only sequenced records, not per-point rows
 
-- Unit: `test/stroke-batcher.test.ts` coalesces multiple enqueues into one flush.
-- Integration: `test/live-strokes.test.ts` proves peer receives `stroke:live`
-  start/points before end.
-- Manual two-browser: peer sees ink mid-stroke. See [TESTING.md](./TESTING.md).
+**Problem.** Completed strokes must converge for every client. Live points are
+high-volume and ephemeral.
 
-## D4 — Durable ops are append-only sequenced strokes, not per-point rows
+**Selected.** On `stroke:end`, the room DO assigns `sequence = MAX+1`, inserts
+**one** SQLite row with the full point list (or a `clear` row for
+`canvas:clear`), and broadcasts `operation:committed` to all sockets. Join sends
+`sync_state` with the ordered **visible** log.
 
-### Problem / invariant
+**Rejected.** CRDT / client-assigned order, or one DB row per pointer sample.
 
-Completed strokes must converge for every client. Live points are high-volume
-and ephemeral; persisting each point would explode storage and break hibernation
-assumptions.
-
-### Selected design
-
-On `stroke:end`, the room DO assigns `sequence = MAX+1`, inserts **one** SQLite
-row with the full point list, and broadcasts `operation:committed` to all
-sockets. Join sends `sync_state` with the ordered log. Clients rebuild
-committed-canvas only from that log.
-
-### Rejected alternative
-
-CRDT / client-assigned order, or one DB row per pointer sample.
-
-Rejected because a single DO coordinator already gives a total order, and
-per-point rows violate the blueprint storage rule.
-
-### Verification
-
-`test/history.test.ts` (sequence equality, join snapshot, abandon, brush/eraser
-overlap). See [TESTING.md](./TESTING.md).
+**Verified.** `test/history.test.ts`, `test/clear-history.test.ts`,
+`test/committed-ops.test.ts`.
 
 ## D5 — Global tombstone undo/redo (not per-user, not mutating the log)
 
-### Problem / invariant
+**Problem.** Completed strokes must be undoable across participants without
+forking the room or rewriting history. Live strokes must not be undoable. A new
+draw after undo must clear redo.
 
-Completed strokes must be undoable across participants without forking the room
-or rewriting history. Live strokes must not be undoable. A new draw after undo
-must clear redo (classic linear history branch).
+**Selected.** Global undo/redo: any joined client may tombstone the latest
+**visible** completed op; peers rebuild from `history:changed`. Tombstones live
+in `history_hidden` + `history_redo_stack`. The `operations` table stays
+append-only. New commits clear the redo stack only; prior hidden sequences stay
+hidden.
 
-### Selected design
+**Rejected.** Per-user undo stacks (assignment asks for global undo; concurrent
+history edits diverge). Deleting or mutating operation rows (breaks auditability
+and join replay).
 
-- **Global** undo/redo: any joined client may tombstone the latest **visible**
-  completed op; peers all rebuild from `history:changed`.
-- Tombstones live in SQLite (`history_hidden` + `history_redo_stack`). The
-  `operations` table stays append-only.
-- New `operation:committed` clears the redo stack only; prior hidden sequences
-  stay hidden.
-
-### Rejected alternative
-
-**Per-user undo stacks** (each participant only undoes their own strokes).
-
-Rejected because the assignment asks for global undo (User A undoes User B) and
-per-user stacks diverge room state under concurrent history edits. Mutating or
-deleting operation rows was also rejected: it breaks auditability and join
-replay of the true log head.
-
-### Verification
-
-`test/history.test.ts` undo-peer / redo / redo-invalidation / rapid history /
-two-client convergence. Manual two-browser proof in [TESTING.md](./TESTING.md).
-
-## D6 — Full snapshot reconnect (not last-seq delta) + 30s live stall expiry
-
-### Problem / invariant
-
-A dropped client must restore the same committed canvas, never double-apply a
-sequence, and must not persist provisional pointer points. Hibernation must not
-assume in-memory live strokes survive.
-
-### Selected design
-
-- Client: exponential reconnect with jitter; UI Connecting / Reconnecting /
-  Connected; on schedule, clear ephemeral ink; on join, replace committed store
-  from full visible `sync_state`.
-- Client: `appliedSequences` set suppresses duplicate `operation:committed`.
-- Server: DO constructor re-ensures SQLite schemas; live **points** map starts
-  empty after hibernation. Idle strokes expire after 30s via alarm using durable
-  `live_stroke_expiry` metadata (ids + `expires_at` only — never points).
-
-### Rejected alternative
-
-**Delta sync by `lastSequence` only** (send ops with sequence > N).
-
-Rejected for this slice because undo tombstones change **visibility** without
-changing sequence head — a pure delta can revive hidden ops or miss visibility
-flips. Full visible snapshot is simpler and correct; delta remains a future
-optimization once a versioned visibility token exists.
-
-**In-memory-only stall expiry** (no SQLite metadata).
-
-Rejected after review: hibernatable WebSockets stay connected while the DO is
-evicted, wiping `liveStrokes`; an alarm wake with an empty map would leave peer
-overlays stuck forever. Minimal expiry rows fix that without persisting points.
-
-### Trade-off (not optimized yet)
-
-Upserting `live_stroke_expiry.expires_at` on every accepted `stroke:points`
-batch (≤ one rAF flush per active drawer) can mean roughly **one small SQLite
-write per frame per drawer** while a stroke is in progress. That is intentional
-correctness-first behavior so hibernation cannot leave peer overlays stuck.
-
-Do **not** coalesce/throttle these writes in this submission unless load testing
-shows real pressure. If it does, measure write rate under a stated drawer count /
-stroke length, then consider a cheaper refresh (e.g. update expiry only every
-N ms or only when the alarm would move) — never by dropping the durable row.
-
-### Verification
-
-`test/reconnect.test.ts`, `test/reconnect-backoff.test.ts`,
-`test/live-expiry-hibernate.test.ts` (`evictDurableObject` + `runDurableObjectAlarm`),
-duplicate suppression in the committed store. Manual refresh reconnect in
+**Verified.** `test/history.test.ts` (undo-peer, redo, redo-invalidation, rapid
+history, two-client convergence); manual two-browser proof in
 [TESTING.md](./TESTING.md).
+
+## D6 — Full snapshot reconnect + hibernation-safe live stall expiry
+
+**Problem.** A dropped client must restore the same committed canvas, never
+double-apply a sequence, and must not persist provisional pointer points.
+Hibernation must not assume in-memory live strokes survive.
+
+**Selected.** Client: exponential reconnect with jitter (500 ms base, 15 s cap);
+UI Connecting / Reconnecting / Connected; on join, replace committed store from
+full visible `sync_state`; `appliedSequences` suppresses duplicate commits.
+Server: constructor re-ensures schemas; live points map starts empty after
+hibernation; idle strokes expire after 30 s via alarm using durable
+`live_stroke_expiry` metadata (ids + `expires_at` only).
+
+**Rejected.** Delta sync by `lastSequence` only (tombstones change visibility
+without changing sequence head). In-memory-only stall expiry (hibernation wipe
+would leave peer overlays stuck).
+
+**Trade-off kept.** Upserting expiry on every accepted `stroke:points` batch can
+mean roughly one small SQLite write per frame per active drawer. Correctness
+first; coalesce only after measured pressure.
+
+**Verified.** `test/reconnect.test.ts`, `test/reconnect-backoff.test.ts`,
+`test/live-expiry-hibernate.test.ts` (`evictDurableObject` +
+`runDurableObjectAlarm`).
 
 ## D7 — Input boundaries without silent drops or premature log reset
 
-### Problem / invariant
+**Problem.** Malformed / abusive frames must not crash a room. Normal rAF drawing
+must keep working. Rapid undo/redo must apply. Empty rooms must be
+hibernation-eligible. Do not invent an unmeasured operation-log wipe.
 
-Malformed / abusive client frames must not crash a room (invariant 10). Normal
-rAF-batched drawing must keep working. Rapid undo/redo must not corrupt sequence
-or redo state. Empty rooms must be hibernation-eligible. Do not invent an
-unmeasured operation-log wipe.
+**Selected.** Reject oversized text frames (`MAX_CLIENT_MESSAGE_BYTES = 16_384`
+UTF-8 bytes) before parse; shape validation in `parseClientMessage`;
+per-participant `120` messages / `1s` on every post-join frame; process every
+accepted history request under DO serialization (no debounce); on last leave,
+clear live state / expiry / alarms but retain committed ops.
 
-### Selected design
+**Rejected.** Debouncing undo/redo (would silently drop intentional actions).
+Wiping the op log when empty or after arbitrary N (surprises rejoins; no
+measured threshold).
 
-- Reject oversized text frames (`MAX_CLIENT_MESSAGE_BYTES = 16_384` **UTF-8
-  bytes** via `TextEncoder`) before parse.
-- Keep shape validation in `parseClientMessage` (unknown type, version, points).
-- Per-participant fixed window: `120` messages / `1s` → typed `rate_limited`,
-  applied to **every** frame once the socket has a participant id (before parse).
-- Process every accepted history request under DO serialization — **no debounce**.
-- On last participant leave: clear live map, expiry rows, rate counters, and
-  `deleteAlarm`. Retain committed SQLite ops.
-- Document room growth honestly: the measured local baseline is 500 operations,
-  not a hard cap or production capacity claim. Future checkpoint / retention
-  follows replay-size measurements, not an arbitrary reset.
+**Verified.** `test/boundaries.test.ts` (malformed JSON, unknown type, UTF-8
+size bypass, rate limit, rapid history, zero-user cleanup).
 
-### Rejected alternative
+## D8 — Measured diagnostics only (honest labels, synthetic load)
 
-**Debounce / coalesce undo-redo** so “spam” history collapses to one action.
+**Problem.** Interviewers ask for FPS / latency / scale evidence. Unmeasured
+“60 FPS / &lt;50 ms” claims violate the evidence rule.
 
-Rejected because intentional rapid undo must apply; silently dropping actions
-would diverge clients and violate explainable global history.
+**Selected.** Collapsed **Metrics** dock in every room: Display rAF rate (only
+while expanded), WebSocket RTT via `ping`/`pong`, inbound/outbound messages/s,
+participants, sequence head. Reproducible `scripts/synthetic-load.mjs`
+(5×100 strokes). Never invent Worker CPU%. Never label display cadence as
+“Canvas FPS.”
 
-**Wipe the operation log when the room empties or after N ops.**
+**Rejected.** Always-expanded marketing HUD. Hiding metrics behind `?debug=1`
+only (reviewers need access without a secret flag).
 
-Rejected as premature: empties happen often in demos; wiping surprises rejoins
-and has no measured threshold. Prefer a future checkpoint record once Prompt 10
-(or a load pass) measures rebuild cost.
-
-### Verification
-
-`test/boundaries.test.ts` (malformed JSON, unknown type, oversized ASCII +
-Unicode UTF-8 bypass, rate limit on valid / malformed / repeated-join frames,
-rapid history, zero-user cleanup). Prior `test/history.test.ts` rapid path.
-Gate recorded in [TESTING.md](./TESTING.md).
-
-## D8 — Measured diagnostics only (`?debug=1` + synthetic load)
-
-### Problem / invariant
-
-Interviewers ask for FPS / latency / scale evidence. Claiming “60 FPS” or a
-fixed RTT budget without a stated workload violates the evidence rule.
-
-### Selected design
-
-- Collapsed **Metrics** dock always available in a room (canvas corner): Display
-  rAF rate from rAF deltas (only while expanded), WebSocket RTT from
-  `ping`/`pong`, inbound/outbound messages/s, presence count, sequence head.
-- Reproducible `scripts/synthetic-load.mjs`: 5 clients × 100 strokes; record
-  wall clock, commit rate, `/api/room-metrics` head — never invent CPU%.
-- Document browser/machine/network and limitations next to the numbers.
-- Never label display cadence as “Canvas FPS.”
-
-### Rejected alternative
-
-**Always-expanded HUD and marketing “60 FPS / &lt;50 ms” badges.**
-
-Rejected: permanent UI noise for reviewers; unmeasured SLA claims are dishonest.
-Hiding metrics behind `?debug=1` only was also rejected for the demo — reviewers
-must be able to open Metrics without a hidden query flag, while the control stays
-collapsed and corner-sized so it does not steal canvas space.
-
-### Verification
-
-`test/observability.test.ts` (label honesty + ping/pong + room-metrics). Manual
-panel use + `npm run load` results in [TESTING.md](./TESTING.md).
+**Verified.** `test/observability.test.ts`; `npm run load` results in
+[TESTING.md](./TESTING.md) (500/500 commits in 3257 ms localhost).
 
 ## D9 — One-origin Cloudflare deployment without repository credentials
 
-### Problem / invariant
+**Problem.** Submission needs a reliable public demo with same-origin WebSocket
+routing. Credentials must never enter source control.
 
-The submission needs a reliable public demo while preserving the same-origin
-WebSocket path and Durable Object routing tested locally. Cloudflare account
-credentials must never enter source control.
+**Selected.** One Worker `loomline` with Vite output in `dist/client` via
+`ASSETS`, `/ws` + `/api/*` on the Worker, `ROOM` Durable Object with v1 SQLite
+migration, `workers_dev = true`. Git push does **not** auto-publish (Workers
+Builds empty); use `npm run deploy` or optional Actions secrets.
 
-### Selected design
+**Rejected.** Split static host + separate WebSocket origin (CORS / dual failure
+boundary). Assuming git auto-deploy without Builds or Actions.
 
-Deploy one Worker named `loomline` with:
-
-- Vite output in `dist/client` served through the `ASSETS` binding;
-- `/ws` and `/api/*` handled by the Worker;
-- one `ROOM` Durable Object binding with the v1 SQLite class migration;
-- `workers_dev = true`, producing
-  <https://loomline.kolasanivenkat2.workers.dev>.
-
-Wrangler OAuth state remains in the developer's local Cloudflare configuration.
-No API token, account id, `.dev.vars`, or `.env` value is required by the app or
-committed to the repository.
-
-**Git push does not publish the Worker by itself.** Cloudflare Workers Builds is
-not connected to this repository (build history is empty). Production updates
-require `npm run deploy` (local Wrangler OAuth) or the optional GitHub Action
-`.github/workflows/deploy-cloudflare.yml` after
-`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repository secrets are set.
-
-### Rejected alternative
-
-Split the static client onto a second host and point it at a separately deployed
-WebSocket origin. Rejected because it adds CORS/origin configuration and another
-failure boundary without helping the room consistency model. A temporary
-preview deployment was also rejected because the submission needs a stable URL.
-Assuming “git auto-deploy” without Workers Builds or Actions was also rejected —
-it silently left production on an older upload.
-
-### Verification
-
-- `wrangler deploy --dry-run` resolved `ROOM` and `ASSETS`.
-- Production redeploy on 26 July 2026 (version
-  `7f696ade-815a-46e2-aef3-52b7d1b506bf`) served current polish HTML/JS
-  (`Partial eraser`, Share link, artist name).
-- `/` and `/api/health` returned HTTP 200.
-- Fresh production clients proved mid-stroke fan-out, isolated rooms, matching
-  global undo/redo state, and reconnect `sync_state`. Exact evidence is in
-  [TESTING.md](./TESTING.md).
+**Verified.** Production redeploys and fresh-session smoke in
+[TESTING.md](./TESTING.md).
 
 ## D10 — Clear is a sequenced replay barrier
 
-### Problem / invariant
+**Problem.** A client-only Clear left peers and reconnects showing durable
+strokes. Global Clear must converge, survive reconnect, participate in undo/redo,
+and preserve an active stroke that completes afterward.
 
-The original Clear button only erased one browser's pixels; peers and reconnect
-still showed the durable strokes. Global Clear must converge, survive reconnect,
-participate in undo/redo, and preserve an active stroke that completes afterward.
+**Selected.** `canvas:clear` appends a `kind: "clear"` operation with the next
+sequence. Replay resets prior pixels at that sequence; later strokes paint
+normally. Tombstoning the clear restores prior strokes. Active strokes stay
+ephemeral and receive a later sequence if completed. Protocol v2 discriminates
+`stroke` | `clear`.
 
-### Selected design
+**Rejected.** Delete operation rows. Broadcast a temporary non-durable clear.
+Cancel active strokes on clear.
 
-`canvas:clear` asks the room Durable Object to append a discriminated
-`kind: "clear"` operation with the next sequence. During deterministic replay a
-visible clear resets prior pixels; later strokes paint normally. Tombstoning the
-clear restores prior strokes, and redo makes the barrier visible again. Active
-strokes remain ephemeral during clear and receive a later sequence if completed.
-Protocol v2 adds `kind: "stroke" | "clear"` to the committed operation model.
-
-SQLite remains append-only. An `operation_type` column is added in place;
-existing rows default to `stroke`, while clear rows use the same authoritative
-sequence and history tables.
-
-### Rejected alternatives
-
-- **Delete operation rows:** destroys undo/reconnect history and breaks the
-  append-only invariant.
-- **Broadcast a temporary clear event:** disappears after reconnect and cannot
-  participate correctly in global undo/redo.
-- **Cancel active strokes:** silently loses valid user work and makes ordering
-  depend on client timing rather than the server sequence.
-
-### Verification
-
-`test/clear-history.test.ts` covers two-client fan-out, join/reconnect
-persistence, undo/redo convergence, a stroke completing after clear, and
-recoverable malformed clear input. `test/committed-ops.test.ts` verifies replay
-order `stroke → clear → stroke`.
+**Verified.** `test/clear-history.test.ts`, `test/committed-ops.test.ts`.
 
 ## D11 — Browser-local artist name, not an account or sticky identity
 
-### Problem / invariant
+**Problem.** Opaque `Artist-<id>` names are hard to follow in a live demo.
+Invitees need a readable name without auth or client-controlled identity.
 
-The old server fallback (`Artist-<id>`) was safe but unfriendly in a live demo.
-Invitees opening a room link need a clear way to choose a readable name before
-they appear in presence. This must not create authentication, a server profile,
-or a client-controlled participant identity.
+**Selected.** Landing offers an empty 1–24-character field (`autocomplete="off"`)
+plus **Random name**. Field is never prefilled. After validation on join, the
+name may be saved to `localStorage`, but every visit still requires explicit
+entry. The Durable Object trims/caps the wire value and assigns a fresh
+participant id and deterministic colour on every join.
 
-### Selected design
+**Rejected.** Opaque generated names only. Prefilling a random nickname on load.
+Server-side profiles / auth. Live rename or client-provided participant ids.
 
-The landing page offers an empty 1–24-character name field (`autocomplete="off"`)
-plus a **Random name** button. The field is never prefilled with a generated or
-restored value. After a successful join, the normalized name is stored in
-browser `localStorage` for optional future use, but every visit still requires
-an explicit name entry (or Random name). Deep links to `/r/<roomId>` always show
-the landing form first. The Durable Object still trims/caps the wire value and
-assigns a fresh participant id and deterministic colour on every join.
+**Verified.** `test/artist-name.test.ts`, `test/rooms.test.ts`; client always
+sets the input to `""` on load.
 
-### Rejected alternatives
+## D12 — Progressive invite sharing with manual fallback
 
-- **Keep opaque generated names only:** requires no UI but makes people and
-  cursor labels harder to follow in a collaboration demo.
-- **Prefill a random nickname on load:** looks like browser autofill and makes
-  the name feel unchosen.
-- **Persist a server-side profile or auth account:** exceeds assignment scope
-  and does not improve authoritative canvas ordering.
-- **Live rename / client-provided participant id:** adds a new presence protocol
-  and gives clients authority that belongs to the room server.
+**Problem.** A raw URL in the header is easy to miss on mobile. Invites must
+always resolve to canonical `/r/<roomId>` without leaking debug query state.
 
-### Verification
+**Selected.** Copy-link icon + **Share link**: native share sheet when present,
+else clipboard, else select the readonly input and explain manual copy.
+User-cancelled native share does not overwrite the clipboard.
 
-`test/artist-name.test.ts` covers validation, readable fallback, persistence,
-and unavailable storage. `test/rooms.test.ts` proves the Worker trims/caps a
-supplied name and falls back for blank input. Local browser proof is recorded in
-[TESTING.md](./TESTING.md).
+**Rejected.** Raw anchor only. External sharing SDK. Always copy after a
+cancelled share.
 
-## D12 — Progressive invite sharing with an explicit manual fallback
-
-### Problem / invariant
-
-A raw URL in the room header is easy to miss and awkward on mobile. Inviting
-must always resolve to the canonical `/r/<roomId>` path without leaking local
-debug query state or changing room membership/history.
-
-### Selected design
-
-The header uses a **Share link** control. It calls the native device share sheet
-when present; otherwise it writes the canonical URL to the clipboard. If both
-APIs are unavailable or denied, the readonly input receives selection and the
-UI explains how to copy it manually. A user-cancelled native share leaves the
-clipboard untouched.
-
-### Rejected alternatives
-
-- **Raw anchor only:** works, but is less discoverable and provides no feedback.
-- **External sharing SDK:** unnecessary dependency and account surface for one
-  URL.
-- **Always copy after a cancelled share:** surprising side effect that overwrites
-  a user's clipboard after they explicitly backed out.
-
-### Verification
-
-`test/invite.test.ts` covers canonical URL creation, native share, clipboard
-fallback, cancellation, and manual fallback. Current automated/local-server
-evidence is recorded in [TESTING.md](./TESTING.md).
+**Verified.** `test/invite.test.ts`.
 
 ## D13 — Canvas-first responsive grid over a fixed-height canvas
 
-### Problem / invariant
+**Problem.** On narrow viewports, wrapped controls and browser chrome cramped the
+drawing surface. Mobile must remain Pointer Events with CSS-box-accurate DPR
+sizing.
 
-On a narrow viewport, wrapped controls and browser chrome could leave the
-current fixed-minimum stage visually cramped. Mobile drawing must remain a
-Pointer Events canvas with its full visible CSS box reflected in DPR sizing.
+**Selected.** At `≤640px`, safe-area-aware `100dvh` CSS grid: header → compact
+presence → canvas → horizontal-scroll toolbar. Desktop layout and ResizeObserver
+sizing unchanged.
 
-### Selected design
+**Rejected.** Fixed `100vh` canvas height. Hiding controls on mobile. Changing
+pointer coordinate math for mobile.
 
-At `≤640px`, use a safe-area-aware `100dvh` CSS grid. The canvas sits before a
-single horizontal-scroll toolbar, receives the remaining row height, and keeps a
-bounded dynamic-viewport minimum. Presence becomes a compact horizontal strip;
-interactive tool controls are at least 44 CSS pixels high. Desktop layout and
-the Canvas/ResizeObserver implementation remain unchanged.
-
-### Rejected alternatives
-
-- **`100vh` with a fixed canvas height:** mobile browser chrome can make it
-  overflow or waste available space.
-- **Hide controls on mobile:** improves space at the cost of discoverability and
-  keyboard/accessibility parity.
-- **Change pointer coordinates for mobile:** unnecessary and risks breaking the
-  existing CSS-pixel/DPR invariant.
-
-### Verification
-
-Production build accepts the CSS and existing canvas sizing/pointer tests stay
-green. A physical mobile and browser-viewport drawing pass remains required and
-is explicitly not claimed in [TESTING.md](./TESTING.md).
+**Verified.** Production CSS + canvas sizing tests; deployed 390px layout proof
+and author-confirmed physical phone two-user session on 26 July 2026
+([TESTING.md](./TESTING.md)).
 
 ## D14 — Derive active collaborator labels from live stroke batches
 
-### Problem / invariant
+**Problem.** Reviewers need to see who is drawing at a stroke tip. A parallel
+cursor stream during drawing would compete with rAF stroke batches for the rate
+limit.
 
-People need an unambiguous indication of who is drawing at a particular stroke
-tip. Sending a parallel cursor message during pointer drawing would compete with
-the rAF-batched live-stroke stream and consume room rate-limit budget without
-improving the cursor's underlying coordinates.
+**Selected.** For `stroke:live` start/points/end, use the latest existing point
+as that participant's DOM cursor position and mark the cue active until end.
+Idle movement still uses `cursor`. Labels stay outside the canvas buffers, flip
+before edges, honour reduced-motion, and clear via presence/reconnect cleanup.
 
-### Selected design
+**Rejected.** Cursor frames alongside every drawing batch. Painting names into
+the live canvas.
 
-For `stroke:live` start/points/end frames, the client uses the latest existing
-point as that participant's DOM cursor position and marks the cue active until
-the end frame. Idle pointer movement continues to use the existing cursor
-message. The label stays outside the two Canvas buffers, flips before a stage
-edge, honours reduced-motion preference, and is removed through existing
-presence/reconnect cleanup.
+**Verified.** `test/remote-cursors.test.ts`; production two-client mid-stroke
+label behavior recorded in [TESTING.md](./TESTING.md).
 
-### Rejected alternatives
+## D15 — Separate brush and eraser controls without new history modes
 
-- **Send cursor frames alongside every drawing batch:** redundant network and
-  limiter pressure for the same position data.
-- **Paint names into the live canvas:** would blur semantic UI with ephemeral
-  drawing pixels and make accessibility/edge placement harder.
+**Problem.** Artists need colour/width and a labelled punch-through eraser with
+its own size, plus accidental-clear protection, without inventing a third eraser
+history mode.
 
-### Verification
+**Selected.** Client-only `ToolSettings` retains brush and eraser widths
+independently (1–32px). Toolbar shows contextual width label + range slider,
+disables colour for eraser, uses circular eraser cursor. Clear requires
+“Clear for everyone?” confirmation. Shortcuts ignored while focus is editable.
 
-`test/remote-cursors.test.ts` verifies latest-point selection and edge placement;
-the full typecheck/test/build gate is recorded in [TESTING.md](./TESTING.md).
-Fresh interactive browser proof remains explicitly pending while the embedded
-browser's local-navigation policy is active.
+**Rejected.** One shared width for both tools. Width preset chip row clutter.
+Whole-stroke / object-deletion eraser (new conflict rules). Immediate Clear
+without confirmation.
 
-## D15 — Separate brush and partial-eraser controls without new history modes
-
-### Problem / invariant
-
-Artists need brush colour/width and a labelled partial eraser with its own size,
-plus accidental-clear protection, without changing the durable operation model
-or inventing a third eraser mode that would complicate global undo.
-
-### Selected design
-
-Client-only `ToolSettings` retains brush and eraser widths independently (1–32px,
-same clamp as the renderer). The toolbar shows a contextual width label + range
-slider (no numeric preset chips), keeps colour disabled for eraser, and uses the
-existing circular eraser cursor. The eraser control is labelled **Eraser**. Clear
-requires an explicit “Clear for everyone?” confirmation because clear is
-room-global and durable. Keyboard shortcuts (`B`/`E`, modifier undo/redo) are
-ignored while focus is in an editable control.
-
-### Rejected alternatives
-
-- **One shared width for brush and eraser:** forces awkward size changes when
-  switching tools.
-- **Width preset chip row (2/4/8/16):** cluttered the compact toolbar without
-  improving control over the existing 1–32 range slider.
-- **Whole-stroke eraser / object deletion:** would require targeting completed
-  ops and new conflict rules; deferred past submission.
-- **Immediate Clear without confirmation:** too easy to wipe a collaborative
-  room mid-demo.
-
-### Verification
-
-`test/tool-settings.test.ts` covers independent widths and clamping; the full
-gate is recorded in [TESTING.md](./TESTING.md).
+**Verified.** `test/tool-settings.test.ts`; current HTML labels **Eraser** (not
+a separate history mode).
 
 ## D16 — Collapsed metrics dock with honest Display rAF naming
 
-### Problem / invariant
+**Problem.** Developer metrics must stay available for interviews without
+dominating the canvas or implying an unmeasured Canvas FPS SLA.
 
-Developer metrics must remain available for interviews without dominating the
-canvas or implying an unmeasured “Canvas FPS” SLA.
+**Selected.** Canvas-corner `<details>` labelled **Metrics**, collapsed by
+default, on every room session (no `?debug=1` gate). Expanded labels: Display
+rAF rate, WebSocket RTT, messages/s, participants, sequence head. Sampler runs
+only while open.
 
-### Selected design
+**Rejected.** Always-expanded HUD. `?debug=1` only. Calling the metric “FPS” /
+“Canvas FPS.”
 
-Keep a canvas-corner `<details>` labelled **Metrics**, collapsed by default, on
-every room session (no `?debug=1` gate). Expanded labels are Display rAF rate,
-WebSocket RTT, inbound/outbound messages/s, participants, and sequence head. The
-rAF sampler runs only while the disclosure is open so a closed dock does not keep
-a permanent measurement loop.
+**Verified.** `test/observability.test.ts`; live demo Metrics control confirmed
+26 July 2026.
 
-### Rejected alternatives
+## D17 — Punch-through eraser + provisional retain on short commits
 
-- **Always-expanded fixed HUD:** steals attention from the drawing surface.
-- **`?debug=1` only:** hides the control from demo reviewers who do not know the
-  query flag.
-- **Calling the metric “FPS” / “Canvas FPS”:** conflates display refresh cadence
-  with Canvas paint cost and invites false performance claims.
+**Problem.** Painting eraser as gray ink on the live layer looked like a brush
+and failed to remove ink. Dropped live point batches could also make a shorter
+committed eraser reopen previously erased ink.
 
-### Verification
+**Selected.** Eraser uses Canvas `destination-out` on the committed view while
+provisional (local awaiting-commit + remote in-progress). Brush stays on the
+live layer until `operation:committed`. If a committed eraser has fewer points
+than the provisional path, keep the provisional hole until `sync_state` /
+`history:changed` clears leftovers (`retainProvisionalEraser`).
 
-`test/observability.test.ts` asserts label honesty; full gate in
-[TESTING.md](./TESTING.md).
+**Rejected.** Gray pencil preview for eraser. Always discarding provisional
+eraser immediately on commit (allowed ink to reappear when batches dropped).
+
+**Verified.** `test/eraser-retain.test.ts`, `test/remote-strokes.test.ts`;
+manual eraser opaque-pixel proof in [TESTING.md](./TESTING.md).
+
+## D18 — Gate outbound stroke points until `stroke:start` is accepted
+
+**Problem.** During Connecting…, a local stroke could enqueue points that flushed
+after welcome for a `strokeId` the server never saw started, producing
+`unknown_stroke` errors and broken peer overlays.
+
+**Selected.** `LiveStrokeTransport` tracks stroke ids whose `stroke:start` was
+successfully sent while joined. Points/end for unknown ids are not sent.
+
+**Rejected.** Blindly flushing the batcher whenever the socket opens.
+
+**Verified.** `test/live-stroke-transport.test.ts`.
+
+## D19 — Exclude the departing socket from presence projection
+
+**Problem.** During `webSocketClose` / `webSocketError`, Cloudflare's
+`getWebSockets()` can still list the closing socket, so a naïve presence map
+kept the leaving participant visible.
+
+**Selected.** Exclude the departing WebSocket / participant id when projecting
+presence on close/error.
+
+**Rejected.** Trusting `getWebSockets()` alone without exclusion.
+
+**Verified.** `test/rooms.test.ts` leave/presence cases; issues log in
+[ISSUES.md](./ISSUES.md).
+
+## D20 — Colour presets plus custom picker (client-only)
+
+**Problem.** A lone native colour input is slow for demos; presets must not
+change the wire protocol or durable colour model.
+
+**Selected.** Five common swatches (`#111827`, `#0f6a5a`, `#1d4ed8`, `#be123c`,
+`#b45309`) plus the existing custom `<input type="color">`. Swatches disabled
+while eraser is active. Colours still travel as `#RRGGBB` on strokes.
+
+**Rejected.** Server-side palette state. Removing the custom picker.
+
+**Verified.** `test/color-presets.test.ts`; current `client/index.html` markup.
+
+## D21 — Conflict policy is server sequence, not CRDT or pixel merge
+
+**Problem.** Concurrent overlapping strokes need a stable, explainable visual
+order without introducing CRDT libraries or unsupported merge claims.
+
+**Selected.** Overlaps are valid. The room Durable Object's single-threaded
+commit path assigns one increasing `sequence` per completed op. Clients replay
+visible ops in that order. Live overlays are ephemeral and do not participate in
+the durable conflict policy.
+
+**Rejected.** CRDT packages. Client-timestamp ordering. Last-writer-wins on
+pixels. Claiming unsupported automatic pixel merges.
+
+**Verified.** Overlap cases in `test/history.test.ts`; architecture explanation
+in [ARCHITECTURE.md](./ARCHITECTURE.md).
+
+## Deferred
+
+These remain intentionally unimplemented:
+
+- Sticky participant identity / colour across reconnect
+- Checkpoint / retention for very large operation logs (after measured replay cost)
+- Delta-by-`lastSequence` join once a versioned visibility token exists
+- Network-chaos demo controls, replay UI, and other stretch blueprint items

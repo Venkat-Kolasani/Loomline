@@ -2,59 +2,48 @@
 
 Real-time collaborative drawing canvas for the Flam Frontend R&D assignment.
 
-**Live URL:** <https://loomline.kolasanivenkat2.workers.dev>
-**Repository:** <https://github.com/Venkat-Kolasani/Loomline> (private by
-author choice; access must be granted to reviewers)
-**Status:** deployed and production-smoke-tested on 26 July 2026
+**Live URL:** <https://loomline.kolasanivenkat2.workers.dev>  
+**Repository:** <https://github.com/Venkat-Kolasani/Loomline> (private by author
+choice; reviewers need access)  
+**Status:** deployed; production smoke + physical-phone two-user session recorded
+26 July 2026
 
-This repository intentionally uses **Cloudflare Workers + Durable Objects** (edge
-JavaScript runtime), not a Node.js process. See [DECISIONS.md](./DECISIONS.md).
+This repository uses **Cloudflare Workers + Durable Objects** (edge JavaScript
+runtime), not a Node.js process. The client still uses the native browser
+WebSocket API. See [DECISIONS.md](./DECISIONS.md).
 
-## What works now (implemented)
+## What works now
 
-- Vite vanilla TypeScript client shell
-- Landing page: create/join shareable `/r/<roomId>` links
-- Browser-local artist name: empty by default; type a nickname or use
-  **Random name** (1–24 trimmed characters). Chosen names are saved in
-  `localStorage` after join, but the field is never prefilled.
-- Room invite control: copy-link icon next to the URL, native share sheet when
-  available, clipboard fallback otherwise, plus a selectable URL when browser
-  APIs are unavailable
-- Brush colour presets (5 common swatches) plus a custom colour picker
-- Responsive canvas-first shell: dynamic viewport sizing, safe-area padding,
-  compact presence, and a single horizontally scrollable mobile tool row
+- Vanilla TypeScript + Vite client; native Canvas 2D; native WebSocket
+- Landing page: create/join shareable `/r/<roomId>` links (8-char `[a-z0-9]`)
+- Artist name gate: empty field; type 1–24 trimmed characters or **Random name**.
+  Name is saved to `localStorage` after a successful join attempt path, but the
+  field is never prefilled on load
+- Invite: copy-link icon + **Share link** (native share → clipboard → selectable
+  URL fallback). Invite URL is always the canonical `/r/<roomId>` path
+- Tools: brush, eraser (punch-through), five colour presets + custom picker,
+  independent brush/eraser widths (1–32px), confirmed room-wide **Clear room**
+- Keyboard: `B` / `E`; ⌘/Ctrl+Z and ⌘/Ctrl+Shift+Z (or Y) for global undo/redo
+  when focus is not in an editable control
+- Two canvas layers + DOM collaborator labels (idle cursors + live stroke tips)
 - Worker routes `/ws?room=` to one Durable Object per room via `idFromName`
-- Presence: join/leave list with the chosen name and deterministic participant
-  colours
-- Live stroke fan-out (`stroke:start` / `points` / `end` → `stroke:live`)
-- Durable stroke/clear `operation:committed` records with SQLite + strictly
-  increasing sequence
-- Join/reconnect `sync_state` snapshot of the **visible** committed log
-- Exponential reconnect backoff with Connecting / Reconnecting / Connected UI
-- Duplicate committed-sequence suppression on the client
-- Global server-owned undo/redo via tombstones; append-only op log
-- Stalled provisional strokes expire after 30s (points not persisted; expiry
-  metadata is durable so hibernation cannot leave peer overlays stuck)
-- Typed rejection of malformed / oversized / rate-limited client frames
-- Empty rooms clear live state + alarms (hibernation-eligible; ops retained)
-- Canvas-corner **Metrics** disclosure (always available in a room): Display rAF
-  rate, WebSocket RTT, message rates, participants, and sequence head — collapsed
-  by default so it does not dominate the drawing surface (not a Canvas FPS claim)
-- Synthetic load script: `npm run load` (5×100 strokes) + `/api/room-metrics`
-- Remote collaborator labels: idle cursor positions plus live stroke-endpoint
-  labels, with edge-aware placement (ephemeral)
-- rAF-batched outgoing points; immediate local drawing
-- Two stacked canvas layers with brush / eraser / colour / per-tool width
-  (1–32px retained independently), circular eraser cursor, and a confirmed
-  room-wide Clear (durable and undoable). Keyboard: `B` / `E` for tools;
-  ⌘/Ctrl+Z and ⌘/Ctrl+Shift+Z (or Y) for global undo/redo when focus is not in
-  an input.
-- Dirty-layer paint API (no permanent render loop)
-- Scripts: `dev`, `dev:client`, `typecheck`, `test`, `load`, `build`, `deploy`
-- Vitest: isolation, protocol, live strokes, history, reconnect/expiry,
-  input boundaries / rate limits / zero-user cleanup, observability
+- Presence list with chosen name + deterministic participant colours
+- Live stroke fan-out; durable stroke/clear ops with strictly increasing sequence
+- Join/reconnect `sync_state` of the **visible** committed log; duplicate sequence
+  suppression on the client
+- Global server-owned undo/redo via tombstones (append-only op log)
+- 30s stalled live-stroke expiry (points in memory; expiry metadata in SQLite)
+- Typed recoverable errors for malformed / oversized / rate-limited frames
+- Empty rooms clear live state + alarms (ops retained; hibernation-eligible)
+- Collapsed canvas-corner **Metrics** dock (Display rAF rate, WS RTT, msg/s,
+  participants, sequence head) — not a Canvas FPS claim
+- Synthetic load: `npm run load` (5×100 strokes) + `GET /api/room-metrics?room=`
+- Vitest coverage across isolation, protocol, live strokes, history, reconnect,
+  boundaries, observability, and UI helpers (102 tests as of this docs pass)
 
-## Quick start
+## Setup (clean clone)
+
+Requires **Node.js ≥ 20** (verified on Node 22/24 during development).
 
 ```bash
 git clone https://github.com/Venkat-Kolasani/Loomline.git
@@ -66,101 +55,162 @@ npm run build
 npm run dev
 ```
 
-Then open `http://127.0.0.1:8787/`, enter a name (or click **Random name**),
-create a room, and open the same room URL in a second browser profile. A
-first-time visitor must supply a name before joining. Draw in one client — the
-peer should see the stroke **while it is still in progress**.
+Then open `http://127.0.0.1:8787/`.
 
-This setup was re-run from a clean clone on 26 July 2026: `npm ci`, typecheck,
-77 tests, and the production build all passed. Cloudflare authentication is
-needed only for `npm run deploy`; no credentials or tokens are stored here.
+`npm run dev` builds the client into `dist/client`, then starts `wrangler dev`
+(Worker + assets + Durable Objects on one origin). Cloudflare login is **not**
+required for local `dev` / `test` / `build`. It is required only for
+`npm run deploy`.
+
+This setup was re-run from a clean dependency install on 26 July 2026:
+`npm ci`, typecheck, tests, and production build all passed. As of this
+documentation pass: **25** test files, **102** tests.
 
 | Script | Purpose |
 | --- | --- |
-| `npm run dev` | Build client assets, then start local Worker (`wrangler dev`) |
-| `npm run dev:client` | Vite-only client HMR (no Worker / `/api/health`) |
-| `npm run typecheck` | TypeScript checks for app + tests |
+| `npm run dev` | Build client, then local Worker (`wrangler dev`) |
+| `npm run dev:client` | Vite-only HMR (no Worker / `/api/health`) |
+| `npm run typecheck` | TypeScript for app + tests |
 | `npm run test` | Vitest with Cloudflare Workers pool |
 | `npm run load` | Synthetic 5×100 stroke load against local `wrangler dev` |
-| `npm run build` | Production client build into `dist/client` |
-| `npm run deploy` | Build + `wrangler deploy` (requires Cloudflare auth) |
-| `npm run cf-typegen` | Regenerate `worker-configuration.d.ts` from Wrangler config |
+| `npm run build` | Production client → `dist/client` |
+| `npm run deploy` | Build + `wrangler deploy` (Cloudflare auth) |
+| `npm run cf-typegen` | Regenerate `worker-configuration.d.ts` |
 
-**Important:** pushing to GitHub does **not** update the live Worker by itself.
-Cloudflare Workers Builds is not linked to this repo. After polish commits, run
-`npm run deploy`, or configure the optional GitHub Action secrets
-`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` so
-`.github/workflows/deploy-cloudflare.yml` can publish on `main`.
+**Important:** `git push` does **not** update the live Worker by itself.
+Cloudflare Workers Builds is not linked to this repo. After code changes that
+should go live, run `npm run deploy`, or configure repository secrets
+`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` for
+`.github/workflows/deploy-cloudflare.yml`.
 
-## Multi-user testing
+## Multi-user testing (exact steps)
 
-Use the live URL above, or run `npm run dev` and use
-`http://127.0.0.1:8787/`.
+Use the live URL, or `npm run dev` → `http://127.0.0.1:8787/`.
 
-1. Choose a name, then click **Create room** and use **Share link**. On a
-   supported device it opens the native share sheet; otherwise it copies the
-   canonical room URL. If browser permission/API support prevents copying, the
-   readonly URL remains selectable for manual copy.
-2. Open the same link in a second browser/profile. On a first visit, choose a
-   name before joining; both presence lists should show the supplied names.
-3. Draw slowly in client A — client B must show the stroke **before** A lifts
-   the pointer (live overlay); A's name label should track the current stroke
-   endpoint without a separate drawing-time cursor stream.
-4. After A ends the stroke, both clients keep it via `operation:committed`.
-5. In client B click **Undo** — both clients must remove the latest completed
-   stroke and enable Redo.
-6. In client A click **Redo** — both clients must restore the same stroke.
-7. Click **Clear room** → confirm **Clear for everyone?** — both committed
-   canvases blank. Click **Undo** to restore the prior strokes in both, then
-   **Redo** to clear again.
-7. Refresh either client — it gets a new participant id and restores the same
-   committed canvas from `sync_state`.
-8. Open a **different** room id in a third client — presence and strokes must
-   not cross rooms.
+1. **Client A — create room**
+   - Enter a name (or **Random name**).
+   - Click **Create room**.
+   - Confirm connection status becomes **Connected** and presence shows you.
+   - Use the copy icon or **Share link** to get the canonical room URL.
 
-Production evidence (26 July 2026):
+2. **Client B — join the same room**
+   - Open the shared URL in a second browser profile / device / private window.
+   - Enter a different name (field starts empty).
+   - Click through the landing join path for that room id.
+   - Both presence lists should show two named participants with different colours.
 
-- Browser clients `Artist-0590` and `Artist-289d` both showed presence `2`.
-- Before pointer-up, the peer live layer had 8,353 opaque pixels while its
-  committed layer had `0`; the peer screenshot showed the remote cursor/stroke.
-- Independent WebSocket clients in `prod2601` received the same commit sequence,
-  converged to 0 visible ops after global undo and 1 after redo.
-- `isol2601` stayed at one participant with no live/committed crossover.
-- A reconnect received `sync_state` head `1` with the committed stroke.
+3. **Live stroke (before pointer-up)**
+   - In A, hold the pointer down and draw slowly without lifting.
+   - B must show the stroke on the live overlay **before** A lifts.
+   - A's name label on B should track the current stroke endpoint.
 
-Full commands and constraints are in [TESTING.md](./TESTING.md).
+4. **Commit**
+   - Lift the pointer in A.
+   - Both clients keep the stroke on the committed canvas via
+     `operation:committed` (same server sequence).
+
+5. **Global undo / redo**
+   - In B click **Undo** — both clients remove the latest completed op; **Redo**
+     enables.
+   - In A click **Redo** — both restore the same stroke.
+
+6. **Clear + history**
+   - Click **Clear room** → confirm **Clear for everyone?**
+   - Both committed canvases blank.
+   - **Undo** restores prior visible strokes on both; **Redo** clears again.
+
+7. **Reconnect**
+   - Refresh either client.
+   - It receives a new participant id/colour, must enter a name again, and
+     restores the same committed canvas from `sync_state`.
+
+8. **Room isolation**
+   - Open a **different** room id in a third client.
+   - Presence and strokes must not cross rooms.
+
+Production evidence for steps 1–8 is recorded in [TESTING.md](./TESTING.md)
+(26 July 2026), including mid-stroke live pixels, matching undo/redo sequences,
+isolation, reconnect snapshot, and an author-confirmed physical phone session.
 
 ## Supported browsers
 
-- **Verified:** Chromium-based Cursor browser on macOS 26.2, local and deployed;
-  deployed 390px mobile layout + touch PointerEvent draw/erase; author-confirmed
-  physical phone two-user session on the live URL (26 July 2026).
-- **Input path verified:** mouse, synthetic PointerEvent touch, and physical
-  mobile touch.
-- **Not yet claimed:** Firefox or Safari as primary review browsers.
+- **Verified:** Chromium-based Cursor browser on macOS; deployed 390px mobile
+  layout + touch PointerEvent draw/erase; author-confirmed physical phone
+  two-user session on the live URL (26 July 2026).
+- **Input path verified:** mouse, synthetic PointerEvent touch, physical mobile
+  touch.
+- **Not claimed:** Firefox or Safari as primary review browsers.
 
 ## Known limitations
 
-- Live in-progress strokes are not undoable (only completed ops)
-- Reconnect assigns a new participant id and colour (no sticky identity), while
-  the browser-local artist name is reused
-- Reconnect uses a full visible `sync_state` snapshot (not a delta by last-seq)
-- Very long strokes are stored as one JSON blob per completed op (no checkpoint
-  compaction yet — see DECISIONS D7)
-- Per-participant rate limit is in-memory (resets if the DO is evicted mid-abuse;
-  anti-spam, not auth)
-- Client chunks outgoing `stroke:points` at `MAX_POINTS_PER_MESSAGE` (64)
-- Room operation-log size under heavy load is **not** load-tested; there is no
-  arbitrary reset. Future: checkpoint + retention after a measured threshold.
-- Browser evidence includes Chromium and an author-confirmed physical phone
-  two-user session; Firefox and Safari remain unverified as primary browsers.
-- The GitHub repository is private by author choice; reviewer access is required.
+These are real constraints of the current code — not a backlog wishlist:
+
+1. **Live strokes are not undoable.** Only completed durable operations enter
+   the history tables.
+2. **No sticky participant identity.** Each join gets a new participant id and
+   colour. Display name is typed again each visit (localStorage is saved but not
+   used to prefill).
+3. **Full snapshot reconnect only.** Reconnect replaces the committed store from
+   a full visible `sync_state`, not a last-seq delta. Needed because undo
+   tombstones change visibility independently of sequence head.
+4. **One SQLite JSON blob per completed stroke.** Very long strokes are not
+   checkpoint-compacted (see DECISIONS D7).
+5. **In-memory rate limit.** The 120 messages / 1s per-participant limit resets
+   if the Durable Object is evicted mid-abuse. It is anti-spam, not auth.
+6. **Client chunks `stroke:points` at 64 points** (`MAX_POINTS_PER_MESSAGE`).
+7. **No measured room-size cap.** Local synthetic load reached 500 committed
+   ops; there is no automatic log reset. Future checkpoint/retention needs a
+   measured threshold first.
+8. **Hibernation is not fully proven in Vitest.** Tests prove Loomline clears
+   live state that would block hibernation and that expiry metadata survives
+   eviction; they cannot prove Cloudflare platform hibernation itself.
+9. **Expiry writes while drawing.** `live_stroke_expiry` is upserted on
+   start/points (correctness-first; can be ~1 small SQLite write per rAF batch
+   per active drawer).
+10. **Browser matrix incomplete.** Firefox/Safari not claimed as primary.
+11. **Private repository.** Reviewer access must be granted.
+12. **Deploy is manual (or optional Actions).** Git push alone does not publish.
+13. **No authentication, accounts, CRDTs, shapes/text/images, or Canvas libraries**
+    — by blueprint scope.
+14. **Metrics Display rAF rate** measures display cadence while the dock is open,
+    not Canvas paint cost or a cross-device FPS SLA.
+15. **Localhost RTT / synthetic commit rate** are not WAN or multi-region claims.
+16. **Demo recording** for the assignment submission is still unchecked in the
+    compliance list below.
+
+## Time spent (honest estimate)
+
+Calendar work ran **25–26 July 2026** (deadline 29 July 15:00 IST). Hours below
+are **estimated focused build + verify time** derived from commit clusters and
+session work — not billable invoices. AI assisted drafting; the author owns
+review and explanation of retained code ([AI_USAGE.md](./AI_USAGE.md)).
+
+| Phase | Approx. hours | What landed |
+| --- | ---: | --- |
+| Planning / blueprint / agent contract | 2.0 | Scope, stack, invariants, docs skeleton |
+| Scaffold (Worker + Vite + Vitest) | 1.5 | Health, DO skeleton, scripts, deploy path |
+| Canvas layers + local drawing + touch | 3.0 | Two layers, tools, point filter, dirty paint |
+| Rooms, landing, presence | 2.5 | `idFromName` isolation, join UI, presence bugs |
+| Live stroke fan-out + rAF batching | 2.0 | Protocol start/points/end → `stroke:live` |
+| Durable ops + committed sync | 2.5 | SQLite sequences, `sync_state`, overlap tests |
+| Global undo/redo | 1.5 | Tombstones, redo invalidation, two-client proof |
+| Reconnect + hibernation-safe expiry | 2.0 | Backoff UI, full snapshot, expiry rows + alarm |
+| Input boundaries / rate limits | 1.5 | UTF-8 size, 120/s limit, zero-user cleanup |
+| Observability + synthetic load | 1.5 | Metrics dock, ping/pong, `npm run load` |
+| Clear-as-op + eraser punch-through | 2.5 | Clear history, provisional eraser retain |
+| Identity, invite, mobile shell, tools polish | 4.0 | Name gate, share/copy, responsive grid, swatches |
+| Deploy refresh + mobile acceptance | 1.5 | Manual deploy, phone proof, CI lockfile |
+| Documentation pass (this commit) | 1.5 | Full README / ARCHITECTURE / DECISIONS rewrite |
+| **Total (estimate)** | **≈ 29.5** | Across two calendar days |
+
+Stretch items still deferred: sticky identity, checkpoint compaction, replay UI,
+network-chaos controls.
 
 ## AI use
 
 AI assisted implementation, tests, debugging, deployment workflow, and
-documentation drafts. The author manually reviewed retained changes and owns
-the architecture, failure modes, and verification evidence. Details:
+documentation drafts. The author manually reviewed retained changes and owns the
+architecture, failure modes, and verification evidence. Details:
 [AI_USAGE.md](./AI_USAGE.md).
 
 ## Assignment Compliance Checklist
@@ -196,8 +246,7 @@ Leave unchecked until implemented **and** verified with evidence.
 
 ### Submission / demo
 
-- [ ] Public GitHub repository with meaningful commits (meaningful history
-  exists, but repository remains private by author choice)
+- [ ] Public GitHub repository with meaningful commits (history exists; repo remains private by author choice)
 - [x] Deployed demo URL works in a fresh browser session
 - [x] README setup works with documented scripts
 - [x] Multi-user test instructions verified
@@ -217,7 +266,7 @@ Leave unchecked until implemented **and** verified with evidence.
 - [ARCHITECTURE.md](./ARCHITECTURE.md)
 - [PROTOCOL.md](./PROTOCOL.md)
 - [DECISIONS.md](./DECISIONS.md)
-- [ISSUES.md](./ISSUES.md) — interview prep: real bugs and how we fixed them
+- [ISSUES.md](./ISSUES.md)
 - [TESTING.md](./TESTING.md)
 - [AI_USAGE.md](./AI_USAGE.md)
 - [PROJECT_BLUEPRINT.md](./PROJECT_BLUEPRINT.md)

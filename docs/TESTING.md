@@ -242,14 +242,16 @@ npm run typecheck && npm run test && npm run build
 → typecheck exit 0
 → invite + scaffold share-meta tests pass
 → `dist/client` includes favicon.svg, favicon-32.png, apple-touch-icon.png,
-  og-image.png, site.webmanifest
+  og-card.png, site.webmanifest
 ```
 
 ### Manual
 
 1. Open the app: browser tab shows the teal Loomline mark (not the default globe).
-2. Share link / OG: room HTML includes `og:title` with room id; landing uses
-   absolute `og-image.png` on the live origin.
+2. Share **home** (`/`) or **room** (`/r/:id`): WhatsApp/iMessage preview shows
+   the Loomline card image with readable title/subtitle; room title includes
+   the room id. New asset path `og-card.png` busts crawler caches of the old
+   low-contrast `og-image.png`.
 
 ## Rectangle shape tool (2026-07-26)
 

@@ -294,7 +294,10 @@ h1 {
 .shape-flyout {
   position: absolute;
   left: 0;
-  bottom: calc(100% + 0.35rem);
+  /* Desktop toolbar sits above the stage — open down toward the canvas so
+     the flyout does not cover invite/share chrome above the toolbar. */
+  top: calc(100% + 0.35rem);
+  bottom: auto;
   z-index: 8;
   display: flex;
   flex-direction: row;
@@ -1129,6 +1132,9 @@ h1 {
   }
 
   .shape-flyout {
+    /* Floating toolbar is at the stage bottom — open upward into the canvas. */
+    top: auto;
+    bottom: calc(100% + 0.35rem);
     left: 50%;
     right: auto;
     transform: translateX(-50%);

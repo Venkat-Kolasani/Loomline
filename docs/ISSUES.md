@@ -699,6 +699,41 @@ tip unless the shaft is inset; butt alone also looks worse at the start.
 
 ---
 
+## I22 — Shapes flyout covered the invite/share row
+
+**When:** 27 July 2026, after the Shapes flyout replaced the standalone Rectangle
+control.
+
+**What the issue was**
+
+Opening Shapes placed the four shape icons over “Invite collaborators” and the
+share-link input; the room URL was partially unreadable until the flyout closed.
+
+**Root cause**
+
+`.shape-flyout` used `bottom: calc(100% + …)`, so it anchored **above** the
+Shapes trigger. On desktop the toolbar sits under the invite/share chrome, so
+“up” meant into that row, not into empty canvas.
+
+**What we fixed**
+
+Default (desktop): open **down** with `top: calc(100% + …)`. Mobile media
+query: keep **up** into the stage because the floating toolbar sits at the
+canvas bottom (`client/src/styles.css`).
+
+**Why this way**
+
+Direction follows toolbar placement rather than one absolute rule. A higher
+`z-index` alone would still obscure the share link; flipping open direction
+fixes readability without moving invite chrome.
+
+**Verification**
+
+`npm run typecheck && npm run test && npm run build`; visual check that desktop
+Shapes opens toward the canvas and the share URL stays fully readable.
+
+---
+
 Copy this block when logging a future issue:
 
 ```markdown

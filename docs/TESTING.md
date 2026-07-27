@@ -71,6 +71,38 @@ Empty-state uses CSS `::before` (no selectable DOM text). Canvas
 `touchstart`/`touchmove` are non-passive + `preventDefault`; `selectstart`
 blocked on the stage. Deployed so phone/iPad Safari pick up the fix.
 
+## Wide desktop canvas room (2026-07-27)
+
+Desktop `.app` no longer caps at `72rem`; invite + presence share one slim bar.
+Toolbar and connection status stay visible. Mobile/tablet shell CSS restored
+inside the existing media query (no pointer/drawing changes).
+
+### Automated
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files 29 passed (29)
+→ Tests 129 passed (129)
+→ Vite production build exit 0
+```
+
+### Manual
+
+Viewport checks on `http://127.0.0.1:8793` room view (CDP `Emulation.setDeviceMetricsOverride`):
+
+| Width | appW | stageW | chrome | toolbar | Connected |
+| --- | --- | --- | --- | --- | --- |
+| 1280×800 | 1280 | 1248 | flex bar ~52px | static, above stage | yes |
+| 1440×900 | 1440 | 1408 | flex bar ~52px | static, above stage | yes |
+| 1920×1080 | 1920 | 1888 | flex bar ~52px | static, above stage | yes |
+| 390×844 (phone) | — | — | `display:none`; Room toggle `flex`; grid `topbar`/`stage`; toolbar `absolute` | floating | yes |
+| 768×1024 coarse tablet | — | — | same mobile shell (`matchTabletShell: true`) | floating | yes |
+
+Screenshots: `layout-desktop-1280.png`, `layout-desktop-1440.png`,
+`layout-desktop-1920.png`, `layout-mobile-390.png`, `layout-tablet-768.png`
+(under Cursor screenshot temp dir for this session).
+
 ## Line / ellipse / arrow shapes (2026-07-27)
 
 `PROTOCOL_VERSION` 5. `shape:line` / `shape:ellipse` / `shape:arrow` reuse the

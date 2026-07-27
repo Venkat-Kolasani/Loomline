@@ -319,8 +319,9 @@ Localhost Metrics RTT (≈1–3 ms) is not a multi-region SLA. Details:
 
 ## Responsive shell
 
-Mouse / large displays keep a stacked shell: compact topbar → invite + presence
-chrome → toolbar → stage.
+Mouse / large displays use a canvas-first stacked shell: compact topbar → a
+single slim invite+presence bar → toolbar → stage that spans nearly the full
+viewport width (no ~72rem inset column).
 
 On phone widths (`≤640px`), short landscape (`max-height: 500px` and
 `max-width: 960px`), **or** finger-first tablets (`hover: none` and

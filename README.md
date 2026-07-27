@@ -55,7 +55,8 @@ separate overlay; global undo/redo is server-owned over completed ops.
 - Global undo / redo and room-wide clear (tombstone history; append-only log)
 - Reconnect restores committed canvas from `sync_state` (no duplicate sequences)
 - Normalized coordinates so peers on different sizes share the same drawing
-- Responsive room UI (mobile / tablet shell + desktop chrome)
+- Responsive room UI (wide desktop canvas + compact invite/presence bar;
+  mobile / tablet shell unchanged)
 - Collapsed Metrics dock (Display rAF rate, WS RTT, msg/s — not a Canvas FPS SLA)
 
 ## Quick start

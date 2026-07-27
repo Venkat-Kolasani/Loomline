@@ -353,11 +353,13 @@ function closeRoomChrome(): void {
 function closeShapeFlyout(): void {
   shapeFlyout.hidden = true;
   shapesTrigger.setAttribute("aria-expanded", "false");
+  clearShapeFlyoutPosition();
 }
 
 function openShapeFlyout(): void {
   shapeFlyout.hidden = false;
   shapesTrigger.setAttribute("aria-expanded", "true");
+  syncShapeFlyoutPosition();
 }
 
 function setShapeFlyoutOpen(open: boolean): void {
@@ -366,6 +368,53 @@ function setShapeFlyoutOpen(open: boolean): void {
   } else {
     closeShapeFlyout();
   }
+}
+
+/**
+ * Same shell as the mobile CSS media query. The floating toolbar uses
+ * overflow-x: auto, which forces overflow-y clipping and hides an absolute
+ * flyout that opens upward — so we pin it with position:fixed while open.
+ */
+const MOBILE_SHELL_MQ =
+  "(max-width: 640px), (max-height: 500px) and (max-width: 960px), (hover: none) and (pointer: coarse) and (max-width: 1180px)";
+
+function usesMobileShell(): boolean {
+  return window.matchMedia(MOBILE_SHELL_MQ).matches;
+}
+
+function clearShapeFlyoutPosition(): void {
+  shapeFlyout.style.position = "";
+  shapeFlyout.style.top = "";
+  shapeFlyout.style.left = "";
+  shapeFlyout.style.right = "";
+  shapeFlyout.style.bottom = "";
+  shapeFlyout.style.transform = "";
+  shapeFlyout.style.zIndex = "";
+}
+
+function syncShapeFlyoutPosition(): void {
+  if (shapeFlyout.hidden || !usesMobileShell()) {
+    clearShapeFlyoutPosition();
+    return;
+  }
+  const trigger = shapesTrigger.getBoundingClientRect();
+  const flyW = shapeFlyout.offsetWidth;
+  const flyH = shapeFlyout.offsetHeight;
+  const gap = 6;
+  const margin = 8;
+  let top = trigger.top - gap - flyH;
+  let left = trigger.left + trigger.width / 2 - flyW / 2;
+  left = Math.max(margin, Math.min(left, window.innerWidth - flyW - margin));
+  if (top < margin) {
+    top = trigger.bottom + gap;
+  }
+  shapeFlyout.style.position = "fixed";
+  shapeFlyout.style.top = `${Math.round(top)}px`;
+  shapeFlyout.style.left = `${Math.round(left)}px`;
+  shapeFlyout.style.right = "auto";
+  shapeFlyout.style.bottom = "auto";
+  shapeFlyout.style.transform = "none";
+  shapeFlyout.style.zIndex = "20";
 }
 
 const SHAPE_ICON_SVG: Record<ShapeKind, string> = {
@@ -1046,6 +1095,17 @@ for (const item of shapeFlyoutItems) {
     closeShapeFlyout();
   });
 }
+
+window.addEventListener("resize", () => {
+  syncShapeFlyoutPosition();
+});
+shapesTrigger.closest(".toolbar")?.addEventListener(
+  "scroll",
+  () => {
+    syncShapeFlyoutPosition();
+  },
+  { passive: true },
+);
 
 document.addEventListener(
   "pointerdown",

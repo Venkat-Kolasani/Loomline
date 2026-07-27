@@ -768,6 +768,41 @@ biarrow shows no ghost text.
 
 ---
 
+## I24 — Mobile shapes flyout clipped by toolbar overflow
+
+**When:** 27 July 2026, after the floating mobile toolbar + upward flyout.
+
+**What the issue was**
+
+Tapping Shapes on mobile activated the tool but the icon grid never appeared
+above the bar.
+
+**Root cause**
+
+`.toolbar` uses `overflow-x: auto` for horizontal scrolling. Per CSS, that
+forces `overflow-y` clipping as well, so the absolutely positioned flyout
+(opening upward out of the bar) was painted inside the clipped box and looked
+missing.
+
+**What we fixed**
+
+On the mobile shell, while the flyout is open, pin it with `position: fixed`
+from the trigger’s `getBoundingClientRect` (and re-sync on resize/toolbar
+scroll). Desktop keeps the normal absolute layout under the toolbar.
+
+**Why this way**
+
+`overflow-x: auto; overflow-y: visible` is invalid (browsers coerce y to auto).
+Moving scroll to an inner wrapper still clips if the flyout stays inside that
+wrapper. Fixed positioning escapes the clip without changing toolbar UX.
+
+**Verification**
+
+`npm run typecheck && npm run test && npm run build`; mobile shell: open Shapes
+and confirm the 4×2 grid appears above the floating bar.
+
+---
+
 Copy this block when logging a future issue:
 
 ```markdown

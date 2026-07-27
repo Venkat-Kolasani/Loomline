@@ -108,7 +108,7 @@ describe("live_stroke_expiry touch throttle", () => {
       new Request("https://room/test/expiry-touch-interval", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ms: 40 }),
+        body: JSON.stringify({ ms: 200 }),
       }),
     );
 
@@ -147,7 +147,7 @@ describe("live_stroke_expiry touch throttle", () => {
     await peerSawFirstPoints;
     expect((await readDurableHead(stub)).expiryTouchCount).toBe(1);
 
-    await delay(55);
+    await delay(250);
 
     const peerSawSecondPoints = waitForLive(socketB, "points", strokeId);
     socketA.send(

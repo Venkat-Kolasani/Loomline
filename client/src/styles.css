@@ -1137,12 +1137,14 @@ h1 {
   }
 
   .shape-flyout {
-    /* Floating toolbar is at the stage bottom — open upward into the canvas. */
+    /* Floating toolbar uses overflow-x: auto, which also clips overflow-y.
+       While open, main.ts pins this panel with position:fixed above the trigger. */
     top: auto;
     bottom: calc(100% + 0.35rem);
     left: 50%;
     right: auto;
     transform: translateX(-50%);
+    z-index: 20;
   }
 
   .field {

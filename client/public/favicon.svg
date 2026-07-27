@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Loomline">
+  <rect width="32" height="32" rx="7" fill="#0f6a5a"/>
+  <!-- Warp threads -->
+  <path
+    d="M8.5 12.5h15M8.5 19.5h15"
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="2.2"
+    stroke-linecap="round"
+  />
+  <!-- Weft / loom stroke -->
+  <path
+    d="M12.5 8.5v15M19.5 8.5v7.5L23.5 23.5"
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="2.2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <circle cx="23.5" cy="23.5" r="1.6" fill="#ffffff"/>
+</svg>

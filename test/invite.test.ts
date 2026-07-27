@@ -17,11 +17,11 @@ describe("room invite sharing", () => {
     const clipboard = { writeText: vi.fn() };
 
     await expect(
-      shareInvite({ share, clipboard }, "https://loomline.example/r/abcd1234"),
+      shareInvite({ share, clipboard }, "https://loomline.example/r/abcd1234", "abcd1234"),
     ).resolves.toBe("shared");
     expect(share).toHaveBeenCalledWith({
-      title: "Join my Loomline room",
-      text: "Draw together in this Loomline room.",
+      title: "Loomline room abcd1234",
+      text: "Join my Loomline room abcd1234 and draw together.",
       url: "https://loomline.example/r/abcd1234",
     });
     expect(clipboard.writeText).not.toHaveBeenCalled();

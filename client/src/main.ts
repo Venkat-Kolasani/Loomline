@@ -1076,7 +1076,8 @@ newArtistNameButton.addEventListener("click", () => {
 });
 
 shareRoomButton.addEventListener("click", async () => {
-  const result = await shareInvite(window.navigator, roomLink.value);
+  const roomId = parseRoomPath(location.pathname) ?? undefined;
+  const result = await shareInvite(window.navigator, roomLink.value, roomId);
   if (result === "shared") {
     shareStatus.textContent = "Invite opened.";
     return;

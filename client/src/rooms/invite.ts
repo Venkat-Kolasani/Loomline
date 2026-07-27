@@ -20,12 +20,14 @@ export function createInviteUrl(origin: string, roomId: string): string {
 export async function shareInvite(
   navigatorLike: InviteNavigator,
   url: string,
+  roomId?: string,
 ): Promise<InviteResult> {
+  const roomLabel = roomId ? ` room ${roomId}` : "";
   if (navigatorLike.share) {
     try {
       await navigatorLike.share({
-        title: "Join my Loomline room",
-        text: "Draw together in this Loomline room.",
+        title: `Loomline${roomLabel}`,
+        text: `Join my Loomline${roomLabel} and draw together.`,
         url,
       });
       return "shared";

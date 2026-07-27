@@ -230,6 +230,27 @@ npm run typecheck && npm run test && npm run build
    Triangle, Star, Line, Arrow, Double). Full names remain in `title` /
    `aria-label`.
 
+## Brand favicon + share meta (2026-07-27)
+
+Tab / home-screen icons and Open Graph assets so invite links preview as Loomline
+instead of a generic globe.
+
+### Automated
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ invite + scaffold share-meta tests pass
+→ `dist/client` includes favicon.svg, favicon-32.png, apple-touch-icon.png,
+  og-image.png, site.webmanifest
+```
+
+### Manual
+
+1. Open the app: browser tab shows the teal Loomline mark (not the default globe).
+2. Share link / OG: room HTML includes `og:title` with room id; landing uses
+   absolute `og-image.png` on the live origin.
+
 ## Rectangle shape tool (2026-07-26)
 
 `PROTOCOL_VERSION` 4. `shape:rect` commits one durable `kind: "rect"` op with

@@ -19,13 +19,20 @@ describe("Loomline scaffold", () => {
     });
   });
 
-  it("exposes a Room Durable Object that rejects non-WebSocket fetches", async () => {
-    const id = env.ROOM.idFromName("scaffold-room");
-    const stub = env.ROOM.get(id);
-    const response = await stub.fetch(
-      new Request("https://room/scaffold-room"),
+  it("injects room-specific share meta on invite HTML", async () => {
+    const response = await exports.default.fetch(
+      new Request("https://example.com/r/abcd1234", {
+        headers: { Accept: "text/html" },
+      }),
+      env,
+      {} as ExecutionContext,
     );
 
-    expect(response.status).toBe(426);
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain("<title>Loomline · abcd1234</title>");
+    expect(html).toContain('property="og:title" content="Loomline · abcd1234"');
+    expect(html).toContain('property="og:url" content="https://example.com/r/abcd1234"');
+    expect(html).toContain("Join Loomline room abcd1234");
   });
 });

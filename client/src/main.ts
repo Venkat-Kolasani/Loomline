@@ -376,7 +376,7 @@ const SHAPE_ICON_SVG: Record<ShapeKind, string> = {
   star: `<svg viewBox="0 0 24 24" width="18" height="18" focusable="false"><path d="M12 3.5 L14.2 9.2 L20.2 9.4 L15.4 13.1 L17 19 L12 15.8 L7 19 L8.6 13.1 L3.8 9.4 L9.8 9.2 Z" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="miter"/></svg>`,
   line: `<svg viewBox="0 0 24 24" width="18" height="18" focusable="false"><path d="M5 19 L19 5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>`,
   arrow: `<svg viewBox="0 0 24 24" width="18" height="18" focusable="false"><path d="M5 19 L17 7" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M11 7 L17 7 L17 13" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
-  biarrow: `<svg viewBox="0 0 24 24" width="18" height="18" focusable="false"><path d="M9 15 L15 9" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M18.5 5.5 L13.2 6.4 L17.6 10.8 Z" fill="currentColor"/><path d="M5.5 18.5 L10.8 17.6 L6.4 13.2 Z" fill="currentColor"/></svg>`,
+  biarrow: `<svg viewBox="0 0 24 24" width="18" height="18" focusable="false"><path d="M9.5 12 L14.5 12" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="butt"/><path d="M5.5 12 L10 8.25 L10 15.75 Z" fill="currentColor"/><path d="M18.5 12 L14 8.25 L14 15.75 Z" fill="currentColor"/></svg>`,
 };
 
 const SHAPE_WIDTH_LABEL: Record<ShapeKind, string> = {

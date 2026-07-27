@@ -734,6 +734,40 @@ Shapes opens toward the canvas and the share URL stays fully readable.
 
 ---
 
+## I23 — Double-arrow flyout label leaked on mobile (“or” ghost text)
+
+**When:** 27 July 2026, after biarrow icon polish on small/mobile toolbar.
+
+**What the issue was**
+
+On the floating mobile toolbar, the double-arrow flyout (and trigger) showed
+faint grey letters (“or”) behind the icon, looking corrupted.
+
+**Root cause**
+
+Shape flyout buttons are CSS grid cells containing both the SVG and a
+`visually-hidden` “Double arrow” span. On WebKit mobile, `clip: rect(0,0,0,0)`
+is unreliable, so the longer label stayed partially visible under the icon.
+
+**What we fixed**
+
+Moved accessible names to `aria-label` on each flyout button and removed the
+spans. Hardened `.visually-hidden` with `clip-path: inset(50%)`. Clipped flyout
+item overflow. Replaced the biarrow glyph with a horizontal filled double-head
+icon that stays clear at 18px.
+
+**Why this way**
+
+`aria-label` on icon-only buttons is the usual pattern and cannot paint into the
+grid cell. Keeping a clipped span would still fight WebKit’s `clip` quirks.
+
+**Verification**
+
+`npm run typecheck && npm run test && npm run build`; mobile-width check that
+biarrow shows no ghost text.
+
+---
+
 Copy this block when logging a future issue:
 
 ```markdown

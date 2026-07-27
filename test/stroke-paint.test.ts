@@ -260,8 +260,10 @@ describe("shape paint geometry", () => {
       },
       space,
     );
+    // Shaft ends at the head base (inset by headLen), not the tip — otherwise
+    // a round line-cap would poke past the triangle.
     expect(ctx.moveTo).toHaveBeenCalledWith(10, 50);
-    expect(ctx.lineTo).toHaveBeenCalledWith(90, 50);
+    expect(ctx.lineTo).toHaveBeenCalledWith(76, 50);
     expect(ctx.strokeSnapshots).toHaveLength(1);
     expect(ctx.fillSnapshots).toHaveLength(1);
     expect(ctx.fillSnapshots[0]!.fillStyle).toBe("#be123c");

@@ -666,6 +666,37 @@ CSS `::before` (no text node); non-passive `touchstart`/`touchmove` +
 `selectstart` guards clear selection; `#view-room` / stage use
 `touch-action: none`. Deployed with this slice.
 
+## I21 — Arrow shaft round-cap poked past the arrowhead tip
+
+**When:** 27 July 2026, after shape tools (line / ellipse / arrow) landed.
+
+**What the issue was**
+
+Drawn arrows showed a small blunt/rounded “nose” sticking out past the sharp
+triangular head.
+
+**Root cause**
+
+`paintArrow` stroked the shaft all the way to the tip (`end`) with
+`lineCap: "round"`, then filled the head triangle on the same tip. The round
+cap is a half-disk centered on `end`, so it protrudes beyond the triangle apex.
+
+**What we fixed**
+
+Stop the shaft at the head base (inset by `headLen` along the start→end vector)
+so the round cap sits under the filled triangle, not past the tip
+(`client/src/canvas/stroke.ts`). Paint test updated to expect the inset endpoint.
+
+**Why this way**
+
+Shortening the shaft keeps the existing filled-triangle head and round start
+cap. Switching only to `lineCap: "butt"` would still leave a flat stub at the
+tip unless the shaft is inset; butt alone also looks worse at the start.
+
+**Verification**
+
+`npx vitest run test/stroke-paint.test.ts`; `npm run typecheck && npm run build`.
+
 ---
 
 Copy this block when logging a future issue:

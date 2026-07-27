@@ -179,6 +179,7 @@ export function paintEllipse(
 /**
  * Line plus a triangular arrowhead at `end`. Head angle is derived from the
  * start→end vector at paint time — never stored on the operation.
+ * The shaft stops at the head base so a round line-cap cannot poke past the tip.
  */
 export function paintArrow(
   ctx: CanvasRenderingContext2D,
@@ -189,9 +190,14 @@ export function paintArrow(
   const b = toCssPixelPoint(shape.end, space);
   const dx = b.x - a.x;
   const dy = b.y - a.y;
+  const length = Math.hypot(dx, dy);
   const angle = Math.atan2(dy, dx);
   const headLen = Math.max(10, shape.width * 3.5);
   const half = Math.PI / 7;
+  // Pull the shaft back to the triangle base (or mid-span for tiny arrows).
+  const shaftInset = length > 0 ? Math.min(headLen, length * 0.85) : 0;
+  const shaftEndX = b.x - Math.cos(angle) * shaftInset;
+  const shaftEndY = b.y - Math.sin(angle) * shaftInset;
 
   ctx.save();
   ctx.globalCompositeOperation = "source-over";
@@ -201,10 +207,12 @@ export function paintArrow(
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
-  ctx.beginPath();
-  ctx.moveTo(a.x, a.y);
-  ctx.lineTo(b.x, b.y);
-  ctx.stroke();
+  if (length > 0.5) {
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(shaftEndX, shaftEndY);
+    ctx.stroke();
+  }
 
   const leftX = b.x - headLen * Math.cos(angle - half);
   const leftY = b.y - headLen * Math.sin(angle - half);

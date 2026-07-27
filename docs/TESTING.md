@@ -207,6 +207,29 @@ Focused proof:
 3. Mobile / narrow width: Shapes trigger stays icon-only; flyout opens upward
    without widening the floating toolbar.
 
+## Mobile Shapes labels (2026-07-27)
+
+Mobile toolbar used to hide the “Shapes” word and flyout cells were icon-only
+(I26). Labels are visible again so the control is discoverable.
+
+### Automated
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files 29 passed (29)
+→ Tests 141 passed (141)
+→ Vite production build exit 0
+```
+
+### Manual
+
+1. Mobile viewport (≤720px or device): floating toolbar **Shapes** button shows
+   icon + the word **Shapes** (same pattern as Brush / Eraser).
+2. Open the flyout: each cell shows a short caption (Rect, Ellipse, Diamond,
+   Triangle, Star, Line, Arrow, Double). Full names remain in `title` /
+   `aria-label`.
+
 ## Rectangle shape tool (2026-07-26)
 
 `PROTOCOL_VERSION` 4. `shape:rect` commits one durable `kind: "rect"` op with

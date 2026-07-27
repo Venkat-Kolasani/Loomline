@@ -838,6 +838,41 @@ and confirm the icon grid appears above the toolbar.
 
 ---
 
+## I26 — Mobile Shapes control hid its name
+
+**When:** 27 July 2026, after mobile shell polish; user feedback on iPhone.
+
+**What the issue was**
+
+On the floating mobile toolbar the Shapes trigger was icon-only (`display: none`
+on `.shape-tool-label`), so users did not know the control opened shape tools.
+Flyout items also had only icons / `aria-label`s — no visible names.
+
+**Root cause**
+
+Mobile CSS intentionally shrunk the trigger to a fixed `2.5rem` square and hid
+the “Shapes” text to save width; the toolbar already scrolls horizontally, so
+that trade-off cost discoverability for no hard space win.
+
+**What we fixed**
+
+Keep the icon + “Shapes” label on mobile (same pattern as Brush / Eraser). Add
+short visible `.shape-flyout-name` captions under each flyout icon (Rect,
+Ellipse, Diamond, Triangle, Star, Line, Arrow, Double).
+
+**Why this way**
+
+Hiding labels to “fit” was unnecessary with horizontal toolbar scroll. Visible
+names beat relying on icon literacy alone; full names remain in `title` /
+`aria-label`.
+
+**Verification**
+
+`npm run typecheck && npm run test && npm run build`; mobile viewport: Shapes
+button shows the word Shapes; open flyout and confirm each cell shows a caption.
+
+---
+
 Copy this block when logging a future issue:
 
 ```markdown

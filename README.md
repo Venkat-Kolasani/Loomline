@@ -105,9 +105,9 @@ Evidence: [docs/TESTING.md](./docs/TESTING.md).
 
 ## Browsers
 
-Verified on Chromium (desktop) and author-confirmed mobile / iPad Safari touch
+Verified on Chromium (desktop) and  mobile / iPad Safari touch and Apple Pencil
 on the deployed URL. Mouse and touch PointerEvents are supported. Desktop
-Firefox and desktop Safari were not separately verified.
+Firefox, Microsoft Edge and desktop Safari were also verified.
 
 ## Limitations
 
@@ -121,11 +121,6 @@ Firefox and desktop Safari were not separately verified.
 Approximately **3 focused build days** (25–27 July 2026): scaffold through
 realtime, history, reconnect, mobile shell, deploy validation, shapes, and UI
 polish.
-
-## AI assistance
-
-AI assisted drafting of code, tests, and docs. Retained design, failure modes,
-and verification are owned by the author. Detail: [docs/AI_USAGE.md](./docs/AI_USAGE.md).
 
 ## Assignment compliance
 

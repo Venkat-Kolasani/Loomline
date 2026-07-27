@@ -49,18 +49,15 @@ function acceptsHtml(request: Request): boolean {
 }
 
 async function serveRoomSharePage(
-  request: Request,
+  _request: Request,
   env: Env,
   url: URL,
   roomId: string,
 ): Promise<Response> {
-  const assetResponse = await env.ASSETS.fetch(request);
-  const contentType = assetResponse.headers.get("Content-Type") ?? "";
-  if (!contentType.includes("text/html")) {
-    return assetResponse;
-  }
-
-  const html = await assetResponse.text();
+  // Fetch the SPA shell by path, not `/r/:id`. Vitest/CI often runs before
+  // `dist/client` exists, and Assets has no file at the room URL — SPA
+  // not_found_handling is not applied when we already intercepted the path.
+  const html = await loadSpaShellHtml(env, url);
   const pageUrl = new URL(`/r/${roomId}`, url.origin).toString();
   const title = `Loomline · ${roomId}`;
   const description = `Join Loomline room ${roomId} and draw together in real time.`;
@@ -91,14 +88,48 @@ async function serveRoomSharePage(
       `<meta name="description" content="${escapeHtml(description)}" />`,
     );
 
-  const headers = new Headers(assetResponse.headers);
-  headers.set("Cache-Control", "no-store");
   return new Response(withShareMeta, {
-    status: assetResponse.status,
-    statusText: assetResponse.statusText,
-    headers,
+    status: 200,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+    },
   });
 }
+
+async function loadSpaShellHtml(env: Env, url: URL): Promise<string> {
+  for (const path of ["/index.html", "/"] as const) {
+    const response = await env.ASSETS.fetch(
+      new Request(new URL(path, url.origin), {
+        method: "GET",
+        headers: { Accept: "text/html" },
+      }),
+    );
+    const contentType = response.headers.get("Content-Type") ?? "";
+    if (response.ok && contentType.includes("text/html")) {
+      return response.text();
+    }
+  }
+  // Minimal shell when Assets are missing (e.g. CI runs tests before build).
+  return SHARE_META_SHELL_HTML;
+}
+
+/** Placeholders match the replace patterns in serveRoomSharePage. */
+const SHARE_META_SHELL_HTML = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Loomline</title>
+    <meta name="description" content="Real-time collaborative drawing canvas." />
+    <meta property="og:title" content="Loomline" />
+    <meta property="og:description" content="Real-time collaborative drawing canvas." />
+    <meta property="og:url" content="https://loomline.example/" />
+    <meta name="twitter:title" content="Loomline" />
+    <meta name="twitter:description" content="Real-time collaborative drawing canvas." />
+  </head>
+  <body></body>
+</html>
+`;
 
 function escapeHtml(value: string): string {
   return value

@@ -33,11 +33,11 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Test
-        run: npm run test
-
       - name: Build client
         run: npm run build
+
+      - name: Test
+        run: npm run test
 
       # Prefer local wrangler from package-lock over cloudflare/wrangler-action.
       # That action's Node 20 runtime emits a deprecation warning and hides the

@@ -873,6 +873,40 @@ button shows the word Shapes; open flyout and confirm each cell shows a caption.
 
 ---
 
+## I27 — CI share-meta test 404 on `/r/:id`
+
+**When:** 27 July 2026, after brand/share meta commit; GitHub Actions failed
+`test/scaffold.test.ts`.
+
+**What the issue was**
+
+`injects room-specific share meta on invite HTML` expected 200 and got 404.
+
+**Root cause**
+
+The Worker rewrote HTML by `ASSETS.fetch` on the room path. Assets has no
+`/r/:id` file; SPA `not_found_handling` does not apply once the Worker has
+already intercepted. CI also ran `npm run test` before `npm run build`, so
+`dist/client` was often empty in Actions.
+
+**What we fixed**
+
+Load `/index.html` (then `/`) for the SPA shell, fall back to a minimal HTML
+share shell when Assets are missing, always return 200 with room OG tags.
+Reorder the deploy workflow to build the client before tests.
+
+**Why this way**
+
+Fetching the real shell path matches production invite crawlers; the fallback
+keeps unit tests honest without requiring a prior build in every local run.
+
+**Verification**
+
+`npm run test -- test/scaffold.test.ts` (with and without a fresh
+`dist/client`); full `npm run typecheck && npm run test && npm run build`.
+
+---
+
 Copy this block when logging a future issue:
 
 ```markdown

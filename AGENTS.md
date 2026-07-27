@@ -224,4 +224,5 @@ No feature is complete merely because it appears to work in one browser. The
 must-ship project is complete only when two clients can draw simultaneously,
 global undo/redo agrees on both clients, a reconnect restores the same committed
 canvas, malformed input remains recoverable, mobile drawing works, the deployed
-URL has passed a fresh-session test, and the demo recording proves those claims.
+URL has passed a fresh-session test, and a live two-browser walkthrough can
+prove those claims (an uploaded demo video is optional, not required).

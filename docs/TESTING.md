@@ -204,8 +204,8 @@ Focused proof:
 2. Served flyout order:
    `rect → ellipse → diamond → triangle → star → line → arrow → biarrow`
    in a 4×2 grid.
-3. Mobile / narrow width: Shapes trigger stays icon-only; flyout opens upward
-   without widening the floating toolbar.
+3. Mobile / narrow width: Shapes trigger shows icon + “Shapes”; flyout opens
+   upward with named cells (later I26).
 
 ## Mobile Shapes labels (2026-07-27)
 
@@ -812,12 +812,16 @@ replaces—the visual browser proof above.
 
 ### Evidence boundaries / blockers
 
-- Verified browser: Chromium-based Cursor browser only.
-- Touch handler path was exercised with synthetic PointerEvents in an earlier
-  slice; physical iOS/Android and narrow-layout usability are not verified.
-- Firefox and Safari are not verified.
-- GitHub history is meaningful, but the repository remains private by author
-  choice; reviewers need access.
+Current truth (updated 27 July 2026; older chronological sections below may
+describe an earlier gate):
+
+- Desktop: Chromium verified end-to-end. Desktop Firefox and desktop Safari were
+  not separately verified.
+- Mobile: PointerEvent emulation plus author-confirmed physical phone / iPad
+  Safari (two-user and UI fixes I20 / I25 / I26). Narrow layout on the deployed
+  URL is verified.
+- GitHub history is meaningful; the repository is **private** — Flam reviewers
+  need explicit access (assignment allows private + access).
 
 ## Latest gate (2026-07-26 — eraser hole must not shrink)
 

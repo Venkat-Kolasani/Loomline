@@ -204,8 +204,9 @@ Product name is **Loomline** (repository and Worker name match).
 - Approved Cloudflare OAuth locally; no credentials were added to source control
 - Chose to keep the GitHub repository private and accepts that reviewers require
   explicit access
-- Owns every evidence boundary: Chromium was tested; Firefox, Safari, a physical
-  mobile device, and a demo recording are not claimed
+- Owns evidence boundaries: Chromium desktop + author-confirmed mobile/iPad
+  Safari; desktop Firefox/Safari not separately claimed; no uploaded demo video
+  artifact (live two-browser walkthrough is the proof)
 
 ## Artist identity (`feat(identity): remember artist name before joining`)
 
@@ -290,7 +291,8 @@ Product name is **Loomline** (repository and Worker name match).
 - Explains why Display rAF rate is not Canvas FPS and must not be marketed as
   an SLA
 - Owns pausing the rAF sampler while the dock is collapsed
-- Owns keeping metrics behind `?debug=1` only
+- Owned the original `?debug=1` gate (later removed so Metrics stays always
+  available on the demo — see deploy refresh slice below)
 
 ## Deploy refresh + mobile acceptance (`test(mobile): record responsive and touch acceptance evidence`)
 

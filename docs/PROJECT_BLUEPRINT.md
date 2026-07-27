@@ -5,8 +5,8 @@
 Build the **Real-Time Collaborative Drawing Canvas** assignment as `Loomline`:
 a room-scoped, deterministic multiplayer drawing application. The submission will
 be deployed on Cloudflare's free Workers/Durable Objects platform and submitted
-with a public GitHub repository, a live URL, a short demo video, and clear
-architecture documentation.
+with a GitHub repository (public or private with reviewer access), a live URL,
+and clear architecture documentation.
 
 This is deliberately not a feature-heavy whiteboard clone. The differentiator is
 a correct, observable, explainable collaboration model: smooth local drawing,
@@ -44,20 +44,30 @@ this choice is defensible only because we can explain it precisely.
 - Reconnect and room snapshot recovery.
 - Mouse, touch, and stylus support; responsive controls.
 - Empty, connection/reconnecting, and failed-room states.
-- Deployed demo, meaningful tests, documentation, and a recorded walkthrough.
+- Deployed demo, meaningful tests, and documentation. A live two-browser
+  walkthrough is the submission proof; a separate uploaded demo video is
+  optional.
+
+### Bonus shipped (assignment optional)
+
+- Geometry shapes as durable sequenced ops (rectangle, ellipse, diamond,
+  triangle, star, line, arrow, double arrow) — same commit/overlay/undo model
+  as strokes; not a second collaboration system.
 
 ### Only after all must-ship items are verified
 
-- Diagnostics panel: current FPS, WebSocket RTT, connected clients, messages/sec.
+- Diagnostics panel: Display rAF rate, WebSocket RTT, connected clients,
+  messages/sec (shipped as a collapsed Metrics dock).
 - Network-chaos demo control: latency and dropped-message simulation in development.
 - Replay mode for the committed event log.
 - Checkpointed Canvas snapshots for faster recovery of large histories.
-- A small load script that drives multiple synthetic WebSocket clients.
+- A small load script that drives multiple synthetic WebSocket clients
+  (shipped as `npm run load`).
 
 ### Explicitly out of scope
 
 - Authentication, billing, external collaboration libraries, Canvas libraries,
-  CRDT packages, shapes/text/images, or a generic product dashboard.
+  CRDT packages, freehand text/images, or a generic product dashboard.
 
 ## System design
 
@@ -147,24 +157,19 @@ The feature is not complete until all of the following are demonstrated:
 - A malformed WebSocket payload produces a typed error, not a broken room.
 - Mobile touch drawing and desktop controls work.
 - The deployed URL works in a fresh browser session.
-- The demo shows an actual two-client interaction, reconnect, and global undo.
+- A live two-browser session shows simultaneous draw, reconnect, and global undo.
 
 ## Delivery schedule (deadline: 29 July, 15:00 IST)
 
-| Timebox | Outcome | Commit |
-| --- | --- | --- |
-| 25 Jul | Tooling and deployment skeleton | `chore(scaffold): initialize edge application` |
-| 25 Jul | Two-layer Canvas layout and responsive shell | `feat(canvas): add layered canvas surface` |
-| 26 Jul AM | Local pointer tools and touch proof | `feat(canvas): add local pointer drawing tools` |
-| 26 Jul PM | Room routing, landing page, and presence | `feat(rooms): add isolated room routing` |
-| 26 Jul PM | Streamed remote live strokes | `feat(realtime): broadcast live stroke batches` |
-| 27 Jul AM | Durable operation ordering and snapshot replay | `feat(history): add durable ordered room operations` |
-| 27 Jul PM | Global tombstone-based undo/redo | `feat(history): add global tombstone-based undo redo` |
-| 28 Jul AM | Reconnect/hibernate recovery | `feat(resilience): recover rooms after reconnect` |
-| 28 Jul AM | Input hardening and abuse limits | `fix(robustness): harden room input boundaries` |
-| 28 Jul PM | Measured diagnostics/load evidence, only if core is green | `feat(observability): add runtime metrics baseline` |
-| 28 Jul PM | Deployment/documentation completion and audit | `docs(submission): complete delivery guide` |
-| 29 Jul before 12:00 | Rehearsal, demo runbook, final proof | `chore(submission): prepare interview rehearsal` |
+Actual build (condensed; commit subjects vary):
+
+| Timebox | Outcome |
+| --- | --- |
+| 25 Jul | Scaffold, layered Canvas, local drawing, rooms/presence, live strokes |
+| 26 Jul | Durable ops, undo/redo, reconnect, polish, mobile shell, deploy + Metrics |
+| 27 Jul | Shapes (through PROTOCOL_VERSION 7), layout/UI polish, submission doc audit |
+| 28 Jul evening | Feature freeze — validation and demo rehearsal only |
+| 29 Jul before 15:00 | Final smoke, email submission |
 
 The 29th is buffer and submission time, not feature-development time.
 

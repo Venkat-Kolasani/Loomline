@@ -3,7 +3,8 @@
 Real-time collaborative drawing canvas — Flam Frontend R&D assignment.
 
 **Live demo:** https://loomline.kolasanivenkat2.workers.dev  
-**Repository:** https://github.com/Venkat-Kolasani/Loomline
+**Repository:** https://github.com/Venkat-Kolasani/Loomline (private — grant Flam
+reviewers access before submission)
 
 Vanilla TypeScript + Vite client, native Canvas 2D, native WebSocket. Backend is
 a Cloudflare Worker with **one Durable Object per room** and Durable Object
@@ -83,6 +84,7 @@ Open http://127.0.0.1:8787/
 | `npm run test` | Vitest (Workers pool) |
 | `npm run build` | Production client → `dist/client` |
 | `npm run deploy` | Build + deploy to Cloudflare |
+| `npm run acceptance` | Headless two-browser acceptance against a running local Worker |
 | `npm run load` | Synthetic multi-client stroke load (local) |
 
 Production deploys via `npm run deploy` or GitHub Actions on `main`
@@ -104,8 +106,9 @@ Evidence: [docs/TESTING.md](./docs/TESTING.md).
 
 ## Browsers
 
-Verified on Chromium (desktop) and physical / emulated mobile touch on the
-deployed URL. Mouse and touch PointerEvents are supported.
+Verified on Chromium (desktop) and author-confirmed mobile / iPad Safari touch
+on the deployed URL. Mouse and touch PointerEvents are supported. Desktop
+Firefox and desktop Safari were not separately verified.
 
 ## Limitations
 
@@ -116,8 +119,9 @@ deployed URL. Mouse and touch PointerEvents are supported.
 
 ## Time spent
 
-Approximately **3 focused build days** (25–26 July 2026): scaffold through
-realtime, history, reconnect, polish, mobile shell, and deploy validation.
+Approximately **3 focused build days** (25–27 July 2026): scaffold through
+realtime, history, reconnect, mobile shell, deploy validation, shapes, and UI
+polish.
 
 ## AI assistance
 

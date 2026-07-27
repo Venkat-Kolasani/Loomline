@@ -12,6 +12,6 @@ Product and system docs for the Flam Frontend R&D collaborative canvas.
 | [AI_USAGE.md](./AI_USAGE.md) | AI assistance disclosure |
 | [PROJECT_BLUEPRINT.md](./PROJECT_BLUEPRINT.md) | Delivery blueprint and stack contract |
 | [ASSIGNMENT.md](./ASSIGNMENT.md) | Original assignment brief |
-| [../AGENTS.md](../AGENTS.md) | Agent operating contract (repo root) |
 
 The public entry point for reviewers is the root [README.md](../README.md).
+Author-only agent/prompt files are not part of the product doc set.

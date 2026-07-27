@@ -319,13 +319,10 @@ h1 {
   appearance: none;
   display: inline-grid;
   place-items: center;
-  grid-template-rows: auto auto;
-  gap: 0.12rem;
-  width: 3.35rem;
-  min-width: 3.35rem;
-  height: auto;
-  min-height: 2.85rem;
-  padding: 0.3rem 0.2rem 0.25rem;
+  width: 2.35rem;
+  height: 2.35rem;
+  min-height: 2.35rem;
+  padding: 0;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 0.35rem;
@@ -349,23 +346,6 @@ h1 {
   display: block;
   position: relative;
   z-index: 1;
-}
-
-.shape-flyout-name {
-  display: block;
-  max-width: 100%;
-  font-size: 0.62rem;
-  line-height: 1.15;
-  letter-spacing: 0.01em;
-  color: var(--muted);
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.shape-flyout button.shape-flyout-item.is-active .shape-flyout-name {
-  color: var(--accent);
 }
 
 .width-value {

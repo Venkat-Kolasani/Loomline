@@ -856,9 +856,9 @@ that trade-off cost discoverability for no hard space win.
 
 **What we fixed**
 
-Keep the icon + “Shapes” label on mobile (same pattern as Brush / Eraser). Add
-short visible `.shape-flyout-name` captions under each flyout icon (Rect,
-Ellipse, Diamond, Triangle, Star, Line, Arrow, Double).
+Keep the icon + “Shapes” label on mobile (same pattern as Brush / Eraser).
+Flyout cells stay icon-only; full names remain in `title` / `aria-label` for
+hover and assistive tech (visible under-icon captions were tried and reverted).
 
 **Why this way**
 
@@ -869,7 +869,7 @@ names beat relying on icon literacy alone; full names remain in `title` /
 **Verification**
 
 `npm run typecheck && npm run test && npm run build`; mobile viewport: Shapes
-button shows the word Shapes; open flyout and confirm each cell shows a caption.
+button shows the word Shapes; flyout cells are icon-only with hover titles.
 
 ---
 

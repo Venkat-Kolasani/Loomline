@@ -226,9 +226,8 @@ npm run typecheck && npm run test && npm run build
 
 1. Mobile viewport (≤720px or device): floating toolbar **Shapes** button shows
    icon + the word **Shapes** (same pattern as Brush / Eraser).
-2. Open the flyout: each cell shows a short caption (Rect, Ellipse, Diamond,
-   Triangle, Star, Line, Arrow, Double). Full names remain in `title` /
-   `aria-label`.
+2. Open the flyout: icon-only cells; hover/`title` shows the full shape name
+   (Rect, Ellipse, …). No permanent under-icon captions.
 
 ## Brand favicon + share meta (2026-07-27)
 

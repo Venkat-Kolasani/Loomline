@@ -89,20 +89,26 @@ export function paintShape(
     case "rect":
       paintRect(ctx, shape, space);
       return;
-    case "line":
-      paintLine(ctx, shape, space);
-      return;
     case "ellipse":
       paintEllipse(ctx, shape, space);
-      return;
-    case "arrow":
-      paintArrow(ctx, shape, space);
       return;
     case "diamond":
       paintDiamond(ctx, shape, space);
       return;
     case "triangle":
       paintTriangle(ctx, shape, space);
+      return;
+    case "star":
+      paintStar(ctx, shape, space);
+      return;
+    case "line":
+      paintLine(ctx, shape, space);
+      return;
+    case "arrow":
+      paintArrow(ctx, shape, space);
+      return;
+    case "biarrow":
+      paintBiArrow(ctx, shape, space);
       return;
   }
 }
@@ -236,6 +242,71 @@ export function paintArrow(
 }
 
 /**
+ * Shaft with filled arrowheads at both `start` and `end`. Head angles are
+ * derived at paint time; shaft is inset so round caps stay under the heads.
+ */
+export function paintBiArrow(
+  ctx: CanvasRenderingContext2D,
+  shape: Pick<ShapeGeometry, "color" | "width" | "start" | "end">,
+  space: CanvasSpace,
+): void {
+  const a = toCssPixelPoint(shape.start, space);
+  const b = toCssPixelPoint(shape.end, space);
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const length = Math.hypot(dx, dy);
+  const angle = Math.atan2(dy, dx);
+  const headLen = Math.max(10, shape.width * 3.5);
+  const half = Math.PI / 7;
+  // Cap each inset so two heads still leave a shaft on short drags.
+  const shaftInset = length > 0 ? Math.min(headLen, length * 0.4) : 0;
+  const shaftStartX = a.x + Math.cos(angle) * shaftInset;
+  const shaftStartY = a.y + Math.sin(angle) * shaftInset;
+  const shaftEndX = b.x - Math.cos(angle) * shaftInset;
+  const shaftEndY = b.y - Math.sin(angle) * shaftInset;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.strokeStyle = shape.color;
+  ctx.fillStyle = shape.color;
+  ctx.lineWidth = shape.width;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  if (length > 0.5) {
+    ctx.beginPath();
+    ctx.moveTo(shaftStartX, shaftStartY);
+    ctx.lineTo(shaftEndX, shaftEndY);
+    ctx.stroke();
+  }
+
+  fillArrowHead(ctx, b.x, b.y, angle, headLen, half);
+  fillArrowHead(ctx, a.x, a.y, angle + Math.PI, headLen, half);
+
+  ctx.restore();
+}
+
+function fillArrowHead(
+  ctx: CanvasRenderingContext2D,
+  tipX: number,
+  tipY: number,
+  angle: number,
+  headLen: number,
+  half: number,
+): void {
+  const leftX = tipX - headLen * Math.cos(angle - half);
+  const leftY = tipY - headLen * Math.sin(angle - half);
+  const rightX = tipX - headLen * Math.cos(angle + half);
+  const rightY = tipY - headLen * Math.sin(angle + half);
+  ctx.beginPath();
+  ctx.moveTo(tipX, tipY);
+  ctx.lineTo(leftX, leftY);
+  ctx.lineTo(rightX, rightY);
+  ctx.closePath();
+  ctx.fill();
+}
+
+/**
  * Rhombus connecting the midpoints of each side of the bounding box of
  * normalized start/end.
  */
@@ -296,6 +367,54 @@ export function paintTriangle(
   ctx.moveTo(midX, minY);
   ctx.lineTo(maxX, maxY);
   ctx.lineTo(minX, maxY);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * Five-point star centered in the bounding box of normalized start/end.
+ * Outer tips sit on the box; inner radius is a fixed fraction of the outer.
+ */
+export function paintStar(
+  ctx: CanvasRenderingContext2D,
+  shape: Pick<ShapeGeometry, "color" | "width" | "start" | "end">,
+  space: CanvasSpace,
+): void {
+  const a = toCssPixelPoint(shape.start, space);
+  const b = toCssPixelPoint(shape.end, space);
+  const minX = Math.min(a.x, b.x);
+  const maxX = Math.max(a.x, b.x);
+  const minY = Math.min(a.y, b.y);
+  const maxY = Math.max(a.y, b.y);
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const outerX = Math.max(Math.abs(maxX - minX) / 2, 0.5);
+  const outerY = Math.max(Math.abs(maxY - minY) / 2, 0.5);
+  const innerRatio = 0.382;
+  const step = Math.PI / 5;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.strokeStyle = shape.color;
+  ctx.lineWidth = shape.width;
+  ctx.lineJoin = "miter";
+  ctx.lineCap = "butt";
+  ctx.beginPath();
+  for (let i = 0; i < 10; i += 1) {
+    const isOuter = i % 2 === 0;
+    const rx = isOuter ? outerX : outerX * innerRatio;
+    const ry = isOuter ? outerY : outerY * innerRatio;
+    // Tip-up: start at -π/2.
+    const angle = -Math.PI / 2 + i * step;
+    const x = cx + Math.cos(angle) * rx;
+    const y = cy + Math.sin(angle) * ry;
+    if (i === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+  }
   ctx.closePath();
   ctx.stroke();
   ctx.restore();

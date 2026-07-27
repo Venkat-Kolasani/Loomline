@@ -370,20 +370,24 @@ function setShapeFlyoutOpen(open: boolean): void {
 
 const SHAPE_ICON_SVG: Record<ShapeKind, string> = {
   rect: `<svg viewBox="0 0 24 24" width="18" height="18" focusable="false"><rect x="5" y="6" width="14" height="12" fill="none" stroke="currentColor" stroke-width="1.75"/></svg>`,
-  line: `<svg viewBox="0 0 24 24" width="18" height="18" focusable="false"><path d="M5 19 L19 5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>`,
   ellipse: `<svg viewBox="0 0 24 24" width="18" height="18" focusable="false"><ellipse cx="12" cy="12" rx="8" ry="6" fill="none" stroke="currentColor" stroke-width="1.75"/></svg>`,
-  arrow: `<svg viewBox="0 0 24 24" width="18" height="18" focusable="false"><path d="M5 19 L17 7" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M11 7 L17 7 L17 13" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   diamond: `<svg viewBox="0 0 24 24" width="18" height="18" focusable="false"><path d="M12 4 L20 12 L12 20 L4 12 Z" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="miter"/></svg>`,
   triangle: `<svg viewBox="0 0 24 24" width="18" height="18" focusable="false"><path d="M12 5 L20 19 L4 19 Z" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="miter"/></svg>`,
+  star: `<svg viewBox="0 0 24 24" width="18" height="18" focusable="false"><path d="M12 3.5 L14.2 9.2 L20.2 9.4 L15.4 13.1 L17 19 L12 15.8 L7 19 L8.6 13.1 L3.8 9.4 L9.8 9.2 Z" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="miter"/></svg>`,
+  line: `<svg viewBox="0 0 24 24" width="18" height="18" focusable="false"><path d="M5 19 L19 5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>`,
+  arrow: `<svg viewBox="0 0 24 24" width="18" height="18" focusable="false"><path d="M5 19 L17 7" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M11 7 L17 7 L17 13" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  biarrow: `<svg viewBox="0 0 24 24" width="18" height="18" focusable="false"><path d="M7 17 L17 7" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M7 17 L7 12 L12 17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 7 L17 12 L12 7" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
 };
 
 const SHAPE_WIDTH_LABEL: Record<ShapeKind, string> = {
   rect: "Rectangle width",
-  line: "Line width",
   ellipse: "Ellipse width",
-  arrow: "Arrow width",
   diamond: "Diamond width",
   triangle: "Triangle width",
+  star: "Star width",
+  line: "Line width",
+  arrow: "Arrow width",
+  biarrow: "Double arrow width",
 };
 
 function syncShapeFlyoutSelection(kind: ShapeKind): void {

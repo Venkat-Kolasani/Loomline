@@ -443,3 +443,15 @@ deployed protocol results are recorded separately in [TESTING.md](./TESTING.md).
 - Owns bounding-box midpoint / isosceles geometry and why D29 (not a second D28)
   documents this slice after line/ellipse/arrow already claimed D28
 - Owns verification at listed desktop widths + two-tab diamond/triangle/undo
+
+## Star / biarrow (`feat(canvas): add star and double-headed arrow shapes`)
+
+### Assisted by AI
+
+- Protocol v7 `star` / `biarrow`, paint, 4×2 closed-then-linear flyout order,
+  tests, and docs (D30)
+
+### Manually reviewed / owned by the author
+
+- Owns five-point star inscription and dual-head shaft inset (same round-cap
+  rule as I21) and the closed-then-linear icon order

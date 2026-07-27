@@ -1,6 +1,7 @@
 # Protocol
 
-**Protocol version:** `6` (`5` → `6`: adds `shape:diamond` / `shape:triangle`;
+**Protocol version:** `7` (`6` → `7`: adds `shape:star` / `shape:biarrow`;
+`5` → `6`: adds `shape:diamond` / `shape:triangle`;
 `4` → `5`: adds `shape:line` / `shape:ellipse` / `shape:arrow`;
 `3` → `4`: adds `shape:rect` / `kind: "rect"`;
 `2` → `3`: coordinates are normalized, see
@@ -23,7 +24,7 @@ All JSON messages include:
 | Field | Type | Notes |
 | --- | --- | --- |
 | `type` | string | Message discriminant |
-| `protocolVersion` | number | Must be `6` |
+| `protocolVersion` | number | Must be `7` |
 | `roomId` | string | Must match the socket room |
 
 ## Coordinate space
@@ -62,7 +63,7 @@ size and per-participant rate limits are enforced in `RoomDurableObject`
 | `stroke:start` | client → server | Begin a provisional stroke |
 | `stroke:points` | client → server | Batched additional points (≤ 64 per message) |
 | `stroke:end` | client → server | Finish provisional stroke; server may commit one op |
-| `shape:rect` / `shape:line` / `shape:ellipse` / `shape:arrow` / `shape:diamond` / `shape:triangle` | client → server | Commit one finished shape (normalized `start`/`end`; no live frames) |
+| `shape:rect` / `shape:ellipse` / `shape:diamond` / `shape:triangle` / `shape:star` / `shape:line` / `shape:arrow` / `shape:biarrow` | client → server | Commit one finished shape (normalized `start`/`end`; no live frames) |
 | `stroke:live` | server → peers | Fan-out of start / points / end for live overlay |
 | `canvas:clear` | client → server | Append one room-global durable clear operation |
 | `operation:committed` | server → **all** | Durable op with authoritative increasing `sequence` |
@@ -78,8 +79,8 @@ size and per-participant rate limits are enforced in `RoomDurableObject`
 
 1. `stroke:end` may produce a durable `kind: "stroke"` operation (only if the
    stroke was live on the server with at least one point). `shape:rect` /
-   `shape:line` / `shape:ellipse` / `shape:arrow` / `shape:diamond` /
-   `shape:triangle` produce a durable shape
+   `shape:ellipse` / `shape:diamond` / `shape:triangle` / `shape:star` /
+   `shape:line` / `shape:arrow` / `shape:biarrow` produce a durable shape
    operation (`kind` matching the message) from two normalized corners
    (no live fan-out while dragging). `canvas:clear` produces a durable
    `kind: "clear"` operation.
@@ -158,7 +159,7 @@ Clients must not send `stroke:points` / `stroke:end` for a `strokeId` unless
 ```json
 {
   "type": "sync_state",
-  "protocolVersion": 6,
+  "protocolVersion": 7,
   "roomId": "abcd1234",
   "sequenceHead": 2,
   "operations": [
@@ -185,7 +186,7 @@ Clients must not send `stroke:points` / `stroke:end` for a `strokeId` unless
 ```json
 {
   "type": "history:changed",
-  "protocolVersion": 6,
+  "protocolVersion": 7,
   "roomId": "abcd1234",
   "sequenceHead": 2,
   "operations": [
@@ -212,7 +213,7 @@ Clients must not send `stroke:points` / `stroke:end` for a `strokeId` unless
 ```json
 {
   "type": "operation:committed",
-  "protocolVersion": 6,
+  "protocolVersion": 7,
   "roomId": "abcd1234",
   "operation": {
     "sequence": 3,
@@ -236,7 +237,7 @@ Client → server (one message on pointer-up; no live intermediate frames):
 ```json
 {
   "type": "shape:rect",
-  "protocolVersion": 6,
+  "protocolVersion": 7,
   "roomId": "abcd1234",
   "shapeId": "…",
   "color": "#1d4ed8",
@@ -251,7 +252,7 @@ Server → all (`operation:committed`):
 ```json
 {
   "type": "operation:committed",
-  "protocolVersion": 6,
+  "protocolVersion": 7,
   "roomId": "abcd1234",
   "operation": {
     "kind": "rect",
@@ -273,7 +274,7 @@ Server → all (`operation:committed`):
 ```json
 {
   "type": "shape:line",
-  "protocolVersion": 6,
+  "protocolVersion": 7,
   "roomId": "abcd1234",
   "shapeId": "…",
   "color": "#0f6a5a",
@@ -286,7 +287,7 @@ Server → all (`operation:committed`):
 ```json
 {
   "type": "operation:committed",
-  "protocolVersion": 6,
+  "protocolVersion": 7,
   "roomId": "abcd1234",
   "operation": {
     "kind": "line",
@@ -308,7 +309,7 @@ Server → all (`operation:committed`):
 ```json
 {
   "type": "shape:ellipse",
-  "protocolVersion": 6,
+  "protocolVersion": 7,
   "roomId": "abcd1234",
   "shapeId": "…",
   "color": "#be123c",
@@ -321,7 +322,7 @@ Server → all (`operation:committed`):
 ```json
 {
   "type": "operation:committed",
-  "protocolVersion": 6,
+  "protocolVersion": 7,
   "roomId": "abcd1234",
   "operation": {
     "kind": "ellipse",
@@ -346,7 +347,7 @@ when painting.
 ```json
 {
   "type": "shape:arrow",
-  "protocolVersion": 6,
+  "protocolVersion": 7,
   "roomId": "abcd1234",
   "shapeId": "…",
   "color": "#b45309",
@@ -359,7 +360,7 @@ when painting.
 ```json
 {
   "type": "operation:committed",
-  "protocolVersion": 6,
+  "protocolVersion": 7,
   "roomId": "abcd1234",
   "operation": {
     "kind": "arrow",
@@ -383,7 +384,7 @@ Rhombus connecting midpoints of each side of the bounding box.
 ```json
 {
   "type": "shape:diamond",
-  "protocolVersion": 6,
+  "protocolVersion": 7,
   "roomId": "abcd1234",
   "shapeId": "…",
   "color": "#7c3aed",
@@ -396,7 +397,7 @@ Rhombus connecting midpoints of each side of the bounding box.
 ```json
 {
   "type": "operation:committed",
-  "protocolVersion": 6,
+  "protocolVersion": 7,
   "roomId": "abcd1234",
   "operation": {
     "kind": "diamond",
@@ -420,7 +421,7 @@ Isosceles triangle: apex at top-center of the box, base at the two bottom corner
 ```json
 {
   "type": "shape:triangle",
-  "protocolVersion": 6,
+  "protocolVersion": 7,
   "roomId": "abcd1234",
   "shapeId": "…",
   "color": "#0f766e",
@@ -433,7 +434,7 @@ Isosceles triangle: apex at top-center of the box, base at the two bottom corner
 ```json
 {
   "type": "operation:committed",
-  "protocolVersion": 6,
+  "protocolVersion": 7,
   "roomId": "abcd1234",
   "operation": {
     "kind": "triangle",
@@ -450,12 +451,86 @@ Isosceles triangle: apex at top-center of the box, base at the two bottom corner
 }
 ```
 
+### shape:star example
+
+Five-point star centered in the bounding box (outer tips on the box).
+
+```json
+{
+  "type": "shape:star",
+  "protocolVersion": 7,
+  "roomId": "abcd1234",
+  "shapeId": "…",
+  "color": "#a16207",
+  "width": 4,
+  "start": { "x": 0.3, "y": 0.2 },
+  "end": { "x": 0.7, "y": 0.8 }
+}
+```
+
+```json
+{
+  "type": "operation:committed",
+  "protocolVersion": 7,
+  "roomId": "abcd1234",
+  "operation": {
+    "kind": "star",
+    "sequence": 11,
+    "opId": "…",
+    "participantId": "…",
+    "shapeId": "…",
+    "color": "#a16207",
+    "width": 4,
+    "start": { "x": 0.3, "y": 0.2 },
+    "end": { "x": 0.7, "y": 0.8 },
+    "createdAt": 1720000001200
+  }
+}
+```
+
+### shape:biarrow example
+
+Double-headed arrow: filled heads at both `start` and `end`; angles derived at paint time.
+
+```json
+{
+  "type": "shape:biarrow",
+  "protocolVersion": 7,
+  "roomId": "abcd1234",
+  "shapeId": "…",
+  "color": "#334155",
+  "width": 5,
+  "start": { "x": 0.1, "y": 0.5 },
+  "end": { "x": 0.9, "y": 0.5 }
+}
+```
+
+```json
+{
+  "type": "operation:committed",
+  "protocolVersion": 7,
+  "roomId": "abcd1234",
+  "operation": {
+    "kind": "biarrow",
+    "sequence": 12,
+    "opId": "…",
+    "participantId": "…",
+    "shapeId": "…",
+    "color": "#334155",
+    "width": 5,
+    "start": { "x": 0.1, "y": 0.5 },
+    "end": { "x": 0.9, "y": 0.5 },
+    "createdAt": 1720000001300
+  }
+}
+```
+
 ### canvas:clear and committed clear example
 
 ```json
 {
   "type": "canvas:clear",
-  "protocolVersion": 6,
+  "protocolVersion": 7,
   "roomId": "abcd1234"
 }
 ```
@@ -463,7 +538,7 @@ Isosceles triangle: apex at top-center of the box, base at the two bottom corner
 ```json
 {
   "type": "operation:committed",
-  "protocolVersion": 6,
+  "protocolVersion": 7,
   "roomId": "abcd1234",
   "operation": {
     "kind": "clear",

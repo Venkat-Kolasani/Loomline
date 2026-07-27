@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   paintArrow,
+  paintBiArrow,
   paintDiamond,
   paintEllipse,
   paintLine,
   paintRect,
+  paintStar,
   paintStroke,
   paintTriangle,
 } from "../client/src/canvas/stroke";
@@ -293,5 +295,37 @@ describe("shape paint geometry", () => {
     expect(ctx.lineTo).toHaveBeenCalledWith(20, 75);
     expect(ctx.closePath).toHaveBeenCalled();
     expect(ctx.strokeSnapshots).toHaveLength(1);
+  });
+
+  it("paintStar draws a tip-up five-point star centered in the box", () => {
+    const ctx = createRecordingContext();
+    paintStar(ctx, corners, space);
+    // First outer tip is top-center of the box.
+    expect(ctx.moveTo).toHaveBeenCalledWith(50, 25);
+    expect(ctx.closePath).toHaveBeenCalled();
+    expect(ctx.strokeSnapshots).toHaveLength(1);
+    // 1 moveTo + 9 lineTo for the 10 star vertices.
+    expect(ctx.lineTo).toHaveBeenCalledTimes(9);
+  });
+
+  it("paintBiArrow insets the shaft and fills heads at both ends", () => {
+    const ctx = createRecordingContext();
+    paintBiArrow(
+      ctx,
+      {
+        color: "#334155",
+        width: 4,
+        start: { x: 0.1, y: 0.5 },
+        end: { x: 0.9, y: 0.5 },
+      },
+      space,
+    );
+    // Horizontal: length 80, headLen 14, inset 14 → shaft from 24 to 76.
+    expect(ctx.moveTo).toHaveBeenCalledWith(24, 50);
+    expect(ctx.lineTo).toHaveBeenCalledWith(76, 50);
+    expect(ctx.strokeSnapshots).toHaveLength(1);
+    expect(ctx.fillSnapshots).toHaveLength(2);
+    expect(ctx.fillSnapshots[0]!.fillStyle).toBe("#334155");
+    expect(ctx.closePath).toHaveBeenCalledTimes(2);
   });
 });

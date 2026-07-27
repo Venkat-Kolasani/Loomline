@@ -47,8 +47,9 @@ separate overlay; global undo/redo is server-owned over completed ops.
 
 ## Features
 
-- Brush, punch-through eraser, shapes (rectangle / line / ellipse / arrow /
-  diamond / triangle; local drag preview → one durable commit)
+- Brush, punch-through eraser, shapes (rectangle / ellipse / diamond /
+  triangle / star / line / arrow / double arrow; local drag preview → one
+  durable commit)
 - Colours (presets + picker), brush width slider, eraser size presets
 - Live stroke fan-out, remote cursors / collaborator labels, presence list
 - Artist name on join; shareable `/r/<roomId>` invite (copy / native share)
@@ -127,7 +128,7 @@ and verification are owned by the author. Detail: [docs/AI_USAGE.md](./docs/AI_U
 
 ### Frontend
 
-- [x] Brush, eraser, colours, stroke width (+ shapes: rect / line / ellipse / arrow / diamond / triangle)
+- [x] Brush, eraser, colours, stroke width (+ shapes: rect / ellipse / diamond / triangle / star / line / arrow / biarrow)
 - [x] Real-time in-progress strokes
 - [x] Remote drawing / cursor indicators
 - [x] Stable overlap via server sequence

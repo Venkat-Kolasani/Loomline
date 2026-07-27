@@ -21,29 +21,36 @@ export type DrawingTool = "brush" | "eraser";
  */
 export type ShapeKind =
   | "rect"
-  | "line"
   | "ellipse"
-  | "arrow"
   | "diamond"
-  | "triangle";
+  | "triangle"
+  | "star"
+  | "line"
+  | "arrow"
+  | "biarrow";
 
+/** Flyout / toolbar order: closed shapes, then linear / directed. */
 export const SHAPE_KINDS: readonly ShapeKind[] = [
   "rect",
-  "line",
   "ellipse",
-  "arrow",
   "diamond",
   "triangle",
+  "star",
+  "line",
+  "arrow",
+  "biarrow",
 ] as const;
 
 export function isShapeKind(value: unknown): value is ShapeKind {
   return (
     value === "rect" ||
-    value === "line" ||
     value === "ellipse" ||
-    value === "arrow" ||
     value === "diamond" ||
-    value === "triangle"
+    value === "triangle" ||
+    value === "star" ||
+    value === "line" ||
+    value === "arrow" ||
+    value === "biarrow"
   );
 }
 
@@ -158,9 +165,10 @@ export type ClientMessage =
     }
   | {
       /**
-       * Commit one finished shape (rect / line / ellipse / arrow / diamond /
-       * triangle). No live fan-out: the author renders a local preview while
-       * dragging; peers see the shape only after `operation:committed`.
+       * Commit one finished shape (rect / ellipse / diamond / triangle / star /
+       * line / arrow / biarrow). No live fan-out: the author renders a local
+       * preview while dragging; peers see the shape only after
+       * `operation:committed`.
        */
       type: ShapeClientMessageType;
       protocolVersion: typeof PROTOCOL_VERSION;
@@ -326,11 +334,13 @@ export function parseClientMessage(value: unknown): ParseClientResult {
     case "stroke:end":
       return parseStrokeEnd(record);
     case "shape:rect":
-    case "shape:line":
     case "shape:ellipse":
-    case "shape:arrow":
     case "shape:diamond":
     case "shape:triangle":
+    case "shape:star":
+    case "shape:line":
+    case "shape:arrow":
+    case "shape:biarrow":
       return parseShapeCommit(record);
     case "cursor":
       return parseCursor(record);

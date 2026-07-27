@@ -173,6 +173,37 @@ Focused proof:
      ~76px gap below share input.
    - 390×844 (mobile MQ): `direction: up` into stage; share row not in floating
      chrome (`overlapsShare: false`).
+
+## Star / double arrow + flyout order (2026-07-27)
+
+`PROTOCOL_VERSION` 7. `shape:star` / `shape:biarrow` reuse the same row shape.
+Flyout reordered to closed-then-linear in a 4×2 grid (D30).
+
+### Automated
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files 29 passed (29)
+→ Tests 141 passed (141)
+→ Vite production build exit 0
+```
+
+Focused proof:
+
+| Spec | Coverage |
+| --- | --- |
+| `test/protocol.test.ts` | parse accept for star / biarrow |
+| `test/shape-ops.test.ts` | two-client commit for star / biarrow |
+| `test/stroke-paint.test.ts` | star / biarrow geometry |
+
+### Manual
+
+1. Two WS clients (`ws://127.0.0.1:8794`, room `starbia1`, `PROTOCOL_VERSION` 7):
+   star + biarrow matched on both; undo left star; `canRedo: true`.
+2. Served flyout order:
+   `rect → ellipse → diamond → triangle → star → line → arrow → biarrow`
+   in a 4×2 grid.
 3. Mobile / narrow width: Shapes trigger stays icon-only; flyout opens upward
    without widening the floating toolbar.
 

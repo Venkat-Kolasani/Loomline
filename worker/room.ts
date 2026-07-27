@@ -346,11 +346,13 @@ export class RoomDurableObject extends DurableObject<Env> {
       case "stroke:points":
       case "stroke:end":
       case "shape:rect":
-      case "shape:line":
       case "shape:ellipse":
-      case "shape:arrow":
       case "shape:diamond":
       case "shape:triangle":
+      case "shape:star":
+      case "shape:line":
+      case "shape:arrow":
+      case "shape:biarrow":
       case "cursor":
       case "canvas:clear":
       case "history:undo":
@@ -493,11 +495,13 @@ export class RoomDurableObject extends DurableObject<Env> {
         this.handleStrokeEnd(ws, attachment, message, roomId);
         return;
       case "shape:rect":
-      case "shape:line":
       case "shape:ellipse":
-      case "shape:arrow":
       case "shape:diamond":
       case "shape:triangle":
+      case "shape:star":
+      case "shape:line":
+      case "shape:arrow":
+      case "shape:biarrow":
         this.handleShapeCommit(attachment, message, roomId);
         return;
       case "cursor":
@@ -690,11 +694,13 @@ export class RoomDurableObject extends DurableObject<Env> {
       {
         type:
           | "shape:rect"
-          | "shape:line"
           | "shape:ellipse"
-          | "shape:arrow"
           | "shape:diamond"
-          | "shape:triangle";
+          | "shape:triangle"
+          | "shape:star"
+          | "shape:line"
+          | "shape:arrow"
+          | "shape:biarrow";
       }
     >,
     roomId: string,

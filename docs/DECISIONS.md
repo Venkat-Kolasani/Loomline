@@ -590,12 +590,31 @@ version 5.)
 
 **Rejected.** Freeform polygon / multi-click tools (different input model). Live
 fan-out of drag frames (same bandwidth/flicker reasons as D24/D28). New wire
-fields or SQLite columns. Optional star / double-headed arrow deferred until
-explicitly requested after this slice.
+fields or SQLite columns. Star / double-headed arrow shipped later as D30.
 
 **Verified.** `test/shape-ops.test.ts` two-client commit for diamond and
 triangle; protocol parse + paint geometry tests; flyout position checked at
 ~1280 / 1440 / 1920 desktop widths and mobile; two-tab draw + undo.
+
+## D30 — Star and double-headed arrow (ordered 4×2 flyout)
+
+**Problem.** Two more geometric tools (five-point star, double-headed arrow)
+must collaborate and undo like earlier shapes without new SQLite columns or
+live-frame fan-out. Eight icons also need a readable order and grid.
+
+**Selected.** `shape:star` / `shape:biarrow` reuse the same normalized
+`start`/`end`, colour, and width (`PROTOCOL_VERSION` 7). Star is a tip-up
+five-point inscription centered in the box; biarrow paints filled heads at both
+ends with a shaft inset under both heads. Flyout order groups closed shapes
+then linear tools — rect, ellipse, diamond, triangle, star, line, arrow,
+biarrow — in a 4×2 grid.
+
+**Rejected.** Storing star vertex lists or head angles on the wire (paint-time
+derivation matches D28). A second toolbar control for biarrow. Keeping the
+older 3-column grid (uneven last row with eight icons).
+
+**Verified.** Protocol parse + paint geometry + two-client commit tests for
+both kinds; typecheck / full Vitest / build.
 
 ## Deferred
 

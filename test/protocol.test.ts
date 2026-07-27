@@ -267,6 +267,40 @@ describe("parseClientMessage", () => {
     }
   });
 
+  it("accepts shape:star with normalized bounding box", () => {
+    const result = parseClientMessage({
+      type: "shape:star",
+      protocolVersion: PROTOCOL_VERSION,
+      roomId: "abcd1234",
+      shapeId: "star-1",
+      color: "#a16207",
+      width: 4,
+      start: { x: 0.3, y: 0.2 },
+      end: { x: 0.7, y: 0.8 },
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.message.type).toBe("shape:star");
+    }
+  });
+
+  it("accepts shape:biarrow with normalized endpoints", () => {
+    const result = parseClientMessage({
+      type: "shape:biarrow",
+      protocolVersion: PROTOCOL_VERSION,
+      roomId: "abcd1234",
+      shapeId: "biarrow-1",
+      color: "#334155",
+      width: 5,
+      start: { x: 0.1, y: 0.5 },
+      end: { x: 0.9, y: 0.5 },
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.message.type).toBe("shape:biarrow");
+    }
+  });
+
   it("rejects shape:rect with invalid color", () => {
     const result = parseClientMessage({
       type: "shape:rect",

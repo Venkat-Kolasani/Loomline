@@ -429,3 +429,17 @@ deployed protocol results are recorded separately in [TESTING.md](./TESTING.md).
   Shapes flyout reuses the collapsed-by-default Room / Metrics pattern
 - Owns verification: typecheck / test / build and two-tab manual proof per kind
   plus undo
+
+## Diamond / triangle + flyout fix (`feat(canvas): fix shape picker position, add diamond and triangle`)
+
+### Assisted by AI
+
+- Protocol v6 diamond / triangle kinds, paint geometry, 3×2 flyout grid,
+  desktop-down / mobile-up flyout CSS, tests, and docs (D29 / PROTOCOL /
+  ARCHITECTURE / README / TESTING / I22)
+
+### Manually reviewed / owned by the author
+
+- Owns bounding-box midpoint / isosceles geometry and why D29 (not a second D28)
+  documents this slice after line/ellipse/arrow already claimed D28
+- Owns verification at listed desktop widths + two-tab diamond/triangle/undo

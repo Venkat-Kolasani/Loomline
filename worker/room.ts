@@ -349,6 +349,8 @@ export class RoomDurableObject extends DurableObject<Env> {
       case "shape:line":
       case "shape:ellipse":
       case "shape:arrow":
+      case "shape:diamond":
+      case "shape:triangle":
       case "cursor":
       case "canvas:clear":
       case "history:undo":
@@ -494,6 +496,8 @@ export class RoomDurableObject extends DurableObject<Env> {
       case "shape:line":
       case "shape:ellipse":
       case "shape:arrow":
+      case "shape:diamond":
+      case "shape:triangle":
         this.handleShapeCommit(attachment, message, roomId);
         return;
       case "cursor":
@@ -688,7 +692,9 @@ export class RoomDurableObject extends DurableObject<Env> {
           | "shape:rect"
           | "shape:line"
           | "shape:ellipse"
-          | "shape:arrow";
+          | "shape:arrow"
+          | "shape:diamond"
+          | "shape:triangle";
       }
     >,
     roomId: string,

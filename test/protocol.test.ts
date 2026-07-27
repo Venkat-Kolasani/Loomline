@@ -233,6 +233,40 @@ describe("parseClientMessage", () => {
     }
   });
 
+  it("accepts shape:diamond with normalized bounding box", () => {
+    const result = parseClientMessage({
+      type: "shape:diamond",
+      protocolVersion: PROTOCOL_VERSION,
+      roomId: "abcd1234",
+      shapeId: "diamond-1",
+      color: "#7c3aed",
+      width: 4,
+      start: { x: 0.2, y: 0.2 },
+      end: { x: 0.8, y: 0.8 },
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.message.type).toBe("shape:diamond");
+    }
+  });
+
+  it("accepts shape:triangle with normalized bounding box", () => {
+    const result = parseClientMessage({
+      type: "shape:triangle",
+      protocolVersion: PROTOCOL_VERSION,
+      roomId: "abcd1234",
+      shapeId: "triangle-1",
+      color: "#0f766e",
+      width: 3,
+      start: { x: 0.25, y: 0.15 },
+      end: { x: 0.75, y: 0.85 },
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.message.type).toBe("shape:triangle");
+    }
+  });
+
   it("rejects shape:rect with invalid color", () => {
     const result = parseClientMessage({
       type: "shape:rect",

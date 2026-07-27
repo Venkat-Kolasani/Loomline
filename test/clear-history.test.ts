@@ -2,6 +2,7 @@ import { env, exports } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import {
   PROTOCOL_VERSION,
+  isShapeKind,
   type CommittedOperation,
   type ServerMessage,
 } from "../shared/protocol";
@@ -174,12 +175,7 @@ function operationLabel(operation: CommittedOperation): string {
   if (operation.kind === "clear") {
     return "clear";
   }
-  if (
-    operation.kind === "rect" ||
-    operation.kind === "line" ||
-    operation.kind === "ellipse" ||
-    operation.kind === "arrow"
-  ) {
+  if (isShapeKind(operation.kind)) {
     return `${operation.kind}:${operation.shapeId}`;
   }
   return `stroke:${operation.strokeId}`;

@@ -29,6 +29,20 @@ describe("shape durable commits", () => {
       start: { x: 0.15, y: 0.5 },
       end: { x: 0.85, y: 0.5 },
     },
+    {
+      kind: "diamond" as const,
+      roomId: "diamon01",
+      shapeId: "shape-diamond",
+      start: { x: 0.2, y: 0.2 },
+      end: { x: 0.8, y: 0.8 },
+    },
+    {
+      kind: "triangle" as const,
+      roomId: "triangl1",
+      shapeId: "shape-triangle",
+      start: { x: 0.25, y: 0.2 },
+      end: { x: 0.75, y: 0.85 },
+    },
   ])(
     "commits one sequenced $kind to both clients",
     async ({ kind, roomId, shapeId, start, end }) => {

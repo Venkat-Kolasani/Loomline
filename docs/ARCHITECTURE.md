@@ -99,7 +99,7 @@ All coordinates are normalized (see [Coordinate space](#coordinate-space)).
 | `stroke:points` | client → server | Batched points (1–64); client sends ≤ one batch per animation frame |
 | `stroke:end` | client → server | Finish provisional stroke; may produce one durable stroke op |
 | `stroke:live` | server → peers | Fan-out start / points / end for live overlay (not to author for own ink) |
-| `shape:rect` / `shape:line` / `shape:ellipse` / `shape:arrow` | client → server | Commit one finished shape (`shapeId`, colour, width, normalized `start`/`end`); no live intermediate frames |
+| `shape:rect` / `shape:line` / `shape:ellipse` / `shape:arrow` / `shape:diamond` / `shape:triangle` | client → server | Commit one finished shape (`shapeId`, colour, width, normalized `start`/`end`); no live intermediate frames |
 | `canvas:clear` | client → server | Request one room-global durable clear operation |
 | `operation:committed` | server → **all** | Durable op with authoritative increasing `sequence` (`stroke` / shape kinds / `clear`) |
 | `history:undo` | client → server | Tombstone latest **visible** completed op |
@@ -113,11 +113,13 @@ All coordinates are normalized (see [Coordinate space](#coordinate-space)).
 ### Protocol extensibility
 
 `shape:rect` proved that a geometric shape is just another `operation_type` in
-the same append-only SQLite log. Line, ellipse, and arrow reused that exact
-mechanism (`PROTOCOL_VERSION` 5): same `start`/`end`/colour/width row shape,
-only the kind discriminator differs, drag preview stays local, and undo/redo
-needs no new machinery. Arrowhead angle is derived at paint time from the
-start→end vector — never stored.
+the same append-only SQLite log. Line, ellipse, arrow, diamond, and triangle
+reused that exact mechanism (`PROTOCOL_VERSION` 5 then 6): same
+`start`/`end`/colour/width row shape, only the kind discriminator differs, drag
+preview stays local, and undo/redo needs no new machinery. Arrowhead angle is
+derived at paint time from the start→end vector — never stored. Diamond connects
+bounding-box side midpoints; triangle is an isosceles inscription (apex
+top-center, base at the bottom corners).
 
 ### Payload / rate limits (enforced)
 

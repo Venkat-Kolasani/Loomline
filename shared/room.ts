@@ -1,6 +1,8 @@
 /** Room identity helpers and participant metadata shared by client and Worker. */
 
 /**
+ * 6: adds `shape:diamond` / `shape:triangle` (same start/end row shape as
+ * rect; kind discriminator only).
  * 5: adds `shape:line` / `shape:ellipse` / `shape:arrow` (same start/end row
  * shape as rect; kind discriminator only).
  * 4: adds `shape:rect` / `kind: "rect"` committed ops (normalized start/end).
@@ -9,7 +11,7 @@
  * into a version 3 room would paint pixel values as fractions, so the bump is
  * what keeps the two coordinate spaces from meeting.
  */
-export const PROTOCOL_VERSION = 5 as const;
+export const PROTOCOL_VERSION = 6 as const;
 
 export const ROOM_ID_PATTERN = /^[a-z0-9]{8}$/;
 

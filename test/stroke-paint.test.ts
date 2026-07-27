@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   paintArrow,
+  paintDiamond,
   paintEllipse,
   paintLine,
   paintRect,
   paintStroke,
+  paintTriangle,
 } from "../client/src/canvas/stroke";
 
 function createRecordingContext(): CanvasRenderingContext2D & {
@@ -268,5 +270,28 @@ describe("shape paint geometry", () => {
     expect(ctx.fillSnapshots).toHaveLength(1);
     expect(ctx.fillSnapshots[0]!.fillStyle).toBe("#be123c");
     expect(ctx.closePath).toHaveBeenCalled();
+  });
+
+  it("paintDiamond connects midpoints of the bounding-box sides", () => {
+    const ctx = createRecordingContext();
+    paintDiamond(ctx, corners, space);
+    // corners: (20,25)-(80,75) → mid top (50,25), right (80,50), bottom (50,75), left (20,50)
+    expect(ctx.moveTo).toHaveBeenCalledWith(50, 25);
+    expect(ctx.lineTo).toHaveBeenCalledWith(80, 50);
+    expect(ctx.lineTo).toHaveBeenCalledWith(50, 75);
+    expect(ctx.lineTo).toHaveBeenCalledWith(20, 50);
+    expect(ctx.closePath).toHaveBeenCalled();
+    expect(ctx.strokeSnapshots).toHaveLength(1);
+  });
+
+  it("paintTriangle uses top-center apex and bottom-corner base", () => {
+    const ctx = createRecordingContext();
+    paintTriangle(ctx, corners, space);
+    // corners: (20,25)-(80,75) → apex (50,25), base (80,75) and (20,75)
+    expect(ctx.moveTo).toHaveBeenCalledWith(50, 25);
+    expect(ctx.lineTo).toHaveBeenCalledWith(80, 75);
+    expect(ctx.lineTo).toHaveBeenCalledWith(20, 75);
+    expect(ctx.closePath).toHaveBeenCalled();
+    expect(ctx.strokeSnapshots).toHaveLength(1);
   });
 });

@@ -19,13 +19,21 @@ export type DrawingTool = "brush" | "eraser";
  * Geometric shape kinds. All share the same durable row: normalized
  * `start`/`end`, colour, and width. Only the kind discriminator differs.
  */
-export type ShapeKind = "rect" | "line" | "ellipse" | "arrow";
+export type ShapeKind =
+  | "rect"
+  | "line"
+  | "ellipse"
+  | "arrow"
+  | "diamond"
+  | "triangle";
 
 export const SHAPE_KINDS: readonly ShapeKind[] = [
   "rect",
   "line",
   "ellipse",
   "arrow",
+  "diamond",
+  "triangle",
 ] as const;
 
 export function isShapeKind(value: unknown): value is ShapeKind {
@@ -33,7 +41,9 @@ export function isShapeKind(value: unknown): value is ShapeKind {
     value === "rect" ||
     value === "line" ||
     value === "ellipse" ||
-    value === "arrow"
+    value === "arrow" ||
+    value === "diamond" ||
+    value === "triangle"
   );
 }
 
@@ -148,9 +158,9 @@ export type ClientMessage =
     }
   | {
       /**
-       * Commit one finished shape (rect / line / ellipse / arrow). No live
-       * fan-out: the author renders a local preview while dragging; peers see
-       * the shape only after `operation:committed`.
+       * Commit one finished shape (rect / line / ellipse / arrow / diamond /
+       * triangle). No live fan-out: the author renders a local preview while
+       * dragging; peers see the shape only after `operation:committed`.
        */
       type: ShapeClientMessageType;
       protocolVersion: typeof PROTOCOL_VERSION;
@@ -319,6 +329,8 @@ export function parseClientMessage(value: unknown): ParseClientResult {
     case "shape:line":
     case "shape:ellipse":
     case "shape:arrow":
+    case "shape:diamond":
+    case "shape:triangle":
       return parseShapeCommit(record);
     case "cursor":
       return parseCursor(record);

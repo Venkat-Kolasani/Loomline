@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CommittedOperationStore } from "../client/src/canvas/committed-ops";
-import type { CommittedOperation } from "../shared/protocol";
+import { isShapeKind, type CommittedOperation } from "../shared/protocol";
 
 function op(sequence: number, strokeId: string): CommittedOperation {
   return {
@@ -34,12 +34,7 @@ function label(operation: CommittedOperation): string {
   if (operation.kind === "clear") {
     return "clear";
   }
-  if (
-    operation.kind === "rect" ||
-    operation.kind === "line" ||
-    operation.kind === "ellipse" ||
-    operation.kind === "arrow"
-  ) {
+  if (isShapeKind(operation.kind)) {
     return operation.shapeId;
   }
   return operation.strokeId;

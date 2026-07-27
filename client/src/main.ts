@@ -373,6 +373,8 @@ const SHAPE_ICON_SVG: Record<ShapeKind, string> = {
   line: `<svg viewBox="0 0 24 24" width="18" height="18" focusable="false"><path d="M5 19 L19 5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>`,
   ellipse: `<svg viewBox="0 0 24 24" width="18" height="18" focusable="false"><ellipse cx="12" cy="12" rx="8" ry="6" fill="none" stroke="currentColor" stroke-width="1.75"/></svg>`,
   arrow: `<svg viewBox="0 0 24 24" width="18" height="18" focusable="false"><path d="M5 19 L17 7" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M11 7 L17 7 L17 13" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  diamond: `<svg viewBox="0 0 24 24" width="18" height="18" focusable="false"><path d="M12 4 L20 12 L12 20 L4 12 Z" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="miter"/></svg>`,
+  triangle: `<svg viewBox="0 0 24 24" width="18" height="18" focusable="false"><path d="M12 5 L20 19 L4 19 Z" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="miter"/></svg>`,
 };
 
 const SHAPE_WIDTH_LABEL: Record<ShapeKind, string> = {
@@ -380,6 +382,8 @@ const SHAPE_WIDTH_LABEL: Record<ShapeKind, string> = {
   line: "Line width",
   ellipse: "Ellipse width",
   arrow: "Arrow width",
+  diamond: "Diamond width",
+  triangle: "Triangle width",
 };
 
 function syncShapeFlyoutSelection(kind: ShapeKind): void {

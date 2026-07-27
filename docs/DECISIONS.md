@@ -572,6 +572,31 @@ mobile toolbar).
 protocol parse tests per kind; paint geometry tests; manual two-tab proof for
 line / ellipse / arrow + undo.
 
+## D29 — Diamond and triangle extend the same shape row (flyout grid)
+
+**Problem.** Two more geometric tools (diamond, triangle) must collaborate and
+undo like rect / line / ellipse / arrow without inventing a second persistence
+model, live-frame path, or SQLite columns. The Shapes flyout also opened upward
+into the invite/share row on desktop (I22), and six icons in one row would make
+that panel too wide.
+
+**Selected.** `shape:diamond` / `shape:triangle` carry the same normalized
+`start`/`end`, colour, and width as earlier shapes (`PROTOCOL_VERSION` 6). Paint
+derives geometry from the bounding box only (diamond = side midpoints; triangle
+= top-center apex + bottom-corner base). Desktop flyout opens **down** toward
+the canvas; mobile keeps opening **up** into the stage. Flyout layout is a
+two-row 3-column icon grid. (D28 already covers line / ellipse / arrow at
+version 5.)
+
+**Rejected.** Freeform polygon / multi-click tools (different input model). Live
+fan-out of drag frames (same bandwidth/flicker reasons as D24/D28). New wire
+fields or SQLite columns. Optional star / double-headed arrow deferred until
+explicitly requested after this slice.
+
+**Verified.** `test/shape-ops.test.ts` two-client commit for diamond and
+triangle; protocol parse + paint geometry tests; flyout position checked at
+~1280 / 1440 / 1920 desktop widths and mobile; two-tab draw + undo.
+
 ## Deferred
 
 These remain intentionally unimplemented:

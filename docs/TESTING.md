@@ -137,6 +137,42 @@ Focused proof:
 2. Browser UI (`http://127.0.0.1:8792`): **Shapes** opens icon flyout
    (Rectangle / Line / Ellipse / Arrow), collapses on selection, trigger shows
    the active shape icon, width label switches (e.g. Line width).
+
+## Diamond / triangle + flyout position (2026-07-27)
+
+`PROTOCOL_VERSION` 6. `shape:diamond` / `shape:triangle` reuse the same
+bounding-box row as rect. Desktop Shapes flyout opens **down** toward the
+canvas (I22 / D29); mobile opens **up**. Flyout is a 3-column two-row grid.
+
+### Automated
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files 29 passed (29)
+→ Tests 135 passed (135)
+→ Vite production build exit 0
+```
+
+Focused proof:
+
+| Spec | Coverage |
+| --- | --- |
+| `test/protocol.test.ts` | parse accept for diamond / triangle |
+| `test/shape-ops.test.ts` | two-client commit for diamond / triangle |
+| `test/stroke-paint.test.ts` | diamond / triangle geometry |
+
+### Manual
+
+1. Two WS clients (`ws://127.0.0.1:8794`, room `diamtri1`, `PROTOCOL_VERSION` 6):
+   diamond seq 1 + triangle seq 2 matched on both sockets; undo left diamond;
+   `canRedo: true`; peer history matched.
+2. Browser UI (`http://127.0.0.1:8794/r/8522519f`): Shapes flyout shows six icons
+   in a 3×2 grid. CDP geometry:
+   - 1280×900 / 1440×900 / 1920×1080: `direction: down`, `overlapsShare: false`,
+     ~76px gap below share input.
+   - 390×844 (mobile MQ): `direction: up` into stage; share row not in floating
+     chrome (`overlapsShare: false`).
 3. Mobile / narrow width: Shapes trigger stays icon-only; flyout opens upward
    without widening the floating toolbar.
 

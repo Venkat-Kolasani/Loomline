@@ -98,6 +98,12 @@ export function paintShape(
     case "arrow":
       paintArrow(ctx, shape, space);
       return;
+    case "diamond":
+      paintDiamond(ctx, shape, space);
+      return;
+    case "triangle":
+      paintTriangle(ctx, shape, space);
+      return;
   }
 }
 
@@ -226,6 +232,72 @@ export function paintArrow(
   ctx.closePath();
   ctx.fill();
 
+  ctx.restore();
+}
+
+/**
+ * Rhombus connecting the midpoints of each side of the bounding box of
+ * normalized start/end.
+ */
+export function paintDiamond(
+  ctx: CanvasRenderingContext2D,
+  shape: Pick<ShapeGeometry, "color" | "width" | "start" | "end">,
+  space: CanvasSpace,
+): void {
+  const a = toCssPixelPoint(shape.start, space);
+  const b = toCssPixelPoint(shape.end, space);
+  const minX = Math.min(a.x, b.x);
+  const maxX = Math.max(a.x, b.x);
+  const minY = Math.min(a.y, b.y);
+  const maxY = Math.max(a.y, b.y);
+  const midX = (minX + maxX) / 2;
+  const midY = (minY + maxY) / 2;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.strokeStyle = shape.color;
+  ctx.lineWidth = shape.width;
+  ctx.lineJoin = "miter";
+  ctx.lineCap = "butt";
+  ctx.beginPath();
+  ctx.moveTo(midX, minY);
+  ctx.lineTo(maxX, midY);
+  ctx.lineTo(midX, maxY);
+  ctx.lineTo(minX, midY);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * Isosceles triangle inscribed in the bounding box: apex at top-center,
+ * base spanning the two bottom corners.
+ */
+export function paintTriangle(
+  ctx: CanvasRenderingContext2D,
+  shape: Pick<ShapeGeometry, "color" | "width" | "start" | "end">,
+  space: CanvasSpace,
+): void {
+  const a = toCssPixelPoint(shape.start, space);
+  const b = toCssPixelPoint(shape.end, space);
+  const minX = Math.min(a.x, b.x);
+  const maxX = Math.max(a.x, b.x);
+  const minY = Math.min(a.y, b.y);
+  const maxY = Math.max(a.y, b.y);
+  const midX = (minX + maxX) / 2;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.strokeStyle = shape.color;
+  ctx.lineWidth = shape.width;
+  ctx.lineJoin = "miter";
+  ctx.lineCap = "butt";
+  ctx.beginPath();
+  ctx.moveTo(midX, minY);
+  ctx.lineTo(maxX, maxY);
+  ctx.lineTo(minX, maxY);
+  ctx.closePath();
+  ctx.stroke();
   ctx.restore();
 }
 

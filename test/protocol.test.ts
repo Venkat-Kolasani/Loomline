@@ -182,6 +182,57 @@ describe("parseClientMessage", () => {
     });
   });
 
+  it("accepts shape:line with normalized endpoints", () => {
+    const result = parseClientMessage({
+      type: "shape:line",
+      protocolVersion: PROTOCOL_VERSION,
+      roomId: "abcd1234",
+      shapeId: "line-1",
+      color: "#1d4ed8",
+      width: 3,
+      start: { x: 0.1, y: 0.1 },
+      end: { x: 0.9, y: 0.9 },
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.message.type).toBe("shape:line");
+    }
+  });
+
+  it("accepts shape:ellipse with normalized bounding box", () => {
+    const result = parseClientMessage({
+      type: "shape:ellipse",
+      protocolVersion: PROTOCOL_VERSION,
+      roomId: "abcd1234",
+      shapeId: "ellipse-1",
+      color: "#be123c",
+      width: 4,
+      start: { x: 0.2, y: 0.2 },
+      end: { x: 0.8, y: 0.7 },
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.message.type).toBe("shape:ellipse");
+    }
+  });
+
+  it("accepts shape:arrow with normalized endpoints", () => {
+    const result = parseClientMessage({
+      type: "shape:arrow",
+      protocolVersion: PROTOCOL_VERSION,
+      roomId: "abcd1234",
+      shapeId: "arrow-1",
+      color: "#b45309",
+      width: 5,
+      start: { x: 0.15, y: 0.5 },
+      end: { x: 0.85, y: 0.5 },
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.message.type).toBe("shape:arrow");
+    }
+  });
+
   it("rejects shape:rect with invalid color", () => {
     const result = parseClientMessage({
       type: "shape:rect",

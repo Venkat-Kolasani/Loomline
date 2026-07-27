@@ -16,6 +16,45 @@ export const MAX_STROKE_WIDTH = 32;
 export type DrawingTool = "brush" | "eraser";
 
 /**
+ * Geometric shape kinds. All share the same durable row: normalized
+ * `start`/`end`, colour, and width. Only the kind discriminator differs.
+ */
+export type ShapeKind = "rect" | "line" | "ellipse" | "arrow";
+
+export const SHAPE_KINDS: readonly ShapeKind[] = [
+  "rect",
+  "line",
+  "ellipse",
+  "arrow",
+] as const;
+
+export function isShapeKind(value: unknown): value is ShapeKind {
+  return (
+    value === "rect" ||
+    value === "line" ||
+    value === "ellipse" ||
+    value === "arrow"
+  );
+}
+
+/** Client → server message type for a finished shape commit. */
+export type ShapeClientMessageType = `shape:${ShapeKind}`;
+
+export function shapeMessageType(kind: ShapeKind): ShapeClientMessageType {
+  return `shape:${kind}`;
+}
+
+export function shapeKindFromMessageType(
+  type: string,
+): ShapeKind | null {
+  if (!type.startsWith("shape:")) {
+    return null;
+  }
+  const kind = type.slice("shape:".length);
+  return isShapeKind(kind) ? kind : null;
+}
+
+/**
  * Normalized canvas coordinate: `x` is a fraction of the canvas width and `y`
  * a fraction of its height (`0`–`1` inside the box). Points are resolution and
  * aspect independent so a persisted operation replays correctly on any canvas
@@ -47,11 +86,12 @@ export interface CommittedStrokeOperation extends CommittedOperationBase {
 }
 
 /**
- * One durable axis-aligned rectangle. Geometry is two normalized corners
- * (drag start / drag end), not a freehand point list.
+ * One durable geometric shape. Geometry is two normalized corners
+ * (drag start / drag end), not a freehand point list. Arrowhead angle is
+ * derived at paint time from start→end — not stored.
  */
-export interface CommittedRectOperation extends CommittedOperationBase {
-  kind: "rect";
+export interface CommittedShapeOperation extends CommittedOperationBase {
+  kind: ShapeKind;
   shapeId: string;
   color: string;
   width: number;
@@ -66,8 +106,14 @@ export interface CommittedClearOperation extends CommittedOperationBase {
 
 export type CommittedOperation =
   | CommittedStrokeOperation
-  | CommittedRectOperation
+  | CommittedShapeOperation
   | CommittedClearOperation;
+
+export function isShapeOperation(
+  op: CommittedOperation,
+): op is CommittedShapeOperation {
+  return isShapeKind(op.kind);
+}
 
 export type ClientMessage =
   | {
@@ -102,11 +148,11 @@ export type ClientMessage =
     }
   | {
       /**
-       * Commit one finished rectangle. No live fan-out: the author renders a
-       * local preview while dragging; peers see the shape only after
-       * `operation:committed`.
+       * Commit one finished shape (rect / line / ellipse / arrow). No live
+       * fan-out: the author renders a local preview while dragging; peers see
+       * the shape only after `operation:committed`.
        */
-      type: "shape:rect";
+      type: ShapeClientMessageType;
       protocolVersion: typeof PROTOCOL_VERSION;
       roomId: string;
       shapeId: string;
@@ -270,7 +316,10 @@ export function parseClientMessage(value: unknown): ParseClientResult {
     case "stroke:end":
       return parseStrokeEnd(record);
     case "shape:rect":
-      return parseShapeRect(record);
+    case "shape:line":
+    case "shape:ellipse":
+    case "shape:arrow":
+      return parseShapeCommit(record);
     case "cursor":
       return parseCursor(record);
     case "canvas:clear":
@@ -446,7 +495,15 @@ function parseStrokeEnd(
   };
 }
 
-function parseShapeRect(record: Record<string, unknown>): ParseClientResult {
+function parseShapeCommit(record: Record<string, unknown>): ParseClientResult {
+  const kind = shapeKindFromMessageType(String(record.type));
+  if (!kind) {
+    return {
+      ok: false,
+      code: "unsupported_type",
+      message: `Unsupported message type: ${String(record.type)}`,
+    };
+  }
   const shapeId = parseStrokeId(record.shapeId);
   if (!shapeId.ok) {
     return {
@@ -485,7 +542,7 @@ function parseShapeRect(record: Record<string, unknown>): ParseClientResult {
   return {
     ok: true,
     message: {
-      type: "shape:rect",
+      type: shapeMessageType(kind),
       protocolVersion: PROTOCOL_VERSION,
       roomId: record.roomId as string,
       shapeId: shapeId.value,

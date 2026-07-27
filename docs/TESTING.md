@@ -71,6 +71,43 @@ Empty-state uses CSS `::before` (no selectable DOM text). Canvas
 `touchstart`/`touchmove` are non-passive + `preventDefault`; `selectstart`
 blocked on the stage. Deployed so phone/iPad Safari pick up the fix.
 
+## Line / ellipse / arrow shapes (2026-07-27)
+
+`PROTOCOL_VERSION` 5. `shape:line` / `shape:ellipse` / `shape:arrow` reuse the
+rect row shape (`start`/`end`/colour/width); only `operation_type` differs.
+Drag preview is local only. D28.
+
+### Automated
+
+```text
+npm run typecheck && npm run test && npm run build
+→ typecheck exit 0
+→ Test Files 29 passed (29)
+→ Tests 129 passed (129)
+→ Vite production build exit 0
+```
+
+Focused proof:
+
+| Spec | Coverage |
+| --- | --- |
+| `test/protocol.test.ts` | parse accept for each new kind |
+| `test/shape-ops.test.ts` | two-client commit per kind + line undo |
+| `test/stroke-paint.test.ts` | line / ellipse / arrow geometry |
+
+### Manual
+
+1. Two tabs / two WS clients in one room: draw **line**, **ellipse**, and **arrow**
+   from the Shapes flyout — peer sees each only after pointer-up; both canvases
+   match. Live local proof (`ws://127.0.0.1:8792`, room `shapdemo`,
+   `PROTOCOL_VERSION` 5): sequences 1–3 equal on both sockets; undo removed
+   arrow; both remaining ops matched; `canRedo: true`.
+2. Browser UI (`http://127.0.0.1:8792`): **Shapes** opens icon flyout
+   (Rectangle / Line / Ellipse / Arrow), collapses on selection, trigger shows
+   the active shape icon, width label switches (e.g. Line width).
+3. Mobile / narrow width: Shapes trigger stays icon-only; flyout opens upward
+   without widening the floating toolbar.
+
 ## Rectangle shape tool (2026-07-26)
 
 `PROTOCOL_VERSION` 4. `shape:rect` commits one durable `kind: "rect"` op with

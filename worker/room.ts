@@ -2,6 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import {
   MAX_DISPLAY_NAME_LENGTH,
   parseClientMessage,
+  shapeKindFromMessageType,
   type ClientMessage,
   type CommittedOperation,
   type ServerMessage,
@@ -345,6 +346,9 @@ export class RoomDurableObject extends DurableObject<Env> {
       case "stroke:points":
       case "stroke:end":
       case "shape:rect":
+      case "shape:line":
+      case "shape:ellipse":
+      case "shape:arrow":
       case "cursor":
       case "canvas:clear":
       case "history:undo":
@@ -487,7 +491,10 @@ export class RoomDurableObject extends DurableObject<Env> {
         this.handleStrokeEnd(ws, attachment, message, roomId);
         return;
       case "shape:rect":
-        this.handleShapeRect(attachment, message, roomId);
+      case "shape:line":
+      case "shape:ellipse":
+      case "shape:arrow":
+        this.handleShapeCommit(attachment, message, roomId);
         return;
       case "cursor":
         this.broadcastExcept(ws, {
@@ -669,17 +676,30 @@ export class RoomDurableObject extends DurableObject<Env> {
   }
 
   /**
-   * Commit one finished rectangle as a durable op. No live fan-out — peers
-   * only see the shape after operation:committed (same append-only log as strokes).
+   * Commit one finished shape as a durable op. No live fan-out — peers only
+   * see the shape after operation:committed (same append-only log as strokes).
    */
-  private handleShapeRect(
+  private handleShapeCommit(
     attachment: SocketAttachment,
-    message: Extract<ClientMessage, { type: "shape:rect" }>,
+    message: Extract<
+      ClientMessage,
+      {
+        type:
+          | "shape:rect"
+          | "shape:line"
+          | "shape:ellipse"
+          | "shape:arrow";
+      }
+    >,
     roomId: string,
   ): void {
+    const kind = shapeKindFromMessageType(message.type);
+    if (!kind) {
+      return;
+    }
     clearRedoBranch(this.ctx.storage.sql);
     const stored: StoredOperation = {
-      kind: "rect",
+      kind,
       sequence: nextSequence(this.ctx.storage.sql),
       opId: crypto.randomUUID(),
       participantId: attachment.participantId,
@@ -1025,25 +1045,25 @@ function toCommitted(op: StoredOperation): CommittedOperation {
       kind: "clear",
     };
   }
-  if (op.kind === "rect") {
+  if (op.kind === "stroke") {
     return {
       ...base,
-      kind: "rect",
-      shapeId: op.shapeId,
+      kind: "stroke",
+      strokeId: op.strokeId,
+      tool: op.tool,
       color: op.color,
       width: op.width,
-      start: op.start,
-      end: op.end,
+      points: op.points,
     };
   }
   return {
     ...base,
-    kind: "stroke",
-    strokeId: op.strokeId,
-    tool: op.tool,
+    kind: op.kind,
+    shapeId: op.shapeId,
     color: op.color,
     width: op.width,
-    points: op.points,
+    start: op.start,
+    end: op.end,
   };
 }
 

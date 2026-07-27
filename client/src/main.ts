@@ -3,6 +3,7 @@ import { LayeredCanvasSurface } from "./canvas/layers";
 import { LocalDrawingController } from "./canvas/local-drawing";
 import { RemoteStrokeStore } from "./canvas/remote-strokes";
 import type { ActiveTool } from "./canvas/stroke";
+import { isShapeTool } from "./canvas/stroke";
 import {
   createToolSettings,
   widthForTool,
@@ -26,7 +27,12 @@ import { latestLivePoint, RemoteCursorLayer } from "./net/remote-cursors";
 import { RoomSocket } from "./net/room-socket";
 import type { Participant } from "../../shared/room";
 import { createRoomId, isValidRoomId } from "../../shared/room";
-import type { StrokePoint } from "../../shared/protocol";
+import {
+  isShapeKind,
+  isShapeOperation,
+  type ShapeKind,
+  type StrokePoint,
+} from "../../shared/protocol";
 
 function requireElement<T extends Element>(
   selector: string,
@@ -158,9 +164,20 @@ const eraserButton = requireElement(
   "#tool-eraser",
   (node): node is HTMLButtonElement => node instanceof HTMLButtonElement,
 );
-const rectButton = requireElement(
-  "#tool-rect",
+const shapesTrigger = requireElement(
+  "#tool-shapes",
   (node): node is HTMLButtonElement => node instanceof HTMLButtonElement,
+);
+const shapeFlyout = requireElement(
+  "#shape-flyout",
+  (node): node is HTMLElement => node instanceof HTMLElement,
+);
+const shapeToolIcon = requireElement(
+  "#shape-tool-icon",
+  (node): node is HTMLElement => node instanceof HTMLElement,
+);
+const shapeFlyoutItems = Array.from(
+  document.querySelectorAll<HTMLButtonElement>("[data-shape]"),
 );
 const colorInput = requireElement(
   "#tool-color",
@@ -221,6 +238,8 @@ let toolSettings: ToolSettings = createToolSettings(
   Number(widthInput.value) || 4,
   12,
 );
+/** Last shape chosen from the flyout; R / trigger reuses this kind. */
+let activeShapeKind: ShapeKind = "rect";
 let drawing!: LocalDrawingController;
 let roomSocket: RoomSocket | null = null;
 let selfParticipant: Participant | null = null;
@@ -331,17 +350,64 @@ function closeRoomChrome(): void {
   setRoomChromeOpen(false);
 }
 
+function closeShapeFlyout(): void {
+  shapeFlyout.hidden = true;
+  shapesTrigger.setAttribute("aria-expanded", "false");
+}
+
+function openShapeFlyout(): void {
+  shapeFlyout.hidden = false;
+  shapesTrigger.setAttribute("aria-expanded", "true");
+}
+
+function setShapeFlyoutOpen(open: boolean): void {
+  if (open) {
+    openShapeFlyout();
+  } else {
+    closeShapeFlyout();
+  }
+}
+
+const SHAPE_ICON_SVG: Record<ShapeKind, string> = {
+  rect: `<svg viewBox="0 0 24 24" width="18" height="18" focusable="false"><rect x="5" y="6" width="14" height="12" fill="none" stroke="currentColor" stroke-width="1.75"/></svg>`,
+  line: `<svg viewBox="0 0 24 24" width="18" height="18" focusable="false"><path d="M5 19 L19 5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>`,
+  ellipse: `<svg viewBox="0 0 24 24" width="18" height="18" focusable="false"><ellipse cx="12" cy="12" rx="8" ry="6" fill="none" stroke="currentColor" stroke-width="1.75"/></svg>`,
+  arrow: `<svg viewBox="0 0 24 24" width="18" height="18" focusable="false"><path d="M5 19 L17 7" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/><path d="M11 7 L17 7 L17 13" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+};
+
+const SHAPE_WIDTH_LABEL: Record<ShapeKind, string> = {
+  rect: "Rectangle width",
+  line: "Line width",
+  ellipse: "Ellipse width",
+  arrow: "Arrow width",
+};
+
+function syncShapeFlyoutSelection(kind: ShapeKind): void {
+  activeShapeKind = kind;
+  shapeToolIcon.innerHTML = SHAPE_ICON_SVG[kind];
+  for (const item of shapeFlyoutItems) {
+    const itemKind = item.dataset.shape;
+    const isActive = itemKind === kind;
+    item.classList.toggle("is-active", isActive);
+    item.setAttribute("aria-checked", isActive ? "true" : "false");
+  }
+}
+
 function setActiveTool(tool: ActiveTool): void {
   drawing.setTool(tool);
+  const shapeActive = isShapeTool(tool);
   brushButton.setAttribute("aria-pressed", tool === "brush" ? "true" : "false");
   eraserButton.setAttribute(
     "aria-pressed",
     tool === "eraser" ? "true" : "false",
   );
-  rectButton.setAttribute("aria-pressed", tool === "rect" ? "true" : "false");
+  shapesTrigger.setAttribute("aria-pressed", shapeActive ? "true" : "false");
   brushButton.classList.toggle("is-active", tool === "brush");
   eraserButton.classList.toggle("is-active", tool === "eraser");
-  rectButton.classList.toggle("is-active", tool === "rect");
+  shapesTrigger.classList.toggle("is-active", shapeActive);
+  if (shapeActive) {
+    syncShapeFlyoutSelection(tool);
+  }
   colorInput.disabled = tool === "eraser";
   colorInput.setAttribute("aria-disabled", tool === "eraser" ? "true" : "false");
   for (const swatch of colorSwatchButtons) {
@@ -389,8 +455,9 @@ function syncWidthControls(): void {
     syncEraserSizePresets(width);
     return;
   }
-  widthLabel.textContent =
-    tool === "rect" ? "Rectangle width" : "Brush width";
+  widthLabel.textContent = isShapeTool(tool)
+    ? SHAPE_WIDTH_LABEL[tool]
+    : "Brush width";
   widthValue.textContent = `${width}px`;
 }
 
@@ -604,11 +671,11 @@ function wireDrawingNetwork(socket: RoomSocket): void {
       }
       return transport.onStrokeEnd(strokeId, point);
     },
-    onShapeRect: (event) => {
+    onShapeCommit: (event) => {
       if (roomSocket !== socket || !socket.isReady()) {
         return false;
       }
-      socket.sendShapeRect(event);
+      socket.sendShapeCommit(event);
       return true;
     },
     onCursor: (point) => {
@@ -805,10 +872,10 @@ function enterRoom(roomId: string, displayName: string): void {
         }
       }
       if (
-        operation.kind === "rect" &&
+        isShapeOperation(operation) &&
         (applied || committedOps.hasShapeId(operation.shapeId))
       ) {
-        drawing.acknowledgeRectCommitted(operation.shapeId);
+        drawing.acknowledgeShapeCommitted(operation.shapeId);
       }
       updateEmptyState();
     },
@@ -942,16 +1009,56 @@ copyRoomLinkButton.addEventListener("click", async () => {
 });
 
 brushButton.addEventListener("click", () => {
+  closeShapeFlyout();
   setActiveTool("brush");
 });
 
 eraserButton.addEventListener("click", () => {
+  closeShapeFlyout();
   setActiveTool("eraser");
 });
 
-rectButton.addEventListener("click", () => {
-  setActiveTool("rect");
+shapesTrigger.addEventListener("click", () => {
+  const open = shapeFlyout.hidden;
+  if (open) {
+    setActiveTool(activeShapeKind);
+    openShapeFlyout();
+  } else {
+    closeShapeFlyout();
+  }
 });
+
+for (const item of shapeFlyoutItems) {
+  item.addEventListener("click", () => {
+    const kind = item.dataset.shape;
+    if (!isShapeKind(kind)) {
+      return;
+    }
+    setActiveTool(kind);
+    closeShapeFlyout();
+  });
+}
+
+document.addEventListener(
+  "pointerdown",
+  (event) => {
+    if (shapeFlyout.hidden) {
+      return;
+    }
+    const target = event.target;
+    if (!(target instanceof Node)) {
+      return;
+    }
+    if (
+      shapesTrigger.contains(target) ||
+      shapeFlyout.contains(target)
+    ) {
+      return;
+    }
+    closeShapeFlyout();
+  },
+  true,
+);
 
 colorInput.addEventListener("input", () => {
   setBrushColor(colorInput.value);
@@ -1032,18 +1139,24 @@ window.addEventListener("keydown", (event) => {
   const key = event.key.toLowerCase();
   if (key === "b" && !event.metaKey && !event.ctrlKey && !event.altKey) {
     event.preventDefault();
+    closeShapeFlyout();
     setActiveTool("brush");
     return;
   }
   if (key === "e" && !event.metaKey && !event.ctrlKey && !event.altKey) {
     event.preventDefault();
+    closeShapeFlyout();
     setActiveTool("eraser");
     return;
   }
   if (key === "r" && !event.metaKey && !event.ctrlKey && !event.altKey) {
     event.preventDefault();
-    setActiveTool("rect");
+    setActiveTool(activeShapeKind);
+    setShapeFlyoutOpen(Boolean(shapeFlyout.hidden));
     return;
+  }
+  if (key === "escape") {
+    closeShapeFlyout();
   }
 
   const modifier = event.metaKey || event.ctrlKey;

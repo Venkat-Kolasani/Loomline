@@ -1,6 +1,9 @@
-import type { CommittedOperation } from "../../../shared/protocol";
+import {
+  isShapeOperation,
+  type CommittedOperation,
+} from "../../../shared/protocol";
 import type { CanvasSpace } from "./normalized-coords";
-import { paintRect, paintStroke, type Stroke } from "./stroke";
+import { paintShape, paintStroke, type Stroke } from "./stroke";
 
 /**
  * Server-authoritative committed operations, keyed by sequence.
@@ -81,7 +84,7 @@ export class CommittedOperationStore {
 
   hasShapeId(shapeId: string): boolean {
     for (const op of this.bySequence.values()) {
-      if (op.kind === "rect" && op.shapeId === shapeId) {
+      if (isShapeOperation(op) && op.shapeId === shapeId) {
         return true;
       }
     }
@@ -98,10 +101,11 @@ export class CommittedOperationStore {
         ctx.restore();
         continue;
       }
-      if (op.kind === "rect") {
-        paintRect(
+      if (isShapeOperation(op)) {
+        paintShape(
           ctx,
           {
+            kind: op.kind,
             color: op.color,
             width: op.width,
             start: op.start,

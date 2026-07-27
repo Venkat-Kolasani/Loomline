@@ -1,9 +1,14 @@
 /**
  * Durable room operation records and SQLite helpers for RoomDurableObject.
- * One row per committed stroke/rect/clear; sequence is the authoritative order key.
+ * One row per committed stroke/shape/clear; sequence is the authoritative order key.
  */
 
-import type { DrawingTool, StrokePoint } from "../shared/protocol";
+import {
+  isShapeKind,
+  type DrawingTool,
+  type ShapeKind,
+  type StrokePoint,
+} from "../shared/protocol";
 
 interface StoredOperationBase {
   sequence: number;
@@ -21,8 +26,8 @@ export interface StoredStrokeOperation extends StoredOperationBase {
   points: StrokePoint[];
 }
 
-export interface StoredRectOperation extends StoredOperationBase {
-  kind: "rect";
+export interface StoredShapeOperation extends StoredOperationBase {
+  kind: ShapeKind;
   shapeId: string;
   color: string;
   width: number;
@@ -36,10 +41,10 @@ export interface StoredClearOperation extends StoredOperationBase {
 
 export type StoredOperation =
   | StoredStrokeOperation
-  | StoredRectOperation
+  | StoredShapeOperation
   | StoredClearOperation;
 
-interface RectGeometryJson {
+interface ShapeGeometryJson {
   start: StrokePoint;
   end: StrokePoint;
 }
@@ -93,15 +98,16 @@ export function insertOperation(sql: SqlStorage, op: StoredOperation): void {
     color = op.color;
     width = op.width;
     pointsJson = JSON.stringify(op.points);
-  } else if (op.kind === "rect") {
-    // Reuse stroke_id for shapeId; points_json holds { start, end }.
+  } else if (op.kind !== "clear") {
+    // Shape kinds: reuse stroke_id for shapeId; points_json holds { start, end }.
+    // No new columns — kind lives in operation_type only.
     strokeId = op.shapeId;
     color = op.color;
     width = op.width;
     pointsJson = JSON.stringify({
       start: op.start,
       end: op.end,
-    } satisfies RectGeometryJson);
+    } satisfies ShapeGeometryJson);
   }
 
   sql.exec(
@@ -148,11 +154,11 @@ export function listOperations(sql: SqlStorage): StoredOperation[] {
     if (row.operation_type === "clear") {
       return { ...base, kind: "clear" };
     }
-    if (row.operation_type === "rect") {
-      const geometry = JSON.parse(row.points_json) as RectGeometryJson;
+    if (isShapeKind(row.operation_type)) {
+      const geometry = JSON.parse(row.points_json) as ShapeGeometryJson;
       return {
         ...base,
-        kind: "rect",
+        kind: row.operation_type,
         shapeId: row.stroke_id,
         color: row.color,
         width: row.width,

@@ -1,4 +1,4 @@
-import type { StrokePoint } from "../../../shared/protocol";
+import type { ShapeKind, StrokePoint } from "../../../shared/protocol";
 import { clientToCssPoint } from "./sizing";
 import {
   toNormalizedPoint,
@@ -7,11 +7,12 @@ import {
 } from "./normalized-coords";
 import { appendFilteredPoint, type Point } from "./points";
 import {
-  paintRect,
+  isShapeTool,
+  paintShape,
   paintStroke,
   type ActiveTool,
   type DrawingTool,
-  type RectShape,
+  type ShapeGeometry,
   type Stroke,
 } from "./stroke";
 import type { LayeredCanvasSurface } from "./layers";
@@ -25,7 +26,8 @@ export interface LocalStrokeStartEvent {
   point: StrokePoint;
 }
 
-export interface LocalRectCommitEvent {
+export interface LocalShapeCommitEvent {
+  kind: ShapeKind;
   shapeId: string;
   color: string;
   width: number;
@@ -39,10 +41,10 @@ export interface LocalDrawingNetworkHooks {
   /** Return true when the server will emit operation:committed for this stroke. */
   onStrokeEnd: (strokeId: string, point?: StrokePoint) => boolean;
   /**
-   * Commit one finished rectangle. Return true when the server will emit
+   * Commit one finished shape. Return true when the server will emit
    * operation:committed (keeps a local provisional until then).
    */
-  onShapeRect: (event: LocalRectCommitEvent) => boolean;
+  onShapeCommit: (event: LocalShapeCommitEvent) => boolean;
   onCursor: (point: StrokePoint) => void;
 }
 
@@ -58,7 +60,7 @@ interface ActiveStroke extends Stroke {
   strokeId: string;
 }
 
-interface ActiveRect extends RectShape {
+interface ActiveShape extends ShapeGeometry {
   shapeId: string;
 }
 
@@ -66,7 +68,7 @@ interface ActiveRect extends RectShape {
  * Local pointer drawing. Brush waits on the live layer until committed.
  * Eraser punches through on the committed view while provisional (active /
  * awaiting-commit), then the store owns the hole after acknowledge.
- * Rectangle drag is local-preview only until pointer-up commits one op.
+ * Shape drag is local-preview only until pointer-up commits one op.
  */
 export class LocalDrawingController {
   private readonly surface: LayeredCanvasSurface;
@@ -77,9 +79,9 @@ export class LocalDrawingController {
 
   /** Own strokes ended locally but not yet confirmed by the server. */
   private awaitingCommit: ActiveStroke[] = [];
-  private awaitingRectCommit: ActiveRect[] = [];
+  private awaitingShapeCommit: ActiveShape[] = [];
   private active: ActiveStroke | null = null;
-  private activeRect: ActiveRect | null = null;
+  private activeShape: ActiveShape | null = null;
   private drawing = false;
   private activePointerId: number | null = null;
 
@@ -124,7 +126,7 @@ export class LocalDrawingController {
     return this.width;
   }
 
-  /** Brush + rect live overlay (eraser paints on the committed pass). */
+  /** Brush + shape live overlay (eraser paints on the committed pass). */
   paintLiveBrush(ctx: CanvasRenderingContext2D, space: CanvasSpace): void {
     for (const stroke of this.awaitingCommit) {
       if (stroke.tool === "brush") {
@@ -134,11 +136,11 @@ export class LocalDrawingController {
     if (this.active?.tool === "brush") {
       paintStroke(ctx, this.active, space, "preview");
     }
-    for (const rect of this.awaitingRectCommit) {
-      paintRect(ctx, rect, space);
+    for (const shape of this.awaitingShapeCommit) {
+      paintShape(ctx, shape, space);
     }
-    if (this.activeRect) {
-      paintRect(ctx, this.activeRect, space);
+    if (this.activeShape) {
+      paintShape(ctx, this.activeShape, space);
     }
   }
 
@@ -214,14 +216,14 @@ export class LocalDrawingController {
     return true;
   }
 
-  /** Drop a locally ended rectangle once the server has committed it. */
-  acknowledgeRectCommitted(shapeId: string): boolean {
-    const removed = this.awaitingRectCommit.find((r) => r.shapeId === shapeId);
+  /** Drop a locally ended shape once the server has committed it. */
+  acknowledgeShapeCommitted(shapeId: string): boolean {
+    const removed = this.awaitingShapeCommit.find((s) => s.shapeId === shapeId);
     if (!removed) {
       return false;
     }
-    this.awaitingRectCommit = this.awaitingRectCommit.filter(
-      (rect) => rect.shapeId !== shapeId,
+    this.awaitingShapeCommit = this.awaitingShapeCommit.filter(
+      (shape) => shape.shapeId !== shapeId,
     );
     this.surface.markDirty("live");
     this.notify();
@@ -231,18 +233,18 @@ export class LocalDrawingController {
   /** Drop awaiting-commit ink (history/sync replaces the committed view). */
   dropAwaitingCommit(): void {
     const hadStroke = this.awaitingCommit.length > 0;
-    const hadRect = this.awaitingRectCommit.length > 0;
-    if (!hadStroke && !hadRect) {
+    const hadShape = this.awaitingShapeCommit.length > 0;
+    if (!hadStroke && !hadShape) {
       return;
     }
     const hadEraser = this.awaitingCommit.some((s) => s.tool === "eraser");
     const hadBrush = this.awaitingCommit.some((s) => s.tool === "brush");
     this.awaitingCommit = [];
-    this.awaitingRectCommit = [];
+    this.awaitingShapeCommit = [];
     if (hadEraser) {
       this.surface.markDirty("committed");
     }
-    if (hadBrush || hadRect) {
+    if (hadBrush || hadShape) {
       this.surface.markDirty("live");
     }
     this.notify();
@@ -250,9 +252,9 @@ export class LocalDrawingController {
 
   clearLocal(): void {
     this.awaitingCommit = [];
-    this.awaitingRectCommit = [];
+    this.awaitingShapeCommit = [];
     this.active = null;
-    this.activeRect = null;
+    this.activeShape = null;
     this.drawing = false;
     this.activePointerId = null;
     this.surface.markAllDirty();
@@ -270,9 +272,9 @@ export class LocalDrawingController {
   hasInk(): boolean {
     return (
       this.awaitingCommit.length > 0 ||
-      this.awaitingRectCommit.length > 0 ||
+      this.awaitingShapeCommit.length > 0 ||
       this.active !== null ||
-      this.activeRect !== null
+      this.activeShape !== null
     );
   }
 
@@ -307,9 +309,10 @@ export class LocalDrawingController {
 
     const { point } = this.samplePointer(event);
 
-    if (this.tool === "rect") {
+    if (isShapeTool(this.tool)) {
       const shapeId = crypto.randomUUID();
-      this.activeRect = {
+      this.activeShape = {
+        kind: this.tool,
         shapeId,
         color: this.color,
         width: this.width,
@@ -357,9 +360,9 @@ export class LocalDrawingController {
     event.preventDefault();
     clearDomSelection();
 
-    if (this.activeRect) {
-      // Local preview only — no network frames while dragging a rectangle.
-      this.activeRect = { ...this.activeRect, end: point };
+    if (this.activeShape) {
+      // Local preview only — no network frames while dragging a shape.
+      this.activeShape = { ...this.activeShape, end: point };
       this.surface.markDirty("live");
       return;
     }
@@ -418,16 +421,16 @@ export class LocalDrawingController {
       // Ignore release failures when capture was never held.
     }
 
-    if (this.activeRect) {
-      this.finishRect(endEvent);
+    if (this.activeShape) {
+      this.finishShape(endEvent);
       return;
     }
 
     this.finishStroke(endEvent);
   }
 
-  private finishRect(endEvent?: PointerEvent): void {
-    const active = this.activeRect;
+  private finishShape(endEvent?: PointerEvent): void {
+    const active = this.activeShape;
     if (active && endEvent) {
       const { point } = this.samplePointer(endEvent);
       active.end = point;
@@ -435,7 +438,8 @@ export class LocalDrawingController {
 
     if (active) {
       const willCommit =
-        this.network?.onShapeRect({
+        this.network?.onShapeCommit({
+          kind: active.kind,
           shapeId: active.shapeId,
           color: active.color,
           width: active.width,
@@ -443,11 +447,11 @@ export class LocalDrawingController {
           end: active.end,
         }) ?? false;
       if (willCommit) {
-        this.awaitingRectCommit = [...this.awaitingRectCommit, active];
+        this.awaitingShapeCommit = [...this.awaitingShapeCommit, active];
       }
     }
 
-    this.activeRect = null;
+    this.activeShape = null;
     this.drawing = false;
     this.activePointerId = null;
     this.surface.markDirty("live");
@@ -479,7 +483,8 @@ export class LocalDrawingController {
       // If start never reached the server, drop live ink with the stroke end.
     }
 
-    const tool = active?.tool ?? (this.tool === "rect" ? "brush" : this.tool);
+    const tool =
+      active?.tool ?? (isShapeTool(this.tool) ? "brush" : this.tool);
     this.active = null;
     this.drawing = false;
     this.activePointerId = null;

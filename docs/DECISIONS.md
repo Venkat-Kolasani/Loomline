@@ -549,6 +549,29 @@ separate shape store or CRDT (overkill vs the existing sequenced log).
 **Verified.** `test/shape-rect.test.ts` two-client commit + undo; protocol parse
 tests; manual two-tab draw/undo.
 
+## D28 — Line, ellipse, and arrow reuse the rect shape mechanism
+
+**Problem.** Additional geometric tools must collaborate and undo like rect
+without inventing a second persistence model or live-frame path.
+
+**Selected.** `shape:line` / `shape:ellipse` / `shape:arrow` carry the same
+normalized `start`/`end`, colour, and width as rect. Drag preview stays local;
+pointer-up commits one durable row whose `operation_type` is the kind
+discriminator only (no new SQLite columns). Arrowhead angle is derived at paint
+time from the start→end vector. Toolbar uses one collapsed-by-default Shapes
+flyout (Room sheet / Metrics dock pattern) so the mobile floating bar width
+does not grow (`PROTOCOL_VERSION` 5).
+
+**Rejected.** A freeform polygon or multi-click triangle tool (different input
+model and time budget for this slice). Live fan-out of drag frames (same
+bandwidth/flicker reasons as D24). Separate shape store or CRDT (overkill vs
+the sequenced log). Four standalone toolbar buttons (would widen the floating
+mobile toolbar).
+
+**Verified.** `test/shape-ops.test.ts` two-client commit per kind + line undo;
+protocol parse tests per kind; paint geometry tests; manual two-tab proof for
+line / ellipse / arrow + undo.
+
 ## Deferred
 
 These remain intentionally unimplemented:

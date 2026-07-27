@@ -5,9 +5,11 @@
 
 import {
   PROTOCOL_VERSION,
+  shapeMessageType,
   type ClientMessage,
   type CommittedOperation,
   type ServerMessage,
+  type ShapeKind,
   type StrokePoint,
 } from "../../../shared/protocol";
 import type { Participant } from "../../../shared/room";
@@ -145,19 +147,21 @@ export class RoomSocket {
     });
   }
 
-  /** One durable rectangle; no intermediate live frames. */
-  sendShapeRect(payload: {
+  /** One durable shape; no intermediate live frames. */
+  sendShapeCommit(payload: {
+    kind: ShapeKind;
     shapeId: string;
     color: string;
     width: number;
     start: StrokePoint;
     end: StrokePoint;
   }): void {
+    const { kind, ...fields } = payload;
     this.send({
-      type: "shape:rect",
+      type: shapeMessageType(kind),
       protocolVersion: PROTOCOL_VERSION,
       roomId: this.roomId,
-      ...payload,
+      ...fields,
     });
   }
 

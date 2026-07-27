@@ -34,7 +34,12 @@ function label(operation: CommittedOperation): string {
   if (operation.kind === "clear") {
     return "clear";
   }
-  if (operation.kind === "rect") {
+  if (
+    operation.kind === "rect" ||
+    operation.kind === "line" ||
+    operation.kind === "ellipse" ||
+    operation.kind === "arrow"
+  ) {
     return operation.shapeId;
   }
   return operation.strokeId;

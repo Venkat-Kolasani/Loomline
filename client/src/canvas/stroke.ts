@@ -1,9 +1,11 @@
+import type { ShapeKind } from "../../../shared/protocol";
+import { isShapeKind } from "../../../shared/protocol";
 import type { Point } from "./points";
 import { toCssPixelPoint, type CanvasSpace } from "./normalized-coords";
 
 export type DrawingTool = "brush" | "eraser";
-/** Toolbar selection: freehand tools plus axis-aligned rectangle. */
-export type ActiveTool = DrawingTool | "rect";
+/** Toolbar selection: freehand tools plus geometric shapes. */
+export type ActiveTool = DrawingTool | ShapeKind;
 
 export interface Stroke {
   tool: DrawingTool;
@@ -13,11 +15,19 @@ export interface Stroke {
   points: Point[];
 }
 
-export interface RectShape {
+export interface ShapeGeometry {
+  kind: ShapeKind;
   color: string;
   width: number;
   start: Point;
   end: Point;
+}
+
+/** @deprecated Prefer ShapeGeometry; rect-era name kept for call-site clarity. */
+export type RectShape = Omit<ShapeGeometry, "kind"> & { kind?: "rect" };
+
+export function isShapeTool(tool: ActiveTool): tool is ShapeKind {
+  return isShapeKind(tool);
 }
 
 /**
@@ -69,10 +79,32 @@ export function paintStroke(
   ctx.restore();
 }
 
+/** Dispatch paint for any geometric shape kind. */
+export function paintShape(
+  ctx: CanvasRenderingContext2D,
+  shape: ShapeGeometry,
+  space: CanvasSpace,
+): void {
+  switch (shape.kind) {
+    case "rect":
+      paintRect(ctx, shape, space);
+      return;
+    case "line":
+      paintLine(ctx, shape, space);
+      return;
+    case "ellipse":
+      paintEllipse(ctx, shape, space);
+      return;
+    case "arrow":
+      paintArrow(ctx, shape, space);
+      return;
+  }
+}
+
 /** Axis-aligned outline from two normalized corners; width is CSS pixels. */
 export function paintRect(
   ctx: CanvasRenderingContext2D,
-  shape: RectShape,
+  shape: Pick<ShapeGeometry, "color" | "width" | "start" | "end">,
   space: CanvasSpace,
 ): void {
   const a = toCssPixelPoint(shape.start, space);
@@ -89,6 +121,103 @@ export function paintRect(
   ctx.lineJoin = "miter";
   ctx.lineCap = "butt";
   ctx.strokeRect(x, y, w, h);
+  ctx.restore();
+}
+
+/** Straight stroke between normalized start and end. */
+export function paintLine(
+  ctx: CanvasRenderingContext2D,
+  shape: Pick<ShapeGeometry, "color" | "width" | "start" | "end">,
+  space: CanvasSpace,
+): void {
+  const a = toCssPixelPoint(shape.start, space);
+  const b = toCssPixelPoint(shape.end, space);
+
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.strokeStyle = shape.color;
+  ctx.lineWidth = shape.width;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** Ellipse inscribed in the bounding box of normalized start/end. */
+export function paintEllipse(
+  ctx: CanvasRenderingContext2D,
+  shape: Pick<ShapeGeometry, "color" | "width" | "start" | "end">,
+  space: CanvasSpace,
+): void {
+  const a = toCssPixelPoint(shape.start, space);
+  const b = toCssPixelPoint(shape.end, space);
+  const cx = (a.x + b.x) / 2;
+  const cy = (a.y + b.y) / 2;
+  const rx = Math.abs(b.x - a.x) / 2;
+  const ry = Math.abs(b.y - a.y) / 2;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.strokeStyle = shape.color;
+  ctx.lineWidth = shape.width;
+  ctx.lineCap = "butt";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  if (rx < 0.5 && ry < 0.5) {
+    // Degenerate drag: paint a tiny circle so a tap still shows ink.
+    ctx.arc(cx, cy, 0.5, 0, Math.PI * 2);
+  } else {
+    ctx.ellipse(cx, cy, Math.max(rx, 0.5), Math.max(ry, 0.5), 0, 0, Math.PI * 2);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * Line plus a triangular arrowhead at `end`. Head angle is derived from the
+ * start→end vector at paint time — never stored on the operation.
+ */
+export function paintArrow(
+  ctx: CanvasRenderingContext2D,
+  shape: Pick<ShapeGeometry, "color" | "width" | "start" | "end">,
+  space: CanvasSpace,
+): void {
+  const a = toCssPixelPoint(shape.start, space);
+  const b = toCssPixelPoint(shape.end, space);
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const angle = Math.atan2(dy, dx);
+  const headLen = Math.max(10, shape.width * 3.5);
+  const half = Math.PI / 7;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.strokeStyle = shape.color;
+  ctx.fillStyle = shape.color;
+  ctx.lineWidth = shape.width;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
+  ctx.stroke();
+
+  const leftX = b.x - headLen * Math.cos(angle - half);
+  const leftY = b.y - headLen * Math.sin(angle - half);
+  const rightX = b.x - headLen * Math.cos(angle + half);
+  const rightY = b.y - headLen * Math.sin(angle + half);
+
+  ctx.beginPath();
+  ctx.moveTo(b.x, b.y);
+  ctx.lineTo(leftX, leftY);
+  ctx.lineTo(rightX, rightY);
+  ctx.closePath();
+  ctx.fill();
+
   ctx.restore();
 }
 

@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { paintStroke } from "../client/src/canvas/stroke";
+import {
+  paintArrow,
+  paintEllipse,
+  paintLine,
+  paintRect,
+  paintStroke,
+} from "../client/src/canvas/stroke";
 
 function createRecordingContext(): CanvasRenderingContext2D & {
   strokeSnapshots: Array<{
@@ -7,24 +13,33 @@ function createRecordingContext(): CanvasRenderingContext2D & {
     strokeStyle: string | CanvasGradient | CanvasPattern;
     lineWidth: number;
   }>;
+  fillSnapshots: Array<{
+    fillStyle: string | CanvasGradient | CanvasPattern;
+  }>;
 } {
   const strokeSnapshots: Array<{
     globalCompositeOperation: GlobalCompositeOperation;
     strokeStyle: string | CanvasGradient | CanvasPattern;
     lineWidth: number;
   }> = [];
+  const fillSnapshots: Array<{
+    fillStyle: string | CanvasGradient | CanvasPattern;
+  }> = [];
 
   let globalCompositeOperation: GlobalCompositeOperation = "source-over";
   let strokeStyle: string | CanvasGradient | CanvasPattern = "#000";
+  let fillStyle: string | CanvasGradient | CanvasPattern = "#000";
   let lineWidth = 1;
   const stack: Array<{
     globalCompositeOperation: GlobalCompositeOperation;
     strokeStyle: string | CanvasGradient | CanvasPattern;
+    fillStyle: string | CanvasGradient | CanvasPattern;
     lineWidth: number;
   }> = [];
 
   const ctx = {
     strokeSnapshots,
+    fillSnapshots,
     lineCap: "butt" as CanvasLineCap,
     lineJoin: "miter" as CanvasLineJoin,
     get globalCompositeOperation() {
@@ -39,6 +54,12 @@ function createRecordingContext(): CanvasRenderingContext2D & {
     set strokeStyle(value: string | CanvasGradient | CanvasPattern) {
       strokeStyle = value;
     },
+    get fillStyle() {
+      return fillStyle;
+    },
+    set fillStyle(value: string | CanvasGradient | CanvasPattern) {
+      fillStyle = value;
+    },
     get lineWidth() {
       return lineWidth;
     },
@@ -46,7 +67,12 @@ function createRecordingContext(): CanvasRenderingContext2D & {
       lineWidth = value;
     },
     save() {
-      stack.push({ globalCompositeOperation, strokeStyle, lineWidth });
+      stack.push({
+        globalCompositeOperation,
+        strokeStyle,
+        fillStyle,
+        lineWidth,
+      });
     },
     restore() {
       const prev = stack.pop();
@@ -55,11 +81,16 @@ function createRecordingContext(): CanvasRenderingContext2D & {
       }
       globalCompositeOperation = prev.globalCompositeOperation;
       strokeStyle = prev.strokeStyle;
+      fillStyle = prev.fillStyle;
       lineWidth = prev.lineWidth;
     },
     beginPath: vi.fn(),
     moveTo: vi.fn(),
     lineTo: vi.fn(),
+    closePath: vi.fn(),
+    strokeRect: vi.fn(),
+    ellipse: vi.fn(),
+    arc: vi.fn(),
     stroke() {
       strokeSnapshots.push({
         globalCompositeOperation,
@@ -67,10 +98,14 @@ function createRecordingContext(): CanvasRenderingContext2D & {
         lineWidth,
       });
     },
+    fill() {
+      fillSnapshots.push({ fillStyle });
+    },
   };
 
   return ctx as unknown as CanvasRenderingContext2D & {
     strokeSnapshots: typeof strokeSnapshots;
+    fillSnapshots: typeof fillSnapshots;
   };
 }
 
@@ -180,5 +215,56 @@ describe("paintStroke coordinate space", () => {
     paintStroke(ctx, stroke, { cssWidth: 0, cssHeight: 0 }, "final");
 
     expect(ctx.moveTo).toHaveBeenCalledWith(0.25, 0.5);
+  });
+});
+
+describe("shape paint geometry", () => {
+  const corners = {
+    color: "#1d4ed8",
+    width: 4,
+    start: { x: 0.2, y: 0.25 },
+    end: { x: 0.8, y: 0.75 },
+  };
+
+  it("paintRect strokes the axis-aligned box of start/end", () => {
+    const ctx = createRecordingContext();
+    paintRect(ctx, corners, space);
+    // geometry only — style is restored after paintRect
+    expect(ctx.strokeRect).toHaveBeenCalledWith(20, 25, 60, 50);
+  });
+
+  it("paintLine draws a straight segment from start to end", () => {
+    const ctx = createRecordingContext();
+    paintLine(ctx, corners, space);
+    expect(ctx.moveTo).toHaveBeenCalledWith(20, 25);
+    expect(ctx.lineTo).toHaveBeenCalledWith(80, 75);
+    expect(ctx.strokeSnapshots).toHaveLength(1);
+  });
+
+  it("paintEllipse draws an ellipse inscribed in the bounding box", () => {
+    const ctx = createRecordingContext();
+    paintEllipse(ctx, corners, space);
+    expect(ctx.ellipse).toHaveBeenCalledWith(50, 50, 30, 25, 0, 0, Math.PI * 2);
+    expect(ctx.strokeSnapshots).toHaveLength(1);
+  });
+
+  it("paintArrow draws a shaft and a filled head derived from the vector", () => {
+    const ctx = createRecordingContext();
+    paintArrow(
+      ctx,
+      {
+        color: "#be123c",
+        width: 4,
+        start: { x: 0.1, y: 0.5 },
+        end: { x: 0.9, y: 0.5 },
+      },
+      space,
+    );
+    expect(ctx.moveTo).toHaveBeenCalledWith(10, 50);
+    expect(ctx.lineTo).toHaveBeenCalledWith(90, 50);
+    expect(ctx.strokeSnapshots).toHaveLength(1);
+    expect(ctx.fillSnapshots).toHaveLength(1);
+    expect(ctx.fillSnapshots[0]!.fillStyle).toBe("#be123c");
+    expect(ctx.closePath).toHaveBeenCalled();
   });
 });

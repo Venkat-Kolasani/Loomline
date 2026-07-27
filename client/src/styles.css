@@ -244,6 +244,63 @@ h1 {
   color: var(--accent);
 }
 
+/* Collapsed-by-default shapes flyout (same pattern as Room sheet / Metrics). */
+.shape-tool {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+.shape-tool-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.shape-tool-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  line-height: 0;
+}
+
+.shape-tool-icon svg {
+  display: block;
+}
+
+.shape-flyout {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 0.35rem);
+  z-index: 8;
+  display: flex;
+  flex-direction: row;
+  gap: 0.3rem;
+  padding: 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 0.35rem 0.9rem rgba(26, 31, 43, 0.14);
+}
+
+.shape-flyout[hidden] {
+  display: none;
+}
+
+.toolbar button.shape-flyout-item {
+  display: inline-grid;
+  place-items: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  min-height: 2.35rem;
+  padding: 0;
+}
+
+.toolbar button.shape-flyout-item svg {
+  display: block;
+}
+
 .width-value {
   min-width: 2.5rem;
   font-variant-numeric: tabular-nums;
@@ -997,6 +1054,24 @@ h1 {
     min-height: 2.5rem;
     padding: 0.35rem 0.6rem;
     white-space: nowrap;
+  }
+
+  /* Keep the shapes trigger compact so the floating bar width stays stable. */
+  .shape-tool-label {
+    display: none;
+  }
+
+  .toolbar button.shape-tool-trigger {
+    width: 2.5rem;
+    min-width: 2.5rem;
+    padding: 0.35rem;
+    justify-content: center;
+  }
+
+  .shape-flyout {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
   }
 
   .field {

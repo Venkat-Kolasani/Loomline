@@ -414,3 +414,18 @@ deployed protocol results are recorded separately in [TESTING.md](./TESTING.md).
   detection within `LIVE_STROKE_STALL_MS + EXPIRY_TOUCH_INTERVAL_MS`
 - Owns the measured before/after `expiryTouchCount` evidence (24 rapid batches
   → 1 touch vs former 25)
+
+## Shape tools (`feat(canvas): add line, ellipse, and arrow shape tools`)
+
+### Assisted by AI
+
+- Extending the rect shape mechanism to line / ellipse / arrow (protocol,
+  SQLite row reuse, paint, local preview, shapes flyout UI), tests, and docs
+  (ARCHITECTURE / PROTOCOL / D28 / README)
+
+### Manually reviewed / owned by the author
+
+- Owns why arrowhead angle is paint-time only (no new wire field) and why the
+  Shapes flyout reuses the collapsed-by-default Room / Metrics pattern
+- Owns verification: typecheck / test / build and two-tab manual proof per kind
+  plus undo

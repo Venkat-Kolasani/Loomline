@@ -1,9 +1,10 @@
 # Protocol
 
-**Protocol version:** `4` (`3` → `4`: adds `shape:rect` / `kind: "rect"`;
+**Protocol version:** `5` (`4` → `5`: adds `shape:line` / `shape:ellipse` /
+`shape:arrow`; `3` → `4`: adds `shape:rect` / `kind: "rect"`;
 `2` → `3`: coordinates are normalized, see
 [Coordinate space](#coordinate-space))
-**Status:** presence, live strokes, durable stroke/rect/clear ops, global undo/redo, reconnect
+**Status:** presence, live strokes, durable stroke/shape/clear ops, global undo/redo, reconnect
 recovery, input-boundary hardening, and **developer diagnostics / load baseline**
 are implemented.
 
@@ -21,13 +22,13 @@ All JSON messages include:
 | Field | Type | Notes |
 | --- | --- | --- |
 | `type` | string | Message discriminant |
-| `protocolVersion` | number | Must be `4` |
+| `protocolVersion` | number | Must be `5` |
 | `roomId` | string | Must match the socket room |
 
 ## Coordinate space
 
 Every `x` / `y` in this protocol — stroke points, the optional `stroke:end`
-point, `shape:rect` `start`/`end`, and `cursor` — is **normalized**: `x` is a
+point, shape `start`/`end`, and `cursor` — is **normalized**: `x` is a
 fraction of the sender's
 canvas width and `y` a fraction of its height, so `{ "x": 0.5, "y": 0.5 }` is
 the centre of any canvas at any size or orientation. Receivers multiply by the
@@ -60,7 +61,7 @@ size and per-participant rate limits are enforced in `RoomDurableObject`
 | `stroke:start` | client → server | Begin a provisional stroke |
 | `stroke:points` | client → server | Batched additional points (≤ 64 per message) |
 | `stroke:end` | client → server | Finish provisional stroke; server may commit one op |
-| `shape:rect` | client → server | Commit one finished rectangle (normalized `start`/`end`; no live frames) |
+| `shape:rect` / `shape:line` / `shape:ellipse` / `shape:arrow` | client → server | Commit one finished shape (normalized `start`/`end`; no live frames) |
 | `stroke:live` | server → peers | Fan-out of start / points / end for live overlay |
 | `canvas:clear` | client → server | Append one room-global durable clear operation |
 | `operation:committed` | server → **all** | Durable op with authoritative increasing `sequence` |
@@ -75,8 +76,9 @@ size and per-participant rate limits are enforced in `RoomDurableObject`
 ### Ordering contract (implemented)
 
 1. `stroke:end` may produce a durable `kind: "stroke"` operation (only if the
-   stroke was live on the server with at least one point). `shape:rect`
-   produces a durable `kind: "rect"` operation from two normalized corners
+   stroke was live on the server with at least one point). `shape:rect` /
+   `shape:line` / `shape:ellipse` / `shape:arrow` produce a durable shape
+   operation (`kind` matching the message) from two normalized corners
    (no live fan-out while dragging). `canvas:clear` produces a durable
    `kind: "clear"` operation.
    An optional final point is filtered/appended before stroke commit so pointer-up
@@ -154,7 +156,7 @@ Clients must not send `stroke:points` / `stroke:end` for a `strokeId` unless
 ```json
 {
   "type": "sync_state",
-  "protocolVersion": 4,
+  "protocolVersion": 5,
   "roomId": "abcd1234",
   "sequenceHead": 2,
   "operations": [
@@ -181,7 +183,7 @@ Clients must not send `stroke:points` / `stroke:end` for a `strokeId` unless
 ```json
 {
   "type": "history:changed",
-  "protocolVersion": 4,
+  "protocolVersion": 5,
   "roomId": "abcd1234",
   "sequenceHead": 2,
   "operations": [
@@ -208,7 +210,7 @@ Clients must not send `stroke:points` / `stroke:end` for a `strokeId` unless
 ```json
 {
   "type": "operation:committed",
-  "protocolVersion": 4,
+  "protocolVersion": 5,
   "roomId": "abcd1234",
   "operation": {
     "sequence": 3,
@@ -232,7 +234,7 @@ Client → server (one message on pointer-up; no live intermediate frames):
 ```json
 {
   "type": "shape:rect",
-  "protocolVersion": 4,
+  "protocolVersion": 5,
   "roomId": "abcd1234",
   "shapeId": "…",
   "color": "#1d4ed8",
@@ -247,7 +249,7 @@ Server → all (`operation:committed`):
 ```json
 {
   "type": "operation:committed",
-  "protocolVersion": 4,
+  "protocolVersion": 5,
   "roomId": "abcd1234",
   "operation": {
     "kind": "rect",
@@ -264,12 +266,120 @@ Server → all (`operation:committed`):
 }
 ```
 
+### shape:line example
+
+```json
+{
+  "type": "shape:line",
+  "protocolVersion": 5,
+  "roomId": "abcd1234",
+  "shapeId": "…",
+  "color": "#0f6a5a",
+  "width": 4,
+  "start": { "x": 0.1, "y": 0.2 },
+  "end": { "x": 0.9, "y": 0.8 }
+}
+```
+
+```json
+{
+  "type": "operation:committed",
+  "protocolVersion": 5,
+  "roomId": "abcd1234",
+  "operation": {
+    "kind": "line",
+    "sequence": 6,
+    "opId": "…",
+    "participantId": "…",
+    "shapeId": "…",
+    "color": "#0f6a5a",
+    "width": 4,
+    "start": { "x": 0.1, "y": 0.2 },
+    "end": { "x": 0.9, "y": 0.8 },
+    "createdAt": 1720000000700
+  }
+}
+```
+
+### shape:ellipse example
+
+```json
+{
+  "type": "shape:ellipse",
+  "protocolVersion": 5,
+  "roomId": "abcd1234",
+  "shapeId": "…",
+  "color": "#be123c",
+  "width": 4,
+  "start": { "x": 0.2, "y": 0.25 },
+  "end": { "x": 0.7, "y": 0.75 }
+}
+```
+
+```json
+{
+  "type": "operation:committed",
+  "protocolVersion": 5,
+  "roomId": "abcd1234",
+  "operation": {
+    "kind": "ellipse",
+    "sequence": 7,
+    "opId": "…",
+    "participantId": "…",
+    "shapeId": "…",
+    "color": "#be123c",
+    "width": 4,
+    "start": { "x": 0.2, "y": 0.25 },
+    "end": { "x": 0.7, "y": 0.75 },
+    "createdAt": 1720000000800
+  }
+}
+```
+
+### shape:arrow example
+
+Arrowhead angle is **not** on the wire — clients derive it from `start`→`end`
+when painting.
+
+```json
+{
+  "type": "shape:arrow",
+  "protocolVersion": 5,
+  "roomId": "abcd1234",
+  "shapeId": "…",
+  "color": "#b45309",
+  "width": 5,
+  "start": { "x": 0.15, "y": 0.5 },
+  "end": { "x": 0.85, "y": 0.5 }
+}
+```
+
+```json
+{
+  "type": "operation:committed",
+  "protocolVersion": 5,
+  "roomId": "abcd1234",
+  "operation": {
+    "kind": "arrow",
+    "sequence": 8,
+    "opId": "…",
+    "participantId": "…",
+    "shapeId": "…",
+    "color": "#b45309",
+    "width": 5,
+    "start": { "x": 0.15, "y": 0.5 },
+    "end": { "x": 0.85, "y": 0.5 },
+    "createdAt": 1720000000900
+  }
+}
+```
+
 ### canvas:clear and committed clear example
 
 ```json
 {
   "type": "canvas:clear",
-  "protocolVersion": 4,
+  "protocolVersion": 5,
   "roomId": "abcd1234"
 }
 ```
@@ -277,7 +387,7 @@ Server → all (`operation:committed`):
 ```json
 {
   "type": "operation:committed",
-  "protocolVersion": 4,
+  "protocolVersion": 5,
   "roomId": "abcd1234",
   "operation": {
     "kind": "clear",

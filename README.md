@@ -3,8 +3,7 @@
 Real-time collaborative drawing canvas — Flam Frontend R&D assignment.
 
 **Live demo:** https://loomline.kolasanivenkat2.workers.dev  
-**Repository:** https://github.com/Venkat-Kolasani/Loomline (private — grant Flam
-reviewers access before submission)
+**Repository:** https://github.com/Venkat-Kolasani/Loomline 
 
 Vanilla TypeScript + Vite client, native Canvas 2D, native WebSocket. Backend is
 a Cloudflare Worker with **one Durable Object per room** and Durable Object

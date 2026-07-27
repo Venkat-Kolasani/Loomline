@@ -1070,7 +1070,7 @@ for (const swatch of colorSwatchButtons) {
     if (!preset) {
       return;
     }
-    setActiveTool("brush");
+    // Colour only — keep the active tool (brush or shape). Eraser disables swatches.
     setBrushColor(preset);
   });
 }

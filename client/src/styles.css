@@ -313,8 +313,10 @@ h1 {
   display: none;
 }
 
-.toolbar button.shape-flyout-item {
+/* Self-contained so styles survive mobile portal to document.body (I25). */
+.shape-flyout button.shape-flyout-item {
   position: relative;
+  appearance: none;
   display: inline-grid;
   place-items: center;
   width: 2.35rem;
@@ -322,9 +324,25 @@ h1 {
   min-height: 2.35rem;
   padding: 0;
   overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
 }
 
-.toolbar button.shape-flyout-item svg {
+.shape-flyout button.shape-flyout-item.is-active {
+  border-color: var(--accent);
+  background: rgba(15, 106, 90, 0.12);
+  color: var(--accent);
+}
+
+.shape-flyout button.shape-flyout-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.shape-flyout button.shape-flyout-item svg {
   display: block;
   position: relative;
   z-index: 1;
@@ -1137,14 +1155,14 @@ h1 {
   }
 
   .shape-flyout {
-    /* Floating toolbar uses overflow-x: auto, which also clips overflow-y.
-       While open, main.ts pins this panel with position:fixed above the trigger. */
+    /* Escapes toolbar via JS portal to document.body + position:fixed (I24/I25).
+       Absolute rules here are only a pre-portal fallback. */
     top: auto;
     bottom: calc(100% + 0.35rem);
     left: 50%;
     right: auto;
     transform: translateX(-50%);
-    z-index: 20;
+    z-index: 40;
   }
 
   .field {

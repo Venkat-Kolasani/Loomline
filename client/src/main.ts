@@ -172,6 +172,10 @@ const shapeFlyout = requireElement(
   "#shape-flyout",
   (node): node is HTMLElement => node instanceof HTMLElement,
 );
+const shapeTool = requireElement(
+  "#shape-tool",
+  (node): node is HTMLElement => node instanceof HTMLElement,
+);
 const shapeToolIcon = requireElement(
   "#shape-tool-icon",
   (node): node is HTMLElement => node instanceof HTMLElement,
@@ -350,16 +354,32 @@ function closeRoomChrome(): void {
   setRoomChromeOpen(false);
 }
 
+/** Ignore outside-dismiss for the opening gesture (iOS often redelivers pointerdown). */
+let shapeFlyoutIgnoreDismissUntil = 0;
+
 function closeShapeFlyout(): void {
   shapeFlyout.hidden = true;
   shapesTrigger.setAttribute("aria-expanded", "false");
   clearShapeFlyoutPosition();
+  restoreShapeFlyoutHome();
 }
 
 function openShapeFlyout(): void {
   shapeFlyout.hidden = false;
   shapesTrigger.setAttribute("aria-expanded", "true");
-  syncShapeFlyoutPosition();
+  shapeFlyoutIgnoreDismissUntil = performance.now() + 450;
+  if (usesMobileShell()) {
+    // Escape toolbar overflow + iOS backdrop-filter fixed containing block.
+    if (shapeFlyout.parentElement !== document.body) {
+      document.body.appendChild(shapeFlyout);
+    }
+  } else {
+    restoreShapeFlyoutHome();
+  }
+  // Layout after reparent before measuring.
+  requestAnimationFrame(() => {
+    syncShapeFlyoutPosition();
+  });
 }
 
 function setShapeFlyoutOpen(open: boolean): void {
@@ -372,14 +392,21 @@ function setShapeFlyoutOpen(open: boolean): void {
 
 /**
  * Same shell as the mobile CSS media query. The floating toolbar uses
- * overflow-x: auto, which forces overflow-y clipping and hides an absolute
- * flyout that opens upward — so we pin it with position:fixed while open.
+ * overflow-x: auto (clips overflow-y) and backdrop-filter (iOS makes
+ * position:fixed relative to that ancestor). Portal the flyout to body.
  */
 const MOBILE_SHELL_MQ =
   "(max-width: 640px), (max-height: 500px) and (max-width: 960px), (hover: none) and (pointer: coarse) and (max-width: 1180px)";
 
 function usesMobileShell(): boolean {
   return window.matchMedia(MOBILE_SHELL_MQ).matches;
+}
+
+function restoreShapeFlyoutHome(): void {
+  if (shapeFlyout.parentElement === shapeTool) {
+    return;
+  }
+  shapeTool.appendChild(shapeFlyout);
 }
 
 function clearShapeFlyoutPosition(): void {
@@ -395,18 +422,29 @@ function clearShapeFlyoutPosition(): void {
 function syncShapeFlyoutPosition(): void {
   if (shapeFlyout.hidden || !usesMobileShell()) {
     clearShapeFlyoutPosition();
+    if (!usesMobileShell()) {
+      restoreShapeFlyoutHome();
+    }
     return;
+  }
+  if (shapeFlyout.parentElement !== document.body) {
+    document.body.appendChild(shapeFlyout);
   }
   const trigger = shapesTrigger.getBoundingClientRect();
   const flyW = shapeFlyout.offsetWidth;
   const flyH = shapeFlyout.offsetHeight;
   const gap = 6;
   const margin = 8;
+  const viewW = window.visualViewport?.width ?? window.innerWidth;
+  const viewH = window.visualViewport?.height ?? window.innerHeight;
   let top = trigger.top - gap - flyH;
   let left = trigger.left + trigger.width / 2 - flyW / 2;
-  left = Math.max(margin, Math.min(left, window.innerWidth - flyW - margin));
+  left = Math.max(margin, Math.min(left, viewW - flyW - margin));
   if (top < margin) {
     top = trigger.bottom + gap;
+  }
+  if (top + flyH > viewH - margin) {
+    top = Math.max(margin, viewH - flyH - margin);
   }
   shapeFlyout.style.position = "fixed";
   shapeFlyout.style.top = `${Math.round(top)}px`;
@@ -414,7 +452,7 @@ function syncShapeFlyoutPosition(): void {
   shapeFlyout.style.right = "auto";
   shapeFlyout.style.bottom = "auto";
   shapeFlyout.style.transform = "none";
-  shapeFlyout.style.zIndex = "20";
+  shapeFlyout.style.zIndex = "40";
 }
 
 const SHAPE_ICON_SVG: Record<ShapeKind, string> = {
@@ -1111,6 +1149,9 @@ document.addEventListener(
   "pointerdown",
   (event) => {
     if (shapeFlyout.hidden) {
+      return;
+    }
+    if (performance.now() < shapeFlyoutIgnoreDismissUntil) {
       return;
     }
     const target = event.target;

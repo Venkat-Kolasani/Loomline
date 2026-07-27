@@ -803,6 +803,41 @@ and confirm the 4×2 grid appears above the floating bar.
 
 ---
 
+## I25 — iPhone Safari still hid the shapes flyout (fixed + backdrop-filter)
+
+**When:** 27 July 2026, after I24’s `position: fixed` fix; reproduced on iPhone
+Safari.
+
+**What the issue was**
+
+Shapes tool activated on iPhone, but the flyout grid still never appeared.
+
+**Root cause**
+
+iOS Safari treats an ancestor with `backdrop-filter` / `-webkit-backdrop-filter`
+as a containing block for `position: fixed`. The floating toolbar uses blur, so
+the “fixed” flyout stayed trapped (and clipped) inside the toolbar.
+
+**What we fixed**
+
+While the mobile shell flyout is open, reparent `#shape-flyout` to
+`document.body`, position it with viewport coordinates from the trigger, then
+restore it under `#shape-tool` on close. Ignore outside-dismiss for ~450ms so
+iOS does not close on the opening gesture.
+
+**Why this way**
+
+Removing toolbar blur would regress the floating chrome. An inner scroll wrapper
+still fails if the flyout remains under `backdrop-filter`. Portaling to `body`
+is the reliable escape hatch.
+
+**Verification**
+
+`npm run typecheck && npm run test && npm run build`; iPhone Safari: tap Shapes
+and confirm the icon grid appears above the toolbar.
+
+---
+
 Copy this block when logging a future issue:
 
 ```markdown

@@ -347,9 +347,7 @@ export class LocalDrawingController {
 
   private readonly onPointerMove = (event: PointerEvent): void => {
     const { point, space } = this.samplePointer(event);
-    // Skip cursor while drawing so live stroke batches stay the only
-    // in-flight pointer traffic (bandwidth / peer overlay clarity).
-    if (!this.drawing) {
+    if (!this.drawing || event.pointerId === this.activePointerId) {
       this.network?.onCursor(point);
     }
 

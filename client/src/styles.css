@@ -570,22 +570,25 @@ h1 {
   will-change: transform;
 }
 
-.remote-cursor-dot {
+.remote-cursor-pointer {
   position: absolute;
   left: 0;
   top: 0;
-  width: 0.65rem;
-  height: 0.65rem;
-  border-radius: 50%;
-  background: var(--cursor-color, #334155);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.85);
-  transform: translate(-50%, -50%);
+  width: 1.35rem;
+  height: 1.35rem;
+  overflow: visible;
+  fill: var(--cursor-color, #334155);
+  stroke: white;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 1px 1px rgba(15, 23, 42, 0.35));
+  transform: translate(-0.17rem, -0.14rem);
 }
 
 .remote-cursor-label {
   position: absolute;
-  left: 0.55rem;
-  top: 0.55rem;
+  left: 1rem;
+  top: 1rem;
   font-size: 0.7rem;
   line-height: 1;
   padding: 0.15rem 0.35rem;
@@ -598,36 +601,12 @@ h1 {
 
 .remote-cursor.is-near-right .remote-cursor-label {
   left: auto;
-  right: 0.55rem;
+  right: 0.35rem;
 }
 
 .remote-cursor.is-near-bottom .remote-cursor-label {
   top: auto;
-  bottom: 0.55rem;
-}
-
-.remote-cursor.is-drawing .remote-cursor-dot {
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.9),
-    0 0 0 5px color-mix(in srgb, var(--cursor-color, #334155) 20%, transparent);
-  animation: remote-cursor-pulse 1.15s ease-in-out infinite;
-}
-
-.remote-cursor.is-drawing .remote-cursor-label {
-  border-color: var(--cursor-color, #334155);
-  font-weight: 650;
-}
-
-@keyframes remote-cursor-pulse {
-  50% {
-    transform: translate(-50%, -50%) scale(1.22);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .remote-cursor.is-drawing .remote-cursor-dot {
-    animation: none;
-  }
+  bottom: 0.35rem;
 }
 
 .empty-state {

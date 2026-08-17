@@ -134,14 +134,36 @@ describe("live stroke fan-out", () => {
     socketB.close(1000, "done");
   });
 
-  it("forwards cursor updates to peers", async () => {
+  it("forwards cursor updates while drawing without committing them", async () => {
     const roomId = "ffff6666";
+    const stub = env.ROOM.get(env.ROOM.idFromName(roomId));
     const socketA = await openRoomSocket(roomId);
     const socketB = await openRoomSocket(roomId);
 
     const welcomeA = await joinAndWaitWelcome(socketA, roomId, "Cursor-A");
     await joinAndWaitWelcome(socketB, roomId, "Cursor-B");
     await waitForPresence(socketB, (p) => p.length === 2);
+
+    const liveStart = waitForMessage(
+      socketB,
+      (message): message is Extract<ServerMessage, { type: "stroke:live" }> =>
+        message.type === "stroke:live" &&
+        message.phase === "start" &&
+        message.strokeId === "cursor-stroke",
+    );
+    socketA.send(
+      JSON.stringify({
+        type: "stroke:start",
+        protocolVersion: PROTOCOL_VERSION,
+        roomId,
+        strokeId: "cursor-stroke",
+        tool: "brush",
+        color: "#0f6a5a",
+        width: 4,
+        point: { x: 0.1, y: 0.2 },
+      }),
+    );
+    await liveStart;
 
     const cursor = waitForMessage(
       socketB,
@@ -155,14 +177,21 @@ describe("live stroke fan-out", () => {
         type: "cursor",
         protocolVersion: PROTOCOL_VERSION,
         roomId,
-        x: 42,
-        y: 84,
+        x: 0.42,
+        y: 0.84,
       }),
     );
 
     const cursorMsg = await cursor;
-    expect(cursorMsg.x).toBe(42);
-    expect(cursorMsg.y).toBe(84);
+    expect(cursorMsg.x).toBe(0.42);
+    expect(cursorMsg.y).toBe(0.84);
+
+    const headResponse = await stub.fetch(
+      new Request("https://room/test/durable-head"),
+    );
+    expect(headResponse.status).toBe(200);
+    const head = (await headResponse.json()) as { operationCount: number };
+    expect(head.operationCount).toBe(0);
 
     socketA.close(1000, "done");
     socketB.close(1000, "done");

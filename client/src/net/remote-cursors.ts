@@ -5,7 +5,6 @@
  * so peer cursors and labels reflow with the canvas on resize / rotation.
  */
 
-import type { StrokePoint } from "../../../shared/protocol";
 import {
   toCssPixelPoint,
   type NormalizedPoint,
@@ -23,13 +22,6 @@ export interface CursorParticipant {
 export interface CursorEdgePlacement {
   nearRight: boolean;
   nearBottom: boolean;
-}
-
-/** The last streamed point is the most accurate remote-drawing cursor source. */
-export function latestLivePoint(
-  points: readonly StrokePoint[],
-): StrokePoint | null {
-  return points.at(-1) ?? null;
 }
 
 /** Flip the DOM label before it would overflow the canvas edge. */
@@ -76,27 +68,26 @@ export class RemoteCursorLayer {
     x: number,
     y: number,
     selfId: string | null,
-    isDrawing = false,
   ): void {
     if (selfId && participantId === selfId) {
       return;
     }
     this.positions.set(participantId, { x, y });
-    this.place(participantId, isDrawing);
+    this.place(participantId);
   }
 
   /**
    * Re-place every cursor against the current overlay box. Cursor traffic is
-   * event-driven, so without this an idle peer's dot would keep stale pixels
+   * event-driven, so without this an idle peer's pointer would keep stale pixels
    * after a resize until they moved again.
    */
   refresh(): void {
     for (const participantId of this.cursors.keys()) {
-      this.place(participantId, undefined);
+      this.place(participantId);
     }
   }
 
-  private place(participantId: string, isDrawing: boolean | undefined): void {
+  private place(participantId: string): void {
     const normalized = this.positions.get(participantId);
     if (!normalized) {
       return;
@@ -106,11 +97,22 @@ export class RemoteCursorLayer {
       el = document.createElement("div");
       el.className = "remote-cursor";
       el.setAttribute("aria-hidden", "true");
-      const dot = document.createElement("span");
-      dot.className = "remote-cursor-dot";
+      const pointer = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "svg",
+      );
+      pointer.classList.add("remote-cursor-pointer");
+      pointer.setAttribute("viewBox", "0 0 24 24");
+      pointer.setAttribute("focusable", "false");
+      const pointerShape = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "path",
+      );
+      pointerShape.setAttribute("d", "M3 2.5 20.5 12 12.2 14.2 8.5 22Z");
+      pointer.appendChild(pointerShape);
       const label = document.createElement("span");
       label.className = "remote-cursor-label";
-      el.appendChild(dot);
+      el.appendChild(pointer);
       el.appendChild(label);
       this.root.appendChild(el);
       this.cursors.set(participantId, el);
@@ -125,9 +127,6 @@ export class RemoteCursorLayer {
     });
     el.style.setProperty("--cursor-color", color);
     el.style.transform = `translate(${pixel.x}px, ${pixel.y}px)`;
-    if (isDrawing !== undefined) {
-      el.classList.toggle("is-drawing", isDrawing);
-    }
     const placement = getCursorEdgePlacement(
       pixel.x,
       pixel.y,
@@ -140,10 +139,6 @@ export class RemoteCursorLayer {
     if (label) {
       label.textContent = name;
     }
-  }
-
-  setDrawing(participantId: string, isDrawing: boolean): void {
-    this.cursors.get(participantId)?.classList.toggle("is-drawing", isDrawing);
   }
 
   remove(participantId: string): void {

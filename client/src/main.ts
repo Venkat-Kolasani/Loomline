@@ -23,7 +23,7 @@ import {
   withDebugQuery,
 } from "./debug/diagnostics";
 import { LiveStrokeTransport } from "./net/live-stroke-transport";
-import { latestLivePoint, RemoteCursorLayer } from "./net/remote-cursors";
+import { RemoteCursorLayer } from "./net/remote-cursors";
 import { RoomSocket } from "./net/room-socket";
 import type { Participant } from "../../shared/room";
 import { createRoomId, isValidRoomId } from "../../shared/room";
@@ -881,20 +881,6 @@ function enterRoom(roomId: string, displayName: string): void {
       if (roomSocket !== socket) {
         return;
       }
-      // Pointer frames pause while drawing, so anchor the collaborator label to
-      // the already-streamed stroke endpoint rather than adding another stream.
-      const point = latestLivePoint(message.points);
-      if (point) {
-        remoteCursors.setPosition(
-          message.participantId,
-          point.x,
-          point.y,
-          selfParticipant?.id ?? null,
-          message.phase !== "end",
-        );
-      } else if (message.phase === "end") {
-        remoteCursors.setDrawing(message.participantId, false);
-      }
       const dirty = remoteStrokes.applyLive(message);
       if (dirty.liveDirty) {
         surface.markDirty("live");
@@ -913,7 +899,6 @@ function enterRoom(roomId: string, displayName: string): void {
         message.x,
         message.y,
         selfParticipant?.id ?? null,
-        false,
       );
     },
     onSyncState: (sequenceHead, operations, _roomId, canUndo, canRedo) => {
